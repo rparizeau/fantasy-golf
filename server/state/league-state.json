@@ -1,0 +1,464 @@
+{
+  "leagues": {
+    "1": {
+      "id": 1,
+      "name": "Andys Amateurs",
+      "settings": {
+        "rosterSize": 12,
+        "activeSize": 5,
+        "mulligansPerSeason": 2,
+        "reserveSize": 3
+      },
+      "teams": [
+        {
+          "teamId": 1,
+          "teamName": "Ricky Bobbys",
+          "managerName": "Bobby",
+          "roster": [
+            1,
+            7,
+            15,
+            25,
+            42,
+            46
+          ],
+          "activeLineup": [
+            7,
+            15,
+            25,
+            42,
+            46
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1245800,
+          "reserve": []
+        },
+        {
+          "teamId": 2,
+          "teamName": "Birdie Brigade",
+          "managerName": "Andy",
+          "roster": [
+            2,
+            9,
+            20,
+            35,
+            50,
+            77
+          ],
+          "activeLineup": [
+            2,
+            9,
+            20,
+            35,
+            50
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1102400,
+          "reserve": []
+        },
+        {
+          "teamId": 3,
+          "teamName": "Eagle Eyes",
+          "managerName": "Sarah",
+          "roster": [
+            3,
+            11,
+            17,
+            30,
+            44,
+            71
+          ],
+          "activeLineup": [
+            3,
+            11,
+            17,
+            30,
+            44
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 987600,
+          "reserve": []
+        },
+        {
+          "teamId": 4,
+          "teamName": "Par Busters",
+          "managerName": "Mike",
+          "roster": [
+            4,
+            10,
+            23,
+            33,
+            48,
+            85
+          ],
+          "activeLineup": [
+            4,
+            10,
+            23,
+            33,
+            48
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1356200,
+          "reserve": []
+        },
+        {
+          "teamId": 5,
+          "teamName": "Bogey Squad",
+          "managerName": "Jess",
+          "roster": [
+            5,
+            12,
+            19,
+            29,
+            55,
+            90
+          ],
+          "activeLineup": [
+            5,
+            12,
+            19,
+            29,
+            55
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 876500,
+          "reserve": []
+        },
+        {
+          "teamId": 6,
+          "teamName": "Fairway Fighters",
+          "managerName": "Dave",
+          "roster": [
+            6,
+            14,
+            21,
+            37,
+            52,
+            68
+          ],
+          "activeLineup": [
+            6,
+            14,
+            21,
+            37,
+            52
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1198700,
+          "reserve": []
+        },
+        {
+          "teamId": 7,
+          "teamName": "The Sandbaggers",
+          "managerName": "Tom",
+          "roster": [
+            8,
+            16,
+            24,
+            38,
+            56,
+            78
+          ],
+          "activeLineup": [
+            8,
+            16,
+            24,
+            38,
+            56
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 934800,
+          "reserve": []
+        },
+        {
+          "teamId": 8,
+          "teamName": "Tee Time Terrors",
+          "managerName": "Lisa",
+          "roster": [
+            13,
+            18,
+            26,
+            39,
+            47,
+            63
+          ],
+          "activeLineup": [
+            13,
+            18,
+            26,
+            39,
+            47
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1067300,
+          "reserve": []
+        },
+        {
+          "teamId": 9,
+          "teamName": "Rough Riders",
+          "managerName": "Chris",
+          "roster": [
+            22,
+            27,
+            31,
+            41,
+            59,
+            82
+          ],
+          "activeLineup": [
+            22,
+            27,
+            31,
+            41,
+            59
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 812900,
+          "reserve": []
+        },
+        {
+          "teamId": 10,
+          "teamName": "Caddy Shack Attack",
+          "managerName": "Pat",
+          "roster": [
+            28,
+            34,
+            36,
+            45,
+            64,
+            92
+          ],
+          "activeLineup": [
+            28,
+            34,
+            36,
+            45,
+            64
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 745600,
+          "reserve": []
+        }
+      ],
+      "waiverClaims": [],
+      "activityFeed": [
+        {
+          "id": "feed-1772402474097-1",
+          "type": "waiver",
+          "message": "Ricky Bobbys added Nick Taylor and dropped Rickie Fowler",
+          "timestamp": "2026-03-01T22:01:14.097Z"
+        }
+      ],
+      "chatMessages": [
+        {
+          "id": "msg-1772402498310",
+          "teamId": 1,
+          "teamName": "Ricky Bobbys",
+          "message": "Good luck this week",
+          "timestamp": "2026-03-01T22:01:38.310Z"
+        }
+      ]
+    },
+    "2": {
+      "id": 2,
+      "name": "Work League Elites",
+      "settings": {
+        "rosterSize": 12,
+        "activeSize": 5,
+        "mulligansPerSeason": 3,
+        "reserveSize": 3
+      },
+      "teams": [
+        {
+          "teamId": 1,
+          "teamName": "Bobby Big Wood",
+          "managerName": "Bobby",
+          "roster": [
+            1,
+            5,
+            13,
+            28,
+            44,
+            72
+          ],
+          "activeLineup": [
+            1,
+            5,
+            13,
+            28,
+            44
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1892100,
+          "reserve": []
+        },
+        {
+          "teamId": 2,
+          "teamName": "Office Aces",
+          "managerName": "Karen",
+          "roster": [
+            2,
+            8,
+            16,
+            33,
+            51,
+            80
+          ],
+          "activeLineup": [
+            2,
+            8,
+            16,
+            33,
+            51
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1654300,
+          "reserve": []
+        },
+        {
+          "teamId": 3,
+          "teamName": "Cubicle Crushers",
+          "managerName": "Steve",
+          "roster": [
+            3,
+            10,
+            19,
+            36,
+            55,
+            76
+          ],
+          "activeLineup": [
+            3,
+            10,
+            19,
+            36,
+            55
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1423700,
+          "reserve": []
+        },
+        {
+          "teamId": 4,
+          "teamName": "Break Room Birdies",
+          "managerName": "Nina",
+          "roster": [
+            4,
+            11,
+            22,
+            39,
+            60,
+            84
+          ],
+          "activeLineup": [
+            4,
+            11,
+            22,
+            39,
+            60
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1567900,
+          "reserve": []
+        },
+        {
+          "teamId": 5,
+          "teamName": "Corner Office Crew",
+          "managerName": "Ryan",
+          "roster": [
+            6,
+            14,
+            24,
+            41,
+            58,
+            88
+          ],
+          "activeLineup": [
+            6,
+            14,
+            24,
+            41,
+            58
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1234500,
+          "reserve": []
+        },
+        {
+          "teamId": 6,
+          "teamName": "The Water Coolers",
+          "managerName": "Emily",
+          "roster": [
+            7,
+            15,
+            26,
+            43,
+            62,
+            90
+          ],
+          "activeLineup": [
+            7,
+            15,
+            26,
+            43,
+            62
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1345600,
+          "reserve": []
+        },
+        {
+          "teamId": 7,
+          "teamName": "Meetings & Mulligans",
+          "managerName": "James",
+          "roster": [
+            9,
+            17,
+            30,
+            47,
+            65,
+            93
+          ],
+          "activeLineup": [
+            9,
+            17,
+            30,
+            47,
+            65
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1178200,
+          "reserve": []
+        },
+        {
+          "teamId": 8,
+          "teamName": "Slack-ers",
+          "managerName": "Alex",
+          "roster": [
+            12,
+            20,
+            34,
+            50,
+            68,
+            95
+          ],
+          "activeLineup": [
+            12,
+            20,
+            34,
+            50,
+            68
+          ],
+          "mulligansUsed": 0,
+          "seasonEarnings": 1089400,
+          "reserve": []
+        }
+      ],
+      "waiverClaims": [],
+      "activityFeed": [],
+      "chatMessages": []
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "name": "Arnold Palmer Invitational",
+    "course": "Bay Hill Club & Lodge",
+    "location": "Orlando, FL",
+    "purse": 20000000,
+    "par": 72,
+    "isMajor": false,
+    "dates": { "start": "2026-03-05", "end": "2026-03-08" }
+  },
+  {
+    "id": 2,
+    "name": "THE PLAYERS Championship",
+    "course": "TPC Sawgrass (Stadium)",
+    "location": "Ponte Vedra Beach, FL",
+    "purse": 25000000,
+    "par": 72,
+    "isMajor": false,
+    "dates": { "start": "2026-03-12", "end": "2026-03-15" }
+  },
+  {
+    "id": 3,
+    "name": "The Masters",
+    "course": "Augusta National Golf Club",
+    "location": "Augusta, GA",
+    "purse": 20000000,
+    "par": 72,
+    "isMajor": true,
+    "dates": { "start": "2026-04-09", "end": "2026-04-12" }
+  }
+]
