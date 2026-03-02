@@ -1,6 +1,6 @@
 import { pgTable, integer, varchar, jsonb, primaryKey, index } from "drizzle-orm/pg-core";
-import { simTournaments } from "./sim-tournaments";
-import { players } from "./players";
+import { simTournaments } from "./sim-tournaments.js";
+import { players } from "./players.js";
 
 export const simPlayers = pgTable("sim_players", {
   tournamentId: integer("tournament_id").notNull().references(() => simTournaments.tournamentId),

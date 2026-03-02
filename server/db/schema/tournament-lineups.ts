@@ -1,7 +1,7 @@
 import { pgTable, integer, primaryKey } from "drizzle-orm/pg-core";
-import { teams } from "./teams";
-import { tournaments } from "./tournaments";
-import { players } from "./players";
+import { teams } from "./teams.js";
+import { tournaments } from "./tournaments.js";
+import { players } from "./players.js";
 
 export const tournamentLineups = pgTable("tournament_lineups", {
   teamPk: integer("team_pk").notNull().references(() => teams.id),

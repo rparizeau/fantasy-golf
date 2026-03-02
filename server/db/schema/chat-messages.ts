@@ -1,5 +1,5 @@
 import { pgTable, integer, varchar, timestamp, serial } from "drizzle-orm/pg-core";
-import { leagues } from "./leagues";
+import { leagues } from "./leagues.js";
 
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),

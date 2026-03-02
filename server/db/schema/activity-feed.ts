@@ -1,5 +1,5 @@
 import { pgTable, integer, varchar, timestamp, serial } from "drizzle-orm/pg-core";
-import { leagues } from "./leagues";
+import { leagues } from "./leagues.js";
 
 export const activityFeed = pgTable("activity_feed", {
   id: serial("id").primaryKey(),
