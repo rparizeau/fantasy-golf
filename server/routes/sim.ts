@@ -1,12 +1,7 @@
 import { Router } from "express";
-import { readFileSync, writeFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { loadState, advance, setOverride, reset, createFreshState, loadPayoutTable, getCurrentTournament } from "../sim/engine.js";
+import { loadState, advance, setOverride, updatePlayer, reset, createFreshState, loadPayoutTable, getCurrentTournament } from "../sim/engine.js";
 import type { SimState } from "../sim/engine.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const LEAGUE_STATE_PATH = join(__dirname, "..", "state", "league-state.json");
+import { loadLeagueState, saveLeagueState, getLineup, setLineupForTournament } from "../lib/league-helpers.js";
 
 function accumulateSeasonEarnings(simState: SimState): void {
   if (simState.phase !== "final") return;
@@ -28,16 +23,64 @@ function accumulateSeasonEarnings(simState: SimState): void {
   }
 
   // Update each team's seasonEarnings across all leagues
-  const leagueState = JSON.parse(readFileSync(LEAGUE_STATE_PATH, "utf-8"));
-  for (const league of Object.values(leagueState.leagues) as any[]) {
+  const leagueState = loadLeagueState();
+  for (const league of Object.values(leagueState.leagues)) {
     for (const team of league.teams) {
-      const weekEarnings = (team.activeLineup as number[]).reduce(
-        (sum: number, pid: number) => sum + (playerEarnings.get(pid) || 0), 0
+      const lineup = getLineup(team, simState.tournamentId);
+      const weekEarnings = lineup.reduce(
+        (sum, pid) => sum + (playerEarnings.get(pid) || 0), 0
       );
       team.seasonEarnings += weekEarnings;
     }
   }
-  writeFileSync(LEAGUE_STATE_PATH, JSON.stringify(leagueState, null, 2));
+  saveLeagueState(leagueState);
+}
+
+/** When advancing from idle → round1, ensure every team has a lineup for the current tournament. */
+function autoCopyLineups(tournamentId: number): void {
+  const leagueState = loadLeagueState();
+  let changed = false;
+
+  for (const league of Object.values(leagueState.leagues)) {
+    for (const team of league.teams) {
+      const existing = getLineup(team, tournamentId);
+      if (existing.length > 0) continue;
+
+      // Find the most recent previous tournament's lineup
+      const tournamentKeys = Object.keys(team.tournamentLineups)
+        .map(Number)
+        .filter((id) => id < tournamentId)
+        .sort((a, b) => b - a);
+
+      let newLineup: number[] = [];
+      for (const prevId of tournamentKeys) {
+        const prevLineup = team.tournamentLineups[String(prevId)];
+        if (prevLineup && prevLineup.length > 0) {
+          // Filter to players still on the roster
+          newLineup = prevLineup.filter((pid) => team.roster.includes(pid));
+          break;
+        }
+      }
+
+      // Fallback: take first activeSize players from roster
+      if (newLineup.length === 0) {
+        newLineup = team.roster.slice(0, league.settings.activeSize);
+      }
+
+      // Pad if we lost players from roster changes
+      if (newLineup.length < league.settings.activeSize) {
+        for (const pid of team.roster) {
+          if (newLineup.length >= league.settings.activeSize) break;
+          if (!newLineup.includes(pid)) newLineup.push(pid);
+        }
+      }
+
+      setLineupForTournament(team, tournamentId, newLineup);
+      changed = true;
+    }
+  }
+
+  if (changed) saveLeagueState(leagueState);
 }
 
 const router = Router();
@@ -75,9 +118,15 @@ router.post("/advance", (_req, res) => {
   if (state.phase === "idle" && state.players.length === 0) {
     // Auto-initialize field on first advance
     const freshState = createFreshState(state.tournamentId);
+    autoCopyLineups(freshState.tournamentId);
     const advanced = advance(freshState);
     res.json({ phase: advanced.phase, currentRound: advanced.currentRound });
     return;
+  }
+
+  if (state.phase === "idle") {
+    // Transitioning from idle → round1: auto-copy lineups
+    autoCopyLineups(state.tournamentId);
   }
 
   const updated = advance(state);
@@ -115,6 +164,31 @@ router.post("/override", (req, res) => {
 
   const updated = setOverride(state, playerId, override);
   res.json({ overrides: updated.overrides });
+});
+
+// POST /api/sim/player/update — directly edit a player's rounds and status
+router.post("/player/update", (req, res) => {
+  const { playerId, rounds, status, holeScores } = req.body;
+
+  if (!playerId) {
+    res.status(400).json({ error: "playerId is required" });
+    return;
+  }
+
+  const state = loadState();
+  const player = state.players.find((p) => p.playerId === playerId);
+  if (!player) {
+    res.status(404).json({ error: "Player not found in field" });
+    return;
+  }
+
+  const updates: { rounds?: (number | null)[]; status?: "active" | "cut" | "wd"; holeScores?: ((number | null)[] | null)[] } = {};
+  if (Array.isArray(rounds)) updates.rounds = rounds;
+  if (Array.isArray(holeScores)) updates.holeScores = holeScores;
+  if (status === "active" || status === "cut" || status === "wd") updates.status = status;
+
+  updatePlayer(state, playerId, updates);
+  res.json({ ok: true });
 });
 
 // POST /api/sim/reset — reset to idle with fresh field

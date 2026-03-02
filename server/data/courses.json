@@ -1,0 +1,21 @@
+{
+  "1":  { "course": "TPC Sawgrass (Stadium)",              "holes": [4, 5, 3, 4, 4, 4, 4, 3, 5, 4, 4, 4, 3, 4, 5, 4, 4, 4] },
+  "2":  { "course": "Innisbrook (Copperhead)",             "holes": [4, 5, 3, 4, 4, 3, 4, 5, 4, 4, 3, 4, 5, 4, 3, 4, 4, 4] },
+  "3":  { "course": "Memorial Park Golf Course",           "holes": [4, 4, 3, 4, 5, 3, 4, 4, 4, 4, 3, 4, 4, 3, 5, 4, 4, 4] },
+  "4":  { "course": "TPC San Antonio (Oaks)",              "holes": [4, 5, 3, 4, 4, 4, 4, 4, 5, 4, 4, 3, 5, 4, 3, 4, 4, 4] },
+  "5":  { "course": "Augusta National Golf Club",          "holes": [4, 5, 4, 3, 4, 3, 4, 5, 4, 4, 4, 3, 5, 4, 5, 3, 4, 4] },
+  "6":  { "course": "Harbour Town Golf Links",             "holes": [4, 5, 4, 3, 5, 4, 3, 4, 4, 4, 4, 4, 4, 3, 5, 4, 3, 4] },
+  "7":  { "course": "TPC Louisiana",                       "holes": [4, 5, 3, 4, 4, 4, 5, 3, 4, 4, 4, 4, 4, 5, 3, 4, 4, 4] },
+  "8":  { "course": "Trump National Doral (Blue Monster)",  "holes": [5, 4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 4, 4, 4, 4, 3, 4, 4] },
+  "9":  { "course": "Quail Hollow Club",                   "holes": [4, 5, 3, 4, 4, 3, 5, 4, 4, 4, 3, 4, 5, 4, 4, 3, 4, 4] },
+  "10": { "course": "Aronimink Golf Club",                 "holes": [4, 4, 3, 4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 3, 4, 4, 4, 5] },
+  "11": { "course": "TPC Craig Ranch",                     "holes": [4, 4, 5, 3, 4, 4, 4, 4, 5, 4, 4, 4, 3, 5, 4, 3, 4, 4] },
+  "12": { "course": "Colonial Country Club",               "holes": [5, 4, 4, 3, 4, 4, 4, 4, 4, 4, 4, 3, 4, 4, 3, 4, 3, 5] },
+  "13": { "course": "Muirfield Village Golf Club",         "holes": [4, 4, 4, 3, 5, 4, 5, 3, 4, 4, 5, 3, 4, 4, 5, 3, 4, 4] },
+  "14": { "course": "TPC Toronto",                         "holes": [4, 5, 4, 3, 4, 4, 4, 4, 5, 4, 3, 4, 5, 4, 3, 4, 4, 4] },
+  "15": { "course": "Shinnecock Hills Golf Club",          "holes": [4, 3, 4, 4, 5, 4, 3, 4, 4, 4, 3, 4, 4, 4, 5, 4, 3, 4] },
+  "16": { "course": "TPC River Highlands",                 "holes": [4, 4, 3, 4, 5, 4, 3, 4, 4, 4, 3, 4, 4, 4, 5, 4, 3, 4] },
+  "17": { "course": "TPC Deere Run",                       "holes": [4, 4, 3, 4, 5, 4, 4, 3, 4, 4, 4, 4, 3, 5, 4, 4, 4, 4] },
+  "18": { "course": "The Renaissance Club",                "holes": [4, 4, 3, 5, 4, 3, 4, 4, 4, 4, 3, 4, 4, 4, 5, 4, 3, 4] },
+  "19": { "course": "Royal Birkdale Golf Club",            "holes": [4, 4, 4, 3, 4, 4, 4, 5, 4, 4, 4, 3, 4, 3, 5, 4, 3, 4] }
+}

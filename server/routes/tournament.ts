@@ -48,6 +48,7 @@ router.get("/leaderboard", (_req, res) => {
       country: p.country,
       ranking: p.ranking,
       rounds: p.rounds,
+      holeScores: p.holeScores,
       total: p.total,
       toPar: p.toPar,
       toParDisplay: p.rounds.length > 0 ? formatScore(p.toPar) : "-",
@@ -63,6 +64,7 @@ router.get("/leaderboard", (_req, res) => {
     phase: state.phase,
     currentRound: state.currentRound,
     par: state.par,
+    holePars: state.holePars,
     cutLine: state.cutLine,
     players: leaderboard,
   });

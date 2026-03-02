@@ -45,6 +45,13 @@ export function setOverride(playerId: number, override: { score?: number; wd?: b
   });
 }
 
+export function updatePlayer(playerId: number, updates: { rounds?: (number | null)[]; status?: string; holeScores?: ((number | null)[] | null)[] }) {
+  return fetchJSON<{ ok: boolean }>("/sim/player/update", {
+    method: "POST",
+    body: JSON.stringify({ playerId, ...updates }),
+  });
+}
+
 export function resetSim(tournamentId?: number) {
   return fetchJSON<{ phase: string; tournamentId: number; fieldSize: number }>("/sim/reset", {
     method: "POST",
@@ -75,6 +82,7 @@ export interface LeaderboardPlayer {
   country: string;
   ranking: number;
   rounds: number[];
+  holeScores?: (number | null)[][];
   total: number;
   toPar: number;
   toParDisplay: string;
@@ -89,6 +97,7 @@ export interface Leaderboard {
   phase: string;
   currentRound: number;
   par: number;
+  holePars?: number[];
   cutLine: number | null;
   players: LeaderboardPlayer[];
 }
