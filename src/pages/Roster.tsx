@@ -14,7 +14,7 @@ interface RosterProps {
   isMajor: boolean;
 }
 
-export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek, isMajor }: RosterProps) {
+export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek: _onChangeWeek, isMajor }: RosterProps) {
   const [data, setData] = useState<RosterData | null>(null);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [reserve, setReserve] = useState<RosterPlayer[]>([]);

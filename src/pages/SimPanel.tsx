@@ -10,7 +10,7 @@ import {
   type SimStatus,
   type LeaderboardPlayer,
   type TournamentListItem,
-  type Leaderboard,
+  type Leaderboard as _Leaderboard,
 } from "../api";
 
 const PHASE_LABELS: Record<string, string> = {
