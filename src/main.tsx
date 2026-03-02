@@ -11,6 +11,7 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/sim" element={<SimPanel />} />
+          <Route path="/league/:leagueId/:page" element={<App />} />
           <Route path="*" element={<App />} />
         </Routes>
       </BrowserRouter>

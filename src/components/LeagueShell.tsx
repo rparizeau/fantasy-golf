@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import type { Theme } from "../theme";
 import type { TournamentListItem } from "../api";
-import { getTournamentList } from "../api";
+import { getTournamentList, getLeagues } from "../api";
 import { LeagueHeader } from "./LeagueHeader";
 import { PageContent } from "./PageContent";
 import { BottomNav } from "./BottomNav";
 
 interface LeagueShellProps {
   leagueId: number;
-  myTeamId: number;
   activePage: string;
   isDark: boolean;
   colors: Theme;
@@ -17,10 +16,11 @@ interface LeagueShellProps {
   onChangePage: (id: string) => void;
 }
 
-export function LeagueShell({ leagueId, myTeamId, activePage, isDark, colors: C, onToggleTheme, onBack, onChangePage }: LeagueShellProps) {
+export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleTheme, onBack, onChangePage }: LeagueShellProps) {
   const [tournaments, setTournaments] = useState<TournamentListItem[]>([]);
   const [currentTournamentId, setCurrentTournamentId] = useState<number>(0);
   const [viewingWeek, setViewingWeek] = useState<number>(0);
+  const [myTeamId, setMyTeamId] = useState<number | null>(null);
 
   useEffect(() => {
     getTournamentList().then((list) => {
@@ -34,7 +34,22 @@ export function LeagueShell({ leagueId, myTeamId, activePage, isDark, colors: C,
     }).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    getLeagues().then((leagues) => {
+      const league = leagues.find((l) => l.id === leagueId);
+      if (league) setMyTeamId(league.myTeamId);
+    }).catch(() => {});
+  }, [leagueId]);
+
   const viewedTournament = tournaments[viewingWeek] || null;
+
+  if (myTeamId === null) {
+    return (
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <p style={{ color: C.txt2, fontSize: 15 }}>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <>

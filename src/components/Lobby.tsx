@@ -9,7 +9,7 @@ interface LobbyProps {
   isDark: boolean;
   colors: Theme;
   onToggleTheme: () => void;
-  onEnterLeague: (id: number, name: string, myTeamId: number) => void;
+  onEnterLeague: (id: number) => void;
 }
 
 function formatPurse(n: number): string {
@@ -56,7 +56,7 @@ export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeague }: Lobby
       {loading
         ? [0, 1].map((i) => <SkeletonCard key={i} colors={C} />)
         : leagues.map((l) => (
-            <LeagueCard key={l.id} league={l} isDark={isDark} colors={C} onTap={() => onEnterLeague(l.id, l.name, l.myTeamId)} />
+            <LeagueCard key={l.id} league={l} isDark={isDark} colors={C} onTap={() => onEnterLeague(l.id)} />
           ))}
 
       {/* Create a League */}

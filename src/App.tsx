@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { themes, type ThemeMode } from "./theme";
 import { useAuth } from "./context/AuthContext";
 import { Login } from "./pages/Login";
@@ -7,8 +8,8 @@ import { LeagueShell } from "./components/LeagueShell";
 
 export default function App() {
   const [mode, setMode] = useState<ThemeMode>("light");
-  const [activeLeague, setActiveLeague] = useState<{ id: number; myTeamId: number } | null>(null);
-  const [page, setPage] = useState("home");
+  const { leagueId: leagueIdParam, page: pageParam } = useParams();
+  const navigate = useNavigate();
 
   const C = themes[mode];
   const isDark = mode === "dark";
@@ -16,11 +17,13 @@ export default function App() {
   const { user, manager, loading } = useAuth();
 
   const toggleTheme = () => setMode((m) => (m === "light" ? "dark" : "light"));
-  const enterLeague = (id: number, _name: string, myTeamId: number) => {
-    setActiveLeague({ id, myTeamId });
-    setPage("home");
-  };
-  const exitLeague = () => setActiveLeague(null);
+
+  const leagueId = leagueIdParam ? Number(leagueIdParam) : null;
+  const page = pageParam || "home";
+
+  const enterLeague = (id: number) => navigate(`/league/${id}/home`);
+  const exitLeague = () => navigate("/");
+  const changePage = (p: string) => navigate(`/league/${leagueId}/${p}`);
 
   if (loading) {
     return (
@@ -42,22 +45,21 @@ export default function App() {
         background: C.card,
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         transition: "background .3s",
-        display: activeLeague ? "flex" : undefined,
-        flexDirection: activeLeague ? "column" : undefined,
+        display: leagueId ? "flex" : undefined,
+        flexDirection: leagueId ? "column" : undefined,
       }}
     >
       <style>{`*{box-sizing:border-box}html,body{margin:0;padding:0;height:100%;overscroll-behavior:none}::-webkit-scrollbar{display:none}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
 
-      {activeLeague ? (
+      {leagueId ? (
         <LeagueShell
-          leagueId={activeLeague.id}
-          myTeamId={activeLeague.myTeamId}
+          leagueId={leagueId}
           activePage={page}
           isDark={isDark}
           colors={C}
           onToggleTheme={toggleTheme}
           onBack={exitLeague}
-          onChangePage={setPage}
+          onChangePage={changePage}
         />
       ) : (
         <Lobby isDark={isDark} colors={C} onToggleTheme={toggleTheme} onEnterLeague={enterLeague} />
