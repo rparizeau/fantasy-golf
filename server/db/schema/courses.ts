@@ -1,5 +1,5 @@
 import { pgTable, integer, varchar, jsonb } from "drizzle-orm/pg-core";
-import { tournaments } from "./tournaments.ts";
+import { tournaments } from "./tournaments";
 
 export const courses = pgTable("courses", {
   tournamentId: integer("tournament_id").primaryKey().references(() => tournaments.id),

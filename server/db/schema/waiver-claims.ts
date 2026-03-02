@@ -1,5 +1,5 @@
 import { pgTable, integer, timestamp, serial } from "drizzle-orm/pg-core";
-import { leagues } from "./leagues.ts";
+import { leagues } from "./leagues";
 
 export const waiverClaims = pgTable("waiver_claims", {
   id: serial("id").primaryKey(),

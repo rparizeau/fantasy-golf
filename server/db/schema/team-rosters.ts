@@ -1,6 +1,6 @@
 import { pgTable, integer, varchar, primaryKey } from "drizzle-orm/pg-core";
-import { teams } from "./teams.ts";
-import { players } from "./players.ts";
+import { teams } from "./teams";
+import { players } from "./players";
 
 export const teamRosters = pgTable("team_rosters", {
   teamPk: integer("team_pk").notNull().references(() => teams.id),
