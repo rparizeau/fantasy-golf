@@ -1,10 +1,14 @@
 import { Router } from "express";
-import { loadState, saveState, advance, rewind, setOverride, updatePlayer, reset, createFreshState, loadPayoutTable, loadTournaments, getCurrentTournament } from "../sim/engine.js";
-import type { SimState } from "../sim/engine.js";
-import { loadLeagueState, saveLeagueState, getLineup, setLineupForTournament } from "../lib/league-helpers.js";
+import {
+  loadActiveSimState, saveSimState, createFreshState,
+  resetSimState, getActiveTournamentId,
+  type SimState,
+} from "../db/dal/sim.js";
+import { loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
+import { getAllLeagues, getLineup, updateSeasonEarnings, autoCopyLineups } from "../db/dal/league.js";
+import { advance, rewind, setOverride, updatePlayer } from "../sim/engine.js";
 
-function buildPlayerEarnings(simState: SimState, purse: number): Map<number, number> {
-  const payoutTable = loadPayoutTable();
+function buildPlayerEarnings(simState: SimState, purse: number, payoutTable: { position: number; pct: number }[]): Map<number, number> {
   const map = new Map<number, number>();
   for (const p of simState.players) {
     let earnings = 0;
@@ -17,109 +21,68 @@ function buildPlayerEarnings(simState: SimState, purse: number): Map<number, num
   return map;
 }
 
-function accumulateSeasonEarnings(simState: SimState): void {
+async function accumulateSeasonEarnings(simState: SimState): Promise<void> {
   if (simState.phase !== "final") return;
-  if (simState.earningsAccumulated) return; // already done
+  if (simState.earningsAccumulated) return;
 
-  const tournament = getCurrentTournament();
-  if (simState.tournamentId !== tournament.id) return;
+  const tournaments = await loadTournaments();
+  const activeId = await getActiveTournamentId();
+  const tournament = tournaments.find((t) => t.id === activeId);
+  if (!tournament || simState.tournamentId !== tournament.id) return;
 
-  const playerEarnings = buildPlayerEarnings(simState, tournament.purse);
+  const payoutTable = await loadPayoutTable();
+  const playerEarnings = buildPlayerEarnings(simState, tournament.purse, payoutTable);
 
-  const leagueState = loadLeagueState();
-  for (const league of Object.values(leagueState.leagues)) {
+  const allLeagues = await getAllLeagues();
+  for (const league of allLeagues) {
     for (const team of league.teams) {
-      const lineup = getLineup(team, simState.tournamentId);
+      const lineup = await getLineup(team.pk, simState.tournamentId);
       const weekEarnings = lineup.reduce(
         (sum, pid) => sum + (playerEarnings.get(pid) || 0), 0
       );
-      team.seasonEarnings += weekEarnings;
+      if (weekEarnings > 0) {
+        await updateSeasonEarnings(team.pk, weekEarnings);
+      }
     }
   }
-  saveLeagueState(leagueState);
 
   simState.earningsAccumulated = true;
-  saveState(simState);
+  await saveSimState(simState);
 }
 
-function deaccumulateSeasonEarnings(simState: SimState): void {
-  if (!simState.earningsAccumulated) return; // nothing to undo
+async function deaccumulateSeasonEarnings(simState: SimState): Promise<void> {
+  if (!simState.earningsAccumulated) return;
   if (simState.players.length === 0) return;
 
-  const tournaments = loadTournaments();
+  const tournaments = await loadTournaments();
   const tournament = tournaments.find((t) => t.id === simState.tournamentId);
   if (!tournament) return;
 
-  const playerEarnings = buildPlayerEarnings(simState, tournament.purse);
+  const payoutTable = await loadPayoutTable();
+  const playerEarnings = buildPlayerEarnings(simState, tournament.purse, payoutTable);
 
-  const leagueState = loadLeagueState();
-  for (const league of Object.values(leagueState.leagues)) {
+  const allLeagues = await getAllLeagues();
+  for (const league of allLeagues) {
     for (const team of league.teams) {
-      const lineup = getLineup(team, simState.tournamentId);
+      const lineup = await getLineup(team.pk, simState.tournamentId);
       const weekEarnings = lineup.reduce(
         (sum, pid) => sum + (playerEarnings.get(pid) || 0), 0
       );
-      team.seasonEarnings = Math.max(0, team.seasonEarnings - weekEarnings);
+      if (weekEarnings > 0) {
+        await updateSeasonEarnings(team.pk, -weekEarnings);
+      }
     }
   }
-  saveLeagueState(leagueState);
 
   simState.earningsAccumulated = false;
-  saveState(simState);
-}
-
-/** When advancing from idle → round1, ensure every team has a lineup for the current tournament. */
-function autoCopyLineups(tournamentId: number): void {
-  const leagueState = loadLeagueState();
-  let changed = false;
-
-  for (const league of Object.values(leagueState.leagues)) {
-    for (const team of league.teams) {
-      const existing = getLineup(team, tournamentId);
-      if (existing.length > 0) continue;
-
-      // Find the most recent previous tournament's lineup
-      const tournamentKeys = Object.keys(team.tournamentLineups)
-        .map(Number)
-        .filter((id) => id < tournamentId)
-        .sort((a, b) => b - a);
-
-      let newLineup: number[] = [];
-      for (const prevId of tournamentKeys) {
-        const prevLineup = team.tournamentLineups[String(prevId)];
-        if (prevLineup && prevLineup.length > 0) {
-          // Filter to players still on the roster
-          newLineup = prevLineup.filter((pid) => team.roster.includes(pid));
-          break;
-        }
-      }
-
-      // Fallback: take first activeSize players from roster
-      if (newLineup.length === 0) {
-        newLineup = team.roster.slice(0, league.settings.activeSize);
-      }
-
-      // Pad if we lost players from roster changes
-      if (newLineup.length < league.settings.activeSize) {
-        for (const pid of team.roster) {
-          if (newLineup.length >= league.settings.activeSize) break;
-          if (!newLineup.includes(pid)) newLineup.push(pid);
-        }
-      }
-
-      setLineupForTournament(team, tournamentId, newLineup);
-      changed = true;
-    }
-  }
-
-  if (changed) saveLeagueState(leagueState);
+  await saveSimState(simState);
 }
 
 const router = Router();
 
 // GET /api/sim/state — current phase, round, player count, cut line
-router.get("/state", (_req, res) => {
-  const state = loadState();
+router.get("/state", async (_req, res) => {
+  const state = await loadActiveSimState();
   const activePlayers = state.players.filter((p) => p.status === "active").length;
   const cutPlayers = state.players.filter((p) => p.status === "cut").length;
   const wdPlayers = state.players.filter((p) => p.status === "wd").length;
@@ -139,8 +102,8 @@ router.get("/state", (_req, res) => {
 });
 
 // POST /api/sim/advance — generate next round of scores
-router.post("/advance", (_req, res) => {
-  const state = loadState();
+router.post("/advance", async (_req, res) => {
+  let state = await loadActiveSimState();
 
   if (state.phase === "final") {
     res.status(400).json({ error: "Tournament is already final. Reset to start a new one." });
@@ -148,23 +111,31 @@ router.post("/advance", (_req, res) => {
   }
 
   if (state.phase === "idle" && state.players.length === 0) {
-    // Auto-initialize field on first advance
-    const freshState = createFreshState(state.tournamentId);
-    autoCopyLineups(freshState.tournamentId);
+    const freshState = await createFreshState(state.tournamentId);
+    const allLeagues = await getAllLeagues();
+    for (const league of allLeagues) {
+      await autoCopyLineups(league.id, freshState.tournamentId, league.settings.activeSize);
+    }
     const advanced = advance(freshState);
+    await saveSimState(advanced);
     res.json({ phase: advanced.phase, currentRound: advanced.currentRound });
     return;
   }
 
   if (state.phase === "idle") {
-    // Transitioning from idle → round1: auto-copy lineups
-    autoCopyLineups(state.tournamentId);
+    const allLeagues = await getAllLeagues();
+    for (const league of allLeagues) {
+      await autoCopyLineups(league.id, state.tournamentId, league.settings.activeSize);
+    }
   }
 
   const updated = advance(state);
+  await saveSimState(updated);
+
   if (updated.phase === "final") {
-    accumulateSeasonEarnings(updated);
+    await accumulateSeasonEarnings(updated);
   }
+
   res.json({
     phase: updated.phase,
     currentRound: updated.currentRound,
@@ -175,16 +146,18 @@ router.post("/advance", (_req, res) => {
 });
 
 // POST /api/sim/rewind — undo the most recent phase transition
-router.post("/rewind", (_req, res) => {
-  const state = loadState();
+router.post("/rewind", async (_req, res) => {
+  const state = await loadActiveSimState();
 
   if (state.phase === "idle") {
     res.status(400).json({ error: "Already at idle." });
     return;
   }
 
-  deaccumulateSeasonEarnings(state);
+  await deaccumulateSeasonEarnings(state);
   const updated = rewind(state);
+  await saveSimState(updated);
+
   res.json({
     phase: updated.phase,
     currentRound: updated.currentRound,
@@ -192,15 +165,14 @@ router.post("/rewind", (_req, res) => {
 });
 
 // POST /api/sim/override — set player outcome (score, WD)
-router.post("/override", (req, res) => {
+router.post("/override", async (req, res) => {
   const { playerId, score, wd } = req.body;
-
   if (!playerId) {
     res.status(400).json({ error: "playerId is required" });
     return;
   }
 
-  const state = loadState();
+  const state = await loadActiveSimState();
   const player = state.players.find((p) => p.playerId === playerId);
   if (!player) {
     res.status(404).json({ error: "Player not found in field" });
@@ -212,19 +184,19 @@ router.post("/override", (req, res) => {
   if (typeof wd === "boolean") override.wd = wd;
 
   const updated = setOverride(state, playerId, override);
+  await saveSimState(updated);
   res.json({ overrides: updated.overrides });
 });
 
 // POST /api/sim/player/update — directly edit a player's rounds and status
-router.post("/player/update", (req, res) => {
+router.post("/player/update", async (req, res) => {
   const { playerId, rounds, status, holeScores } = req.body;
-
   if (!playerId) {
     res.status(400).json({ error: "playerId is required" });
     return;
   }
 
-  const state = loadState();
+  const state = await loadActiveSimState();
   const player = state.players.find((p) => p.playerId === playerId);
   if (!player) {
     res.status(404).json({ error: "Player not found in field" });
@@ -237,15 +209,16 @@ router.post("/player/update", (req, res) => {
   if (status === "active" || status === "cut" || status === "wd") updates.status = status;
 
   updatePlayer(state, playerId, updates);
+  await saveSimState(state);
   res.json({ ok: true });
 });
 
 // POST /api/sim/reset — reset to idle with fresh field
-router.post("/reset", (req, res) => {
+router.post("/reset", async (req, res) => {
   const { tournamentId } = req.body || {};
-  const prevState = loadState();
-  deaccumulateSeasonEarnings(prevState);
-  const state = reset(tournamentId);
+  const prevState = await loadActiveSimState();
+  await deaccumulateSeasonEarnings(prevState);
+  const state = await resetSimState(tournamentId);
   res.json({
     phase: state.phase,
     tournamentId: state.tournamentId,

@@ -1,13 +1,13 @@
 import { Router } from "express";
-import { loadState, loadPayoutTable, getCurrentTournament } from "../sim/engine.js";
-import { loadLeagueState, saveLeagueState, getLineup } from "../lib/league-helpers.js";
+import { loadActiveSimState, getActiveTournamentId } from "../db/dal/sim.js";
+import { loadTournaments, loadPayoutTable } from "../db/dal/seed-data.js";
+import { getLeague, getLineup, incrementMulligansUsed, addActivityFeedEntry } from "../db/dal/league.js";
 
 const router = Router();
 
 // GET /api/league/:id/team/:teamId/mulligan — mulligan status
-router.get("/:id/team/:teamId/mulligan", (req, res) => {
-  const leagueState = loadLeagueState();
-  const league = leagueState.leagues[req.params.id];
+router.get("/:id/team/:teamId/mulligan", async (req, res) => {
+  const league = await getLeague(Number(req.params.id));
   if (!league) {
     res.status(404).json({ error: "League not found" });
     return;
@@ -19,45 +19,32 @@ router.get("/:id/team/:teamId/mulligan", (req, res) => {
     return;
   }
 
-  const simState = loadState();
-  const tournament = getCurrentTournament();
-  const payoutTable = loadPayoutTable();
+  const simState = await loadActiveSimState();
+  const tournaments = await loadTournaments();
+  const activeId = await getActiveTournamentId();
+  const tournament = tournaments.find((t) => t.id === activeId) || tournaments[0];
+  const payoutTable = await loadPayoutTable();
 
-  // Window is open after cut phase, before round 3 starts, and not during majors
   const windowOpen = simState.phase === "cut" && simState.tournamentId === tournament.id && !tournament.isMajor;
   const remaining = league.settings.mulligansPerSeason - team.mulligansUsed;
 
-  // Eligible players: active lineup players who made the cut but have negative earnings potential
-  const lineup = getLineup(team, simState.tournamentId);
+  const lineup = await getLineup(team.pk, simState.tournamentId);
   const eligiblePlayers = lineup
     .map((playerId) => {
       const simPlayer = simState.players.find((p) => p.playerId === playerId);
       if (!simPlayer || simPlayer.status !== "active") return null;
-
-      // Calculate projected earnings (if they stay where they are)
       const payout = payoutTable.find((pt) => pt.position === simPlayer.position);
       const projectedEarnings = payout ? Math.round(tournament.purse * (payout.pct / 100)) : 0;
-
-      return {
-        playerId,
-        name: simPlayer.name,
-        earnings: projectedEarnings,
-      };
+      return { playerId, name: simPlayer.name, earnings: projectedEarnings };
     })
     .filter(Boolean);
 
-  res.json({
-    windowOpen,
-    remaining,
-    eligiblePlayers,
-    isMajor: tournament.isMajor,
-  });
+  res.json({ windowOpen, remaining, eligiblePlayers, isMajor: tournament.isMajor });
 });
 
 // POST /api/league/:id/team/:teamId/mulligan — activate mulligan on a player
-router.post("/:id/team/:teamId/mulligan", (req, res) => {
-  const leagueState = loadLeagueState();
-  const league = leagueState.leagues[req.params.id];
+router.post("/:id/team/:teamId/mulligan", async (req, res) => {
+  const league = await getLeague(Number(req.params.id));
   if (!league) {
     res.status(404).json({ error: "League not found" });
     return;
@@ -69,14 +56,15 @@ router.post("/:id/team/:teamId/mulligan", (req, res) => {
     return;
   }
 
-  const simState = loadState();
-  const tournament = getCurrentTournament();
+  const simState = await loadActiveSimState();
+  const tournaments = await loadTournaments();
+  const activeId = await getActiveTournamentId();
+  const tournament = tournaments.find((t) => t.id === activeId) || tournaments[0];
 
   if (tournament.isMajor) {
     res.status(403).json({ error: "Mulligans are disabled during major championships" });
     return;
   }
-
   if (simState.phase !== "cut") {
     res.status(403).json({ error: "Mulligan window is not open" });
     return;
@@ -89,26 +77,20 @@ router.post("/:id/team/:teamId/mulligan", (req, res) => {
   }
 
   const { playerId } = req.body;
-  const lineup = getLineup(team, simState.tournamentId);
+  const lineup = await getLineup(team.pk, simState.tournamentId);
   if (!playerId || !lineup.includes(playerId)) {
     res.status(400).json({ error: "Player must be in your active lineup" });
     return;
   }
 
-  // Mark the mulligan — move player from active to bench equivalent
-  // (In a full implementation, we'd zero out their earnings)
-  team.mulligansUsed++;
+  await incrementMulligansUsed(team.pk);
 
-  // Add to activity feed
   const simPlayer = simState.players.find((p) => p.playerId === playerId);
-  league.activityFeed.push({
-    id: `feed-${Date.now()}`,
-    type: "mulligan",
-    message: `${team.teamName} used a Mulligan on ${simPlayer?.name || `Player ${playerId}`}`,
-    timestamp: new Date().toISOString(),
-  });
-
-  saveLeagueState(leagueState);
+  await addActivityFeedEntry(
+    league.id,
+    "mulligan",
+    `${team.teamName} used a Mulligan on ${simPlayer?.name || `Player ${playerId}`}`
+  );
 
   res.json({ ok: true, remaining: remaining - 1 });
 });

@@ -1,38 +1,47 @@
 import { Router } from "express";
-import { loadLeagueState, saveLeagueState } from "../lib/league-helpers.js";
+import { getLeague, getActivityFeed, getChatMessages, addChatMessage } from "../db/dal/league.js";
 
 const router = Router();
 
 // GET /api/league/:id/feed — activity feed
-router.get("/:id/feed", (req, res) => {
-  const leagueState = loadLeagueState();
-  const league = leagueState.leagues[req.params.id];
+router.get("/:id/feed", async (req, res) => {
+  const league = await getLeague(Number(req.params.id));
   if (!league) {
     res.status(404).json({ error: "League not found" });
     return;
   }
 
-  // Return feed sorted newest first
-  const feed = [...league.activityFeed].reverse();
-  res.json(feed);
+  const feed = await getActivityFeed(league.id);
+  // Map to match existing shape
+  res.json(feed.map((f) => ({
+    id: `feed-${f.id}`,
+    type: f.type,
+    message: f.message,
+    timestamp: f.createdAt.toISOString(),
+  })));
 });
 
 // GET /api/league/:id/chat — message history
-router.get("/:id/chat", (req, res) => {
-  const leagueState = loadLeagueState();
-  const league = leagueState.leagues[req.params.id];
+router.get("/:id/chat", async (req, res) => {
+  const league = await getLeague(Number(req.params.id));
   if (!league) {
     res.status(404).json({ error: "League not found" });
     return;
   }
 
-  res.json(league.chatMessages);
+  const messages = await getChatMessages(league.id);
+  res.json(messages.map((m) => ({
+    id: `msg-${m.id}`,
+    teamId: m.teamId,
+    teamName: m.teamName,
+    message: m.message,
+    timestamp: m.createdAt.toISOString(),
+  })));
 });
 
 // POST /api/league/:id/chat — send a message
-router.post("/:id/chat", (req, res) => {
-  const leagueState = loadLeagueState();
-  const league = leagueState.leagues[req.params.id];
+router.post("/:id/chat", async (req, res) => {
+  const league = await getLeague(Number(req.params.id));
   if (!league) {
     res.status(404).json({ error: "League not found" });
     return;
@@ -45,18 +54,15 @@ router.post("/:id/chat", (req, res) => {
   }
 
   const team = league.teams.find((t) => t.teamId === teamId);
-  const msg = {
-    id: `msg-${Date.now()}`,
-    teamId,
-    teamName: team?.teamName || "Unknown",
-    message: message.trim(),
-    timestamp: new Date().toISOString(),
-  };
+  const msg = await addChatMessage(league.id, teamId, team?.teamName || "Unknown", message.trim());
 
-  league.chatMessages.push(msg);
-  saveLeagueState(leagueState);
-
-  res.json(msg);
+  res.json({
+    id: `msg-${msg.id}`,
+    teamId: msg.teamId,
+    teamName: msg.teamName,
+    message: msg.message,
+    timestamp: msg.createdAt.toISOString(),
+  });
 });
 
 export default router;

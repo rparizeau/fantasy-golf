@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import simRoutes from "./routes/sim.js";
@@ -10,7 +11,6 @@ import rosterRoutes from "./routes/roster.js";
 import playerDetailRoutes from "./routes/player.js";
 
 const app = express();
-const PORT = 3001;
 
 app.use(cors());
 app.use(express.json());
@@ -30,6 +30,11 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.listen(PORT, () => {
-  console.log(`Fantasy Golf API running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== "production") {
+  const PORT = 3001;
+  app.listen(PORT, () => {
+    console.log(`Fantasy Golf API running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;

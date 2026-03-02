@@ -1,0 +1,291 @@
+import { db } from "../index.js";
+import {
+  leagues, teams, teamRosters, tournamentLineups,
+  waiverClaims, activityFeed, chatMessages,
+} from "../schema/index.js";
+import { eq, and, desc, asc } from "drizzle-orm";
+
+// --- Types matching existing API shapes ---
+
+export interface TeamData {
+  pk: number;            // global PK (teams.id)
+  teamId: number;        // league-local ID
+  teamName: string;
+  managerName: string;
+  roster: number[];      // player IDs with slot='roster'
+  reserve: number[];     // player IDs with slot='reserve'
+  mulligansUsed: number;
+  seasonEarnings: number;
+}
+
+export interface LeagueData {
+  id: number;
+  name: string;
+  settings: {
+    rosterSize: number;
+    activeSize: number;
+    reserveSize: number;
+    mulligansPerSeason: number;
+  };
+  teams: TeamData[];
+}
+
+// --- League queries ---
+
+export async function getLeague(leagueId: number): Promise<LeagueData | null> {
+  const [league] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
+  if (!league) return null;
+
+  const teamRows = await db.select().from(teams)
+    .where(eq(teams.leagueId, leagueId))
+    .orderBy(teams.teamId);
+
+  const teamDataList: TeamData[] = [];
+  for (const t of teamRows) {
+    const rosterRows = await db.select().from(teamRosters)
+      .where(eq(teamRosters.teamPk, t.id));
+
+    teamDataList.push({
+      pk: t.id,
+      teamId: t.teamId,
+      teamName: t.teamName,
+      managerName: t.managerName,
+      roster: rosterRows.filter((r) => r.slot === "roster").map((r) => r.playerId),
+      reserve: rosterRows.filter((r) => r.slot === "reserve").map((r) => r.playerId),
+      mulligansUsed: t.mulligansUsed,
+      seasonEarnings: t.seasonEarnings,
+    });
+  }
+
+  return {
+    id: league.id,
+    name: league.name,
+    settings: {
+      rosterSize: league.rosterSize,
+      activeSize: league.activeSize,
+      reserveSize: league.reserveSize,
+      mulligansPerSeason: league.mulligansPerSeason,
+    },
+    teams: teamDataList,
+  };
+}
+
+export async function getAllLeagues(): Promise<LeagueData[]> {
+  const leagueRows = await db.select().from(leagues).orderBy(leagues.id);
+  const result: LeagueData[] = [];
+  for (const l of leagueRows) {
+    const data = await getLeague(l.id);
+    if (data) result.push(data);
+  }
+  return result;
+}
+
+// --- Team queries ---
+
+export async function getTeamPk(leagueId: number, teamId: number): Promise<number | null> {
+  const [row] = await db.select({ id: teams.id }).from(teams)
+    .where(and(eq(teams.leagueId, leagueId), eq(teams.teamId, teamId)));
+  return row?.id ?? null;
+}
+
+// --- Lineup queries ---
+
+export async function getLineup(teamPk: number, tournamentId: number): Promise<number[]> {
+  const rows = await db.select().from(tournamentLineups)
+    .where(and(
+      eq(tournamentLineups.teamPk, teamPk),
+      eq(tournamentLineups.tournamentId, tournamentId),
+    ));
+  return rows.map((r) => r.playerId);
+}
+
+export async function setLineup(teamPk: number, tournamentId: number, playerIds: number[]): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.delete(tournamentLineups).where(and(
+      eq(tournamentLineups.teamPk, teamPk),
+      eq(tournamentLineups.tournamentId, tournamentId),
+    ));
+    if (playerIds.length > 0) {
+      await tx.insert(tournamentLineups).values(
+        playerIds.map((pid) => ({ teamPk, tournamentId, playerId: pid }))
+      );
+    }
+  });
+}
+
+// --- Roster mutations ---
+
+export async function addToRoster(teamPk: number, playerId: number, slot: "roster" | "reserve" = "roster"): Promise<void> {
+  await db.insert(teamRosters).values({ teamPk, playerId, slot });
+}
+
+export async function removeFromRoster(teamPk: number, playerId: number): Promise<void> {
+  await db.delete(teamRosters).where(and(
+    eq(teamRosters.teamPk, teamPk),
+    eq(teamRosters.playerId, playerId),
+  ));
+}
+
+export async function swapRosterPlayer(teamPk: number, dropPlayerId: number, addPlayerId: number): Promise<void> {
+  await db.transaction(async (tx) => {
+    // Get the slot of the dropped player
+    const [dropped] = await tx.select().from(teamRosters)
+      .where(and(eq(teamRosters.teamPk, teamPk), eq(teamRosters.playerId, dropPlayerId)));
+    const slot = dropped?.slot ?? "roster";
+
+    await tx.delete(teamRosters).where(and(
+      eq(teamRosters.teamPk, teamPk),
+      eq(teamRosters.playerId, dropPlayerId),
+    ));
+    await tx.insert(teamRosters).values({ teamPk, playerId: addPlayerId, slot });
+  });
+}
+
+export async function getRosterCount(teamPk: number): Promise<number> {
+  const rows = await db.select().from(teamRosters)
+    .where(and(eq(teamRosters.teamPk, teamPk), eq(teamRosters.slot, "roster")));
+  return rows.length;
+}
+
+// --- Season earnings ---
+
+export async function updateSeasonEarnings(teamPk: number, delta: number): Promise<void> {
+  const [team] = await db.select().from(teams).where(eq(teams.id, teamPk));
+  if (!team) return;
+  const newEarnings = Math.max(0, team.seasonEarnings + delta);
+  await db.update(teams).set({ seasonEarnings: newEarnings }).where(eq(teams.id, teamPk));
+}
+
+// --- Mulligans ---
+
+export async function incrementMulligansUsed(teamPk: number): Promise<void> {
+  const [team] = await db.select().from(teams).where(eq(teams.id, teamPk));
+  if (!team) return;
+  await db.update(teams).set({ mulligansUsed: team.mulligansUsed + 1 }).where(eq(teams.id, teamPk));
+}
+
+// --- Waiver claims ---
+
+export async function getWaiverClaims(leagueId: number) {
+  return db.select().from(waiverClaims)
+    .where(eq(waiverClaims.leagueId, leagueId))
+    .orderBy(desc(waiverClaims.faabBid), asc(waiverClaims.createdAt));
+}
+
+export async function addWaiverClaim(leagueId: number, teamId: number, addPlayerId: number, dropPlayerId: number | null, faabBid: number) {
+  await db.insert(waiverClaims).values({
+    leagueId,
+    teamId,
+    addPlayerId,
+    dropPlayerId,
+    faabBid,
+  });
+}
+
+export async function clearWaiverClaims(leagueId: number) {
+  await db.delete(waiverClaims).where(eq(waiverClaims.leagueId, leagueId));
+}
+
+// --- Activity feed ---
+
+export async function getActivityFeed(leagueId: number) {
+  return db.select().from(activityFeed)
+    .where(eq(activityFeed.leagueId, leagueId))
+    .orderBy(desc(activityFeed.createdAt));
+}
+
+export async function addActivityFeedEntry(leagueId: number, type: string, message: string) {
+  await db.insert(activityFeed).values({ leagueId, type, message });
+}
+
+// --- Chat messages ---
+
+export async function getChatMessages(leagueId: number) {
+  return db.select().from(chatMessages)
+    .where(eq(chatMessages.leagueId, leagueId))
+    .orderBy(asc(chatMessages.createdAt));
+}
+
+export async function addChatMessage(leagueId: number, teamId: number, teamName: string, message: string) {
+  const [msg] = await db.insert(chatMessages)
+    .values({ leagueId, teamId, teamName, message })
+    .returning();
+  return msg;
+}
+
+// --- Ownership check (is a player on any team in this league?) ---
+
+export async function isPlayerOwned(leagueId: number, playerId: number): Promise<boolean> {
+  const teamRows = await db.select({ id: teams.id }).from(teams)
+    .where(eq(teams.leagueId, leagueId));
+  const teamPks = teamRows.map((t) => t.id);
+  if (teamPks.length === 0) return false;
+
+  for (const pk of teamPks) {
+    const [row] = await db.select().from(teamRosters)
+      .where(and(eq(teamRosters.teamPk, pk), eq(teamRosters.playerId, playerId)));
+    if (row) return true;
+  }
+  return false;
+}
+
+// --- Build ownership map for a league ---
+
+export async function getOwnershipMap(leagueId: number): Promise<Map<number, { teamId: number; teamName: string }>> {
+  const teamRows = await db.select().from(teams)
+    .where(eq(teams.leagueId, leagueId));
+
+  const map = new Map<number, { teamId: number; teamName: string }>();
+  for (const t of teamRows) {
+    const rosterRows = await db.select().from(teamRosters)
+      .where(eq(teamRosters.teamPk, t.id));
+    for (const r of rosterRows) {
+      map.set(r.playerId, { teamId: t.teamId, teamName: t.teamName });
+    }
+  }
+  return map;
+}
+
+// --- Auto-copy lineups ---
+
+export async function autoCopyLineups(leagueId: number, tournamentId: number, activeSize: number): Promise<void> {
+  const league = await getLeague(leagueId);
+  if (!league) return;
+
+  for (const team of league.teams) {
+    const existing = await getLineup(team.pk, tournamentId);
+    if (existing.length > 0) continue;
+
+    // Find most recent previous tournament lineup
+    const allLineupRows = await db.select().from(tournamentLineups)
+      .where(eq(tournamentLineups.teamPk, team.pk));
+
+    const prevTournamentIds = [...new Set(allLineupRows.map((r) => r.tournamentId))]
+      .filter((id) => id < tournamentId)
+      .sort((a, b) => b - a);
+
+    let newLineup: number[] = [];
+    for (const prevId of prevTournamentIds) {
+      const prevLineup = allLineupRows
+        .filter((r) => r.tournamentId === prevId)
+        .map((r) => r.playerId);
+      if (prevLineup.length > 0) {
+        newLineup = prevLineup.filter((pid) => team.roster.includes(pid));
+        break;
+      }
+    }
+
+    if (newLineup.length === 0) {
+      newLineup = team.roster.slice(0, activeSize);
+    }
+
+    if (newLineup.length < activeSize) {
+      for (const pid of team.roster) {
+        if (newLineup.length >= activeSize) break;
+        if (!newLineup.includes(pid)) newLineup.push(pid);
+      }
+    }
+
+    await setLineup(team.pk, tournamentId, newLineup);
+  }
+}

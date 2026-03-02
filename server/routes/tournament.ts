@@ -1,12 +1,17 @@
 import { Router } from "express";
-import { loadState, loadTournaments, loadPayoutTable, formatScore, getCurrentTournament } from "../sim/engine.js";
+import { loadActiveSimState } from "../db/dal/sim.js";
+import { loadTournaments, loadPayoutTable } from "../db/dal/seed-data.js";
+import { getActiveTournamentId } from "../db/dal/sim.js";
+import { formatScore } from "../sim/engine.js";
 
 const router = Router();
 
 // GET /api/tournament/current — tournament info + status
-router.get("/current", (_req, res) => {
-  const tournament = getCurrentTournament();
-  const state = loadState();
+router.get("/current", async (_req, res) => {
+  const tournaments = await loadTournaments();
+  const activeId = await getActiveTournamentId();
+  const tournament = tournaments.find((t) => t.id === activeId) || tournaments[0];
+  const state = await loadActiveSimState();
   const simMatchesCurrent = state.tournamentId === tournament.id;
 
   res.json({
@@ -27,11 +32,11 @@ router.get("/current", (_req, res) => {
 });
 
 // GET /api/tournament/leaderboard — all players ranked by total score
-router.get("/leaderboard", (_req, res) => {
-  const state = loadState();
-  const tournaments = loadTournaments();
+router.get("/leaderboard", async (_req, res) => {
+  const state = await loadActiveSimState();
+  const tournaments = await loadTournaments();
   const tournament = tournaments.find((t) => t.id === state.tournamentId) || tournaments[0];
-  const payoutTable = loadPayoutTable();
+  const payoutTable = await loadPayoutTable();
 
   const leaderboard = state.players.map((p) => {
     let earnings = 0;
@@ -71,8 +76,8 @@ router.get("/leaderboard", (_req, res) => {
 });
 
 // GET /api/tournament/list — all available tournaments
-router.get("/list", (_req, res) => {
-  const tournaments = loadTournaments();
+router.get("/list", async (_req, res) => {
+  const tournaments = await loadTournaments();
   res.json(tournaments);
 });
 
