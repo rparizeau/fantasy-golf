@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getRoster, setLineup, type RosterPlayer, type RosterData, type TournamentListItem } from "../api";
+import { PlayerModal } from "../components/PlayerModal";
 import type { Theme } from "../theme";
 
 interface RosterProps {
@@ -10,16 +11,18 @@ interface RosterProps {
   currentTournamentId: number;
   viewingWeek: number;
   onChangeWeek: (week: number) => void;
+  isMajor: boolean;
 }
 
-export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek }: RosterProps) {
+export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek, isMajor }: RosterProps) {
   const [data, setData] = useState<RosterData | null>(null);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [reserve, setReserve] = useState<RosterPlayer[]>([]);
   const [locked, setLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [modalPlayerId, setModalPlayerId] = useState<number | null>(null);
+  const [moving, setMoving] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -55,61 +58,50 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
     });
   };
 
-  const handlePlayerClick = (playerId: number) => {
+  const handleMoveBtn = (playerId: number) => {
     if (locked) return;
 
-    // No selection yet — select this player
-    if (selected === null) {
-      setSelected(playerId);
-      return;
-    }
+    // Toggle off if same player
+    if (moving === playerId) { setMoving(null); return; }
 
-    // Same player — deselect
-    if (selected === playerId) {
-      setSelected(null);
-      return;
-    }
+    // No active move — start one
+    if (moving === null) { setMoving(playerId); return; }
 
-    // Find both players across roster + reserve
-    const selInRoster = roster.find((p) => p.playerId === selected);
-    const selInReserve = reserve.find((p) => p.playerId === selected);
+    // Complete the swap
+    const selInRoster = roster.find((p) => p.playerId === moving);
+    const selInReserve = reserve.find((p) => p.playerId === moving);
     const tgtInRoster = roster.find((p) => p.playerId === playerId);
     const tgtInReserve = reserve.find((p) => p.playerId === playerId);
 
     if (!(selInRoster || selInReserve) || !(tgtInRoster || tgtInReserve)) {
-      setSelected(null);
+      setMoving(null);
       return;
     }
 
     if (selInRoster && tgtInRoster) {
-      // Both in roster
       if (selInRoster.isActive !== tgtInRoster.isActive) {
-        // Cross-section: swap isActive flags
         const newRoster = roster.map((p) => {
-          if (p.playerId === selected) return { ...p, isActive: tgtInRoster.isActive };
+          if (p.playerId === moving) return { ...p, isActive: tgtInRoster.isActive };
           if (p.playerId === playerId) return { ...p, isActive: selInRoster.isActive };
           return p;
         });
         setRoster(newRoster);
         autoSave(newRoster);
       } else {
-        // Same section: swap array positions
         const newRoster = [...roster];
-        const i = newRoster.findIndex((p) => p.playerId === selected);
+        const i = newRoster.findIndex((p) => p.playerId === moving);
         const j = newRoster.findIndex((p) => p.playerId === playerId);
         [newRoster[i], newRoster[j]] = [newRoster[j], newRoster[i]];
         setRoster(newRoster);
         autoSave(newRoster);
       }
     } else if (selInReserve && tgtInReserve) {
-      // Both in reserve: swap positions
       const newReserve = [...reserve];
-      const i = newReserve.findIndex((p) => p.playerId === selected);
+      const i = newReserve.findIndex((p) => p.playerId === moving);
       const j = newReserve.findIndex((p) => p.playerId === playerId);
       [newReserve[i], newReserve[j]] = [newReserve[j], newReserve[i]];
       setReserve(newReserve);
     } else {
-      // Cross-collection: roster ↔ reserve
       const rosterPlayer = (selInRoster || tgtInRoster)!;
       const reservePlayer = (selInReserve || tgtInReserve)!;
       const newRoster = roster.map((p) =>
@@ -124,57 +116,50 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       setReserve(newReserve);
       autoSave(newRoster);
     }
-    setSelected(null);
+    setMoving(null);
   };
 
-  const handleEmptySlotClick = (section: "active" | "bench" | "reserve") => {
-    if (locked || selected === null) return;
+  const handleEmptySlotDrop = (section: "active" | "bench" | "reserve") => {
+    if (locked || moving === null) return;
 
-    const selInRoster = roster.find((p) => p.playerId === selected);
-    const selInReserve = reserve.find((p) => p.playerId === selected);
+    const selInRoster = roster.find((p) => p.playerId === moving);
+    const selInReserve = reserve.find((p) => p.playerId === moving);
     const player = selInRoster || selInReserve;
-    if (!player) { setSelected(null); return; }
+    if (!player) { setMoving(null); return; }
 
     if (section === "reserve") {
-      // Move to reserve
-      if (selInReserve) { setSelected(null); return; } // already in reserve
-      const newRoster = roster.filter((p) => p.playerId !== selected);
+      if (selInReserve) { setMoving(null); return; }
+      const newRoster = roster.filter((p) => p.playerId !== moving);
       const newReserve = [{ ...player, isActive: false }, ...reserve];
       setRoster(newRoster);
       setReserve(newReserve);
       autoSave(newRoster);
     } else {
       const wantActive = section === "active";
-
       if (selInRoster) {
-        // Within roster: flip section
-        if (player.isActive === wantActive) { setSelected(null); return; }
+        if (player.isActive === wantActive) { setMoving(null); return; }
         if (wantActive && roster.filter((p) => p.isActive).length >= activeSize) {
-          setSelected(null);
+          setMoving(null);
           return;
         }
         const updated = roster.map((p) =>
-          p.playerId === selected ? { ...p, isActive: wantActive } : p
+          p.playerId === moving ? { ...p, isActive: wantActive } : p
         );
-        const idx = updated.findIndex((p) => p.playerId === selected);
-        const [moved] = updated.splice(idx, 1);
-        updated.unshift(moved);
         setRoster(updated);
         autoSave(updated);
       } else {
-        // From reserve to roster
         if (wantActive && roster.filter((p) => p.isActive).length >= activeSize) {
-          setSelected(null);
+          setMoving(null);
           return;
         }
         const newRoster = [{ ...player, isActive: wantActive }, ...roster];
-        const newReserve = reserve.filter((p) => p.playerId !== selected);
+        const newReserve = reserve.filter((p) => p.playerId !== moving);
         setRoster(newRoster);
         setReserve(newReserve);
         autoSave(newRoster);
       }
     }
-    setSelected(null);
+    setMoving(null);
   };
 
   const activePlayers = roster.filter((p) => p.isActive).sort((a, b) => a.ranking - b.ranking);
@@ -226,7 +211,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       )}
 
       {/* Active lineup */}
-      <div style={{ background: C.greenDim }}>
+      <div style={{ background: isMajor ? C.goldDim : C.greenDim }}>
         {sectionHeader(
           `Active Lineup (${activePlayers.length}/${activeSize})`,
           emptyActive > 0 && !locked ? (
@@ -237,10 +222,10 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         )}
         <div style={{ padding: "0 16px 6px" }}>
           {activePlayers.map((p) => (
-            <PlayerCard key={p.playerId} player={p} colors={C} locked={locked} selected={selected === p.playerId} onToggle={() => handlePlayerClick(p.playerId)} />
+            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} locked={locked} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
           ))}
           {Array.from({ length: emptyActive }).map((_, i) => (
-            <EmptySlot key={`ea-${i}`} label="Active" colors={C} highlight={selected !== null} warn={!locked} onClick={() => handleEmptySlotClick("active")} />
+            <EmptySlot key={`ea-${i}`} label="Active" colors={C} highlight={moving !== null} warn={!locked && moving === null} onClick={() => handleEmptySlotDrop("active")} />
           ))}
         </div>
       </div>
@@ -250,10 +235,10 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         {sectionHeader(`Bench (${benchPlayers.length}/${benchSize})`)}
         <div style={{ padding: "0 16px 6px" }}>
           {benchPlayers.map((p) => (
-            <PlayerCard key={p.playerId} player={p} colors={C} locked={locked} selected={selected === p.playerId} onToggle={() => handlePlayerClick(p.playerId)} />
+            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} locked={locked} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
           ))}
           {Array.from({ length: emptyBench }).map((_, i) => (
-            <EmptySlot key={`eb-${i}`} label="Bench" colors={C} highlight={selected !== null} onClick={() => handleEmptySlotClick("bench")} />
+            <EmptySlot key={`eb-${i}`} label="Bench" colors={C} highlight={moving !== null} onClick={() => handleEmptySlotDrop("bench")} />
           ))}
         </div>
       </div>
@@ -263,13 +248,17 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         {sectionHeader(`Reserve (${sortedReserve.length}/${reserveSize})`)}
         <div style={{ padding: "0 16px 6px" }}>
           {sortedReserve.map((p) => (
-            <PlayerCard key={p.playerId} player={p} colors={C} locked={locked} selected={selected === p.playerId} onToggle={() => handlePlayerClick(p.playerId)} />
+            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} locked={locked} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
           ))}
           {Array.from({ length: emptyReserve }).map((_, i) => (
-            <EmptySlot key={`er-${i}`} label="Reserve" colors={C} highlight={selected !== null} onClick={() => handleEmptySlotClick("reserve")} />
+            <EmptySlot key={`er-${i}`} label="Reserve" colors={C} highlight={moving !== null} onClick={() => handleEmptySlotDrop("reserve")} />
           ))}
         </div>
       </div>
+
+      {modalPlayerId !== null && (
+        <PlayerModal playerId={modalPlayerId} colors={C} onClose={() => setModalPlayerId(null)} />
+      )}
     </div>
   );
 }
@@ -312,7 +301,7 @@ export function WeekNav({
           justifyContent: "space-between",
           height: 44,
           padding: "0 16px",
-          background: C.card,
+          background: "transparent",
         }}
       >
         {/* Left arrow */}
@@ -437,7 +426,7 @@ function EmptySlot({ label, colors: C, highlight, warn, onClick }: { label: stri
   const textColor = highlight ? C.green : warn ? C.red : C.txt3;
   return (
     <div
-      onClick={onClick}
+      onClick={highlight ? onClick : undefined}
       style={{
         display: "flex",
         alignItems: "center",
@@ -452,7 +441,7 @@ function EmptySlot({ label, colors: C, highlight, warn, onClick }: { label: stri
         opacity: highlight || warn ? 1 : 0.5,
       }}
     >
-      <span style={{ fontSize: 13, color: textColor }}>Empty {label} Slot</span>
+      <span style={{ fontSize: 13, color: textColor }}>{highlight ? "Move here" : `Empty ${label} Slot`}</span>
     </div>
   );
 }
@@ -460,19 +449,22 @@ function EmptySlot({ label, colors: C, highlight, warn, onClick }: { label: stri
 function PlayerCard({
   player: p,
   colors: C,
+  moving,
   locked,
-  selected,
-  onToggle,
+  onMove,
+  onTap,
 }: {
   player: RosterPlayer;
   colors: Theme;
+  moving: boolean;
   locked: boolean;
-  selected: boolean;
-  onToggle: () => void;
+  onMove: () => void;
+  onTap: () => void;
 }) {
+  const btnSize = 36;
   return (
     <div
-      onClick={onToggle}
+      onClick={onTap}
       style={{
         display: "flex",
         alignItems: "center",
@@ -481,24 +473,35 @@ function PlayerCard({
         boxSizing: "border-box",
         background: C.card,
         borderRadius: 10,
-        border: selected ? `2px solid ${C.green}` : `1px solid ${C.border}`,
+        border: `1px solid ${C.border}`,
         marginBottom: 6,
-        cursor: locked ? "default" : "pointer",
-        opacity: 1,
+        cursor: "pointer",
       }}
     >
-      {/* Active dot */}
-      <div
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: p.isActive ? C.greenBright : C.txt3,
-          marginRight: 12,
-          flexShrink: 0,
-          border: p.isActive ? "none" : `1px solid ${C.border}`,
-        }}
-      />
+      {/* Move button */}
+      {!locked && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onMove(); }}
+          style={{
+            width: btnSize,
+            height: btnSize,
+            flexShrink: 0,
+            marginRight: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 8,
+            border: `1.5px solid ${moving ? C.green : C.border}`,
+            background: moving ? C.greenDim : "transparent",
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2v12M8 2L5 5M8 2l3 3M8 14L5 11M8 14l3-3M2 8h12M2 8l3-3M2 8l3 3M14 8l-3-3M14 8l-3 3" stroke={moving ? C.green : C.txt3} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
 
       {/* Player info */}
       <div style={{ flex: 1, minWidth: 0 }}>

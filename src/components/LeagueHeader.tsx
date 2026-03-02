@@ -31,14 +31,16 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
     getLeagueInfo(leagueId).then((info) => setLeagueName(info.name));
   }, [leagueId]);
 
+  const isMajor = t?.isMajor ?? false;
+  const tintColor = isMajor ? C.goldDim : C.greenDim;
+
   return (
     <div
       style={{
         position: "sticky",
         top: 0,
         zIndex: 40,
-        background: C.card,
-        boxShadow: dk ? "none" : "0 1px 3px rgba(0,0,0,0.04)",
+        background: `linear-gradient(to bottom, ${C.card} 0%, ${tintColor} 100%)`,
       }}
     >
       {/* Tournament info section */}

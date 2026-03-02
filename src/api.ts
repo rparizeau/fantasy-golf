@@ -300,6 +300,25 @@ export function sendChatMessage(leagueId: number, message: string) {
   });
 }
 
+// --- Player Detail ---
+
+export interface PlayerDetail {
+  playerId: number;
+  name: string;
+  country: string;
+  ranking: number;
+  toPar: number;
+  toParDisplay: string;
+  position: number;
+  status: "active" | "cut" | "wd";
+  rounds: number[];
+  earnings: number;
+}
+
+export function getPlayer(id: number) {
+  return fetchJSON<PlayerDetail>(`/player/${id}`);
+}
+
 // --- Mulligan (Build 7+) ---
 
 export interface MulliganStatus {

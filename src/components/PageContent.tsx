@@ -37,6 +37,7 @@ export function PageContent({ page, leagueId, colors: C, tournaments, currentTou
             currentTournamentId={currentTournamentId}
             viewingWeek={viewingWeek}
             onChangeWeek={onChangeWeek}
+            isMajor={tournaments[viewingWeek]?.isMajor ?? false}
           />
         </div>
       );
