@@ -180,10 +180,6 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={modal.metaLabel}>To Par</span>
                 <span style={{ ...modal.metaValue, color: toPar < 0 ? "#2D8B52" : toPar > 0 ? "#D94438" : "#1A1D21" }}>{toParDisplay}</span>
-                <span style={{ ...modal.metaLabel, marginLeft: 12 }}>Purse</span>
-                <span style={modal.metaValue}>
-                  {player.earnings > 0 ? `$${player.earnings.toLocaleString()}` : "-"}
-                </span>
               </div>
             </div>
           </div>
@@ -626,62 +622,25 @@ export function SimPanel() {
               onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
               style={{ ...styles.input, flex: 1 }}
             />
-            <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center" }}>
-              {[1, 2, 3, 4].map((r) => {
-                const isOn = completedRound >= r;
-                return (
-                  <button
-                    key={r}
-                    onClick={() => handleToggleRound(r)}
-                    disabled={loading}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: 6,
-                      border: isOn ? "1px solid #2D8B52" : "1px solid #E2E5EA",
-                      background: isOn ? "#2D8B52" : "#fff",
-                      color: isOn ? "#fff" : "#8E95A0",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    R{r}
-                  </button>
-                );
-              })}
-              <div style={{ width: 1, height: 20, background: "#E2E5EA", margin: "0 4px" }} />
-              <button
-                onClick={handleToggleScore}
-                disabled={loading || (completedRound < 4 && !isFinal)}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 6,
-                  border: isFinal ? "1px solid #2D8B52" : "1px solid #E2E5EA",
-                  background: isFinal ? "#2D8B52" : "#fff",
-                  color: isFinal ? "#fff" : completedRound >= 4 ? "#1A1D21" : "#CCC",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: completedRound >= 4 || isFinal ? "pointer" : "default",
-                }}
-              >
-                Score
-              </button>
-              <button style={styles.dangerBtn} onClick={handleReset} disabled={loading}>
-                Reset
-              </button>
-            </div>
+            <button style={styles.dangerBtn} onClick={handleReset} disabled={loading}>
+              Reset
+            </button>
         </div>
             <table style={styles.table}>
               <colgroup>
                 <col style={{ width: 40 }} />
                 <col />
                 <col style={{ width: 80 }} />
-                <col style={{ width: 40 }} />
-                <col style={{ width: 40 }} />
-                <col style={{ width: 40 }} />
-                <col style={{ width: 40 }} />
-                <col style={{ width: 50 }} />
-                <col style={{ width: 85 }} />
+                <col style={{ width: 36 }} />
+                <col style={{ width: 36 }} />
+                <col style={{ width: 36 }} />
+                <col style={{ width: 36 }} />
+                <col style={{ width: 36 }} />
+                <col style={{ width: 70 }} />
+                <col style={{ width: 55 }} />
+                <col style={{ width: 55 }} />
+                <col style={{ width: 55 }} />
+                <col style={{ width: 55 }} />
                 <col style={{ width: 50 }} />
               </colgroup>
               <thead>
@@ -689,13 +648,36 @@ export function SimPanel() {
                   <th style={{ ...styles.th, textAlign: "left" }}>Pos</th>
                   <th style={{ ...styles.th, textAlign: "left" }}>Player</th>
                   <th style={styles.th}>Status</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>R1</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>R2</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>R3</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>R4</th>
+                  <th style={styles.th}>EGL</th>
+                  <th style={styles.th}>BRD</th>
+                  <th style={styles.th}>PAR</th>
+                  <th style={styles.th}>BOG</th>
+                  <th style={styles.th}>2B</th>
+                  <th style={styles.th}>Thru</th>
+                  {[1, 2, 3, 4].map((r) => {
+                    const isOn = completedRound >= r;
+                    return (
+                      <th key={r} style={styles.th}>
+                        <button
+                          onClick={() => handleToggleRound(r)}
+                          disabled={loading}
+                          style={{
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            border: isOn ? "1px solid #2D8B52" : "1px solid #E2E5EA",
+                            background: isOn ? "#2D8B52" : "#fff",
+                            color: isOn ? "#fff" : "#8E95A0",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          R{r}
+                        </button>
+                      </th>
+                    );
+                  })}
                   <th style={{ ...styles.th, textAlign: "right" }}>Tot</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Purse</th>
-                  <th style={styles.th}></th>
                 </tr>
               </thead>
               <tbody>
@@ -710,30 +692,75 @@ export function SimPanel() {
                     <td style={{ ...styles.td, textAlign: "left" }}>{posLabel}</td>
                     <td style={{ ...styles.td, textAlign: "left", fontWeight: 500 }}>
                       <span style={{ color: "#B0B5BC", fontSize: 11, fontWeight: 400, marginRight: 6 }}>{p.ranking}</span>
-                      {p.name}
+                      <span style={{ cursor: "pointer" }} onClick={() => setEditingPlayer(p)}>{p.name}</span>
                     </td>
                     <td style={styles.td}>
                       <span style={styles.statusBadge}>Active</span>
                     </td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{p.rounds[0] ?? "-"}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{p.rounds[1] ?? "-"}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{p.rounds[2] ?? "-"}</td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>{p.rounds[3] ?? "-"}</td>
+                    {(() => {
+                      const counts = { egl: 0, brd: 0, par: 0, bog: 0, dbog: 0 };
+                      const pars = holePars ?? [];
+                      if (p.holeScores) {
+                        for (const round of p.holeScores) {
+                          for (let h = 0; h < round.length; h++) {
+                            const s = round[h];
+                            if (s == null) continue;
+                            const diff = s - (pars[h] ?? 4);
+                            if (diff <= -2) counts.egl++;
+                            else if (diff === -1) counts.brd++;
+                            else if (diff === 0) counts.par++;
+                            else if (diff === 1) counts.bog++;
+                            else counts.dbog++;
+                          }
+                        }
+                      }
+                      return (
+                        <>
+                          <td style={styles.td}>{counts.egl || "-"}</td>
+                          <td style={styles.td}>{counts.brd || "-"}</td>
+                          <td style={styles.td}>{counts.par || "-"}</td>
+                          <td style={styles.td}>{counts.bog || "-"}</td>
+                          <td style={styles.td}>{counts.dbog || "-"}</td>
+                        </>
+                      );
+                    })()}
+                    <td style={styles.td}>
+                      {(() => {
+                        if (p.holeScores && p.holeScores.length > 0) {
+                          for (let r = p.holeScores.length - 1; r >= 0; r--) {
+                            const round = p.holeScores[r];
+                            if (round && round.some((s) => s != null)) {
+                              let lastHole = 0;
+                              for (let h = round.length - 1; h >= 0; h--) {
+                                if (round[h] != null) { lastHole = h + 1; break; }
+                              }
+                              return <>{lastHole}<span style={{ color: "#B0B5BC", fontSize: 10, fontWeight: 400, marginLeft: 2 }}>(R{r + 1})</span></>;
+                            }
+                          }
+                        } else if (p.rounds.length > 0) {
+                          return <>18<span style={{ color: "#B0B5BC", fontSize: 10, fontWeight: 400, marginLeft: 2 }}>(R{p.rounds.length})</span></>;
+                        }
+                        return "-";
+                      })()}
+                    </td>
+                    {[0, 1, 2, 3].map((i) => {
+                      const score = p.rounds[i];
+                      if (score == null) return <td key={i} style={styles.td}>-</td>;
+                      const rtp = score - sim.par;
+                      const rtpStr = rtp === 0 ? "E" : rtp > 0 ? `+${rtp}` : `${rtp}`;
+                      return (
+                        <td key={i} style={{ ...styles.td, color: rtp > 0 ? "#D94438" : "#1A1D21", fontWeight: 600 }}>
+                          {rtpStr}<span style={{ color: "#B0B5BC", fontSize: 10, fontWeight: 400, marginLeft: 2 }}>/{score}</span>
+                        </td>
+                      );
+                    })}
                     <td style={{
                       ...styles.td,
                       textAlign: "right",
-                      color: p.toPar < 0 ? "#2D8B52" : p.toPar > 0 ? "#D94438" : "#1A1D21",
+                      color: p.toPar > 0 ? "#D94438" : "#1A1D21",
                       fontWeight: 600,
                     }}>
                       {p.toParDisplay}
-                    </td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>
-                      {p.earnings > 0 ? `$${p.earnings.toLocaleString()}` : "-"}
-                    </td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>
-                      <button style={styles.editBtn} onClick={() => setEditingPlayer(p)}>
-                        Edit
-                      </button>
                     </td>
                   </tr>
                   );
