@@ -14,7 +14,7 @@ interface RosterProps {
   isMajor: boolean;
 }
 
-export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek: _onChangeWeek, isMajor }: RosterProps) {
+export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek: _onChangeWeek, isMajor: _isMajor }: RosterProps) {
   const [data, setData] = useState<RosterData | null>(null);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [reserve, setReserve] = useState<RosterPlayer[]>([]);
@@ -24,7 +24,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const [modalPlayerId, setModalPlayerId] = useState<number | null>(null);
   const [moving, setMoving] = useState<number | null>(null);
   const [myRank, setMyRank] = useState(0);
-  const [totalTeams, setTotalTeams] = useState(0);
+  const [, setTotalTeams] = useState(0);
   const [myPoints, setMyPoints] = useState(0);
   const [rivalAbove, setRivalAbove] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [rivalBelow, setRivalBelow] = useState<{ name: string; points: number; rank: number } | null>(null);
@@ -541,7 +541,7 @@ function EmptySlot({ label, colors: C, highlight, warn, onClick }: { label: stri
 
 function PlayerCard({
   player: p,
-  par,
+  par: _par,
   colors: C,
   moving,
   disabled,

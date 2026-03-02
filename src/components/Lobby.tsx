@@ -12,12 +12,6 @@ interface LobbyProps {
   onEnterLeague: (id: number, name: string, myTeamId: number) => void;
 }
 
-function formatMoney(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${Math.round(n / 1000).toLocaleString()}K`;
-  return `$${n.toLocaleString()}`;
-}
-
 function formatPurse(n: number): string {
   if (n >= 1_000_000) return `$${Math.round(n / 1_000_000)}M`;
   return `$${n.toLocaleString()}`;
