@@ -9,6 +9,7 @@ import { Chat } from "../pages/Chat";
 interface PageContentProps {
   page: string;
   leagueId: number;
+  myTeamId: number;
   colors: Theme;
   tournaments: TournamentListItem[];
   currentTournamentId: number;
@@ -16,8 +17,7 @@ interface PageContentProps {
   onChangeWeek: (week: number) => void;
 }
 
-export function PageContent({ page, leagueId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek }: PageContentProps) {
-  const myTeamId = 1;
+export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek }: PageContentProps) {
 
   switch (page) {
     case "home":

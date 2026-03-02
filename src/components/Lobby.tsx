@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import type { Theme } from "../theme";
 import type { LeagueSummary } from "../api";
 import { getLeagues } from "../api";
+import { useAuth } from "../context/AuthContext";
 import { ThemeToggle } from "./ThemeToggle";
 
 interface LobbyProps {
   isDark: boolean;
   colors: Theme;
   onToggleTheme: () => void;
-  onEnterLeague: (id: number, name: string) => void;
+  onEnterLeague: (id: number, name: string, myTeamId: number) => void;
 }
 
 function formatMoney(n: number): string {
@@ -23,6 +24,7 @@ function formatPurse(n: number): string {
 }
 
 export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeague }: LobbyProps) {
+  const { manager, signOut } = useAuth();
   const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,9 +40,17 @@ export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeague }: Lobby
       <div style={{ paddingBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 64 }}>
           <p style={{ color: C.txt2, fontSize: 14, margin: 0 }}>Welcome back,</p>
-          <ThemeToggle isDark={isDark} colors={C} onToggle={onToggleTheme} />
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span
+              onClick={signOut}
+              style={{ color: C.txt3, fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+            >
+              Sign Out
+            </span>
+            <ThemeToggle isDark={isDark} colors={C} onToggle={onToggleTheme} />
+          </div>
         </div>
-        <p style={{ color: C.txt, fontSize: 30, fontWeight: 700, margin: 0, letterSpacing: -0.5 }}>Bobby</p>
+        <p style={{ color: C.txt, fontSize: 30, fontWeight: 700, margin: 0, letterSpacing: -0.5 }}>{manager?.displayName ?? "Manager"}</p>
       </div>
 
       {/* SECTION BODY */}
@@ -52,7 +62,7 @@ export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeague }: Lobby
       {loading
         ? [0, 1].map((i) => <SkeletonCard key={i} colors={C} />)
         : leagues.map((l) => (
-            <LeagueCard key={l.id} league={l} isDark={isDark} colors={C} onTap={() => onEnterLeague(l.id, l.name)} />
+            <LeagueCard key={l.id} league={l} isDark={isDark} colors={C} onTap={() => onEnterLeague(l.id, l.name, l.myTeamId)} />
           ))}
 
       {/* Create a League */}

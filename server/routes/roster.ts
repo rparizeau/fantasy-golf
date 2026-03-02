@@ -2,6 +2,7 @@ import { Router } from "express";
 import { loadActiveSimState, getActiveTournamentId } from "../db/dal/sim.js";
 import { loadTournaments, loadPayoutTable } from "../db/dal/seed-data.js";
 import { getLeague, getLineup, incrementMulligansUsed, addActivityFeedEntry } from "../db/dal/league.js";
+import type { AuthenticatedRequest } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -43,7 +44,7 @@ router.get("/:id/team/:teamId/mulligan", async (req, res) => {
 });
 
 // POST /api/league/:id/team/:teamId/mulligan — activate mulligan on a player
-router.post("/:id/team/:teamId/mulligan", async (req, res) => {
+router.post("/:id/team/:teamId/mulligan", async (req: AuthenticatedRequest, res) => {
   const league = await getLeague(Number(req.params.id));
   if (!league) {
     res.status(404).json({ error: "League not found" });
@@ -53,6 +54,11 @@ router.post("/:id/team/:teamId/mulligan", async (req, res) => {
   const team = league.teams.find((t) => t.teamId === Number(req.params.teamId));
   if (!team) {
     res.status(404).json({ error: "Team not found" });
+    return;
+  }
+
+  if (team.managerId !== req.manager?.id) {
+    res.status(403).json({ error: "You don't own this team" });
     return;
   }
 

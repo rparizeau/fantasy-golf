@@ -1,8 +1,16 @@
+import { supabase } from "./lib/supabase";
+
 const BASE = "/api";
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (session?.access_token) {
+    headers["Authorization"] = `Bearer ${session.access_token}`;
+  }
+
   const res = await fetch(`${BASE}${url}`, {
-    headers: { "Content-Type": "application/json" },
+    headers,
     ...options,
   });
   if (!res.ok) {
@@ -148,6 +156,7 @@ export interface LeagueSummary {
   round: number;
   cut: string;
   phase: string;
+  myTeamId: number;
 }
 
 export function getLeagues() {

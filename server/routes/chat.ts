@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { getLeague, getActivityFeed, getChatMessages, addChatMessage } from "../db/dal/league.js";
+import { getLeague, getActivityFeed, getChatMessages, addChatMessage, getTeamByManagerAndLeague } from "../db/dal/league.js";
+import type { AuthenticatedRequest } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -40,21 +41,27 @@ router.get("/:id/chat", async (req, res) => {
 });
 
 // POST /api/league/:id/chat — send a message
-router.post("/:id/chat", async (req, res) => {
-  const league = await getLeague(Number(req.params.id));
+router.post("/:id/chat", async (req: AuthenticatedRequest, res) => {
+  const leagueId = Number(req.params.id);
+  const league = await getLeague(leagueId);
   if (!league) {
     res.status(404).json({ error: "League not found" });
     return;
   }
 
-  const { message, teamId = 1 } = req.body;
+  const myTeam = await getTeamByManagerAndLeague(req.manager!.id, leagueId);
+  if (!myTeam) {
+    res.status(403).json({ error: "You don't have a team in this league" });
+    return;
+  }
+
+  const { message } = req.body;
   if (!message || typeof message !== "string") {
     res.status(400).json({ error: "message is required" });
     return;
   }
 
-  const team = league.teams.find((t) => t.teamId === teamId);
-  const msg = await addChatMessage(league.id, teamId, team?.teamName || "Unknown", message.trim());
+  const msg = await addChatMessage(league.id, myTeam.teamId, myTeam.teamName, message.trim());
 
   res.json({
     id: `msg-${msg.id}`,

@@ -3,6 +3,17 @@ import {
   jsonb, timestamp, primaryKey, index,
 } from "drizzle-orm/pg-core";
 
+// --- Managers (Auth) ---
+
+export const managers = pgTable("managers", {
+  id: serial("id").primaryKey(),
+  supabaseUserId: varchar("supabase_user_id", { length: 36 }).notNull().unique(),
+  email: varchar("email", { length: 255 }).notNull(),
+  displayName: varchar("display_name", { length: 100 }).notNull(),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // --- Seed Data (read-only) ---
 
 export const players = pgTable("players", {
@@ -53,6 +64,7 @@ export const teams = pgTable("teams", {
   teamId: integer("team_id").notNull(),
   teamName: varchar("team_name", { length: 100 }).notNull(),
   managerName: varchar("manager_name", { length: 100 }).notNull(),
+  managerId: integer("manager_id").references(() => managers.id),
   mulligansUsed: integer("mulligans_used").notNull().default(0),
   seasonEarnings: integer("season_earnings").notNull().default(0),
 });

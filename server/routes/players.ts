@@ -3,11 +3,12 @@ import { loadPlayers } from "../db/dal/seed-data.js";
 import { loadActiveSimState } from "../db/dal/sim.js";
 import {
   getLeague, getOwnershipMap, isPlayerOwned,
-  getTeamPk, addWaiverClaim,
+  getTeamPk, addWaiverClaim, getTeamByManagerAndLeague,
   getWaiverClaims, clearWaiverClaims,
   swapRosterPlayer, addToRoster, getLineup, setLineup,
   addActivityFeedEntry,
 } from "../db/dal/league.js";
+import type { AuthenticatedRequest } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -40,14 +41,21 @@ router.get("/:id/players", async (req, res) => {
 });
 
 // POST /api/league/:id/waiver/claim — submit a waiver claim
-router.post("/:id/waiver/claim", async (req, res) => {
-  const league = await getLeague(Number(req.params.id));
+router.post("/:id/waiver/claim", async (req: AuthenticatedRequest, res) => {
+  const leagueId = Number(req.params.id);
+  const league = await getLeague(leagueId);
   if (!league) {
     res.status(404).json({ error: "League not found" });
     return;
   }
 
-  const { addPlayerId, dropPlayerId, faabBid, teamId = 1 } = req.body;
+  const myTeam = await getTeamByManagerAndLeague(req.manager!.id, leagueId);
+  if (!myTeam) {
+    res.status(403).json({ error: "You don't have a team in this league" });
+    return;
+  }
+
+  const { addPlayerId, dropPlayerId, faabBid } = req.body;
   if (!addPlayerId) {
     res.status(400).json({ error: "addPlayerId is required" });
     return;
@@ -59,31 +67,19 @@ router.post("/:id/waiver/claim", async (req, res) => {
     return;
   }
 
-  const teamPk = await getTeamPk(league.id, teamId);
-  if (!teamPk) {
-    res.status(400).json({ error: "Team not found" });
-    return;
-  }
-
-  const team = league.teams.find((t) => t.teamId === teamId);
-  if (!team) {
-    res.status(400).json({ error: "Team not found" });
-    return;
-  }
-
   if (dropPlayerId) {
-    if (!team.roster.includes(dropPlayerId)) {
+    if (!myTeam.roster.includes(dropPlayerId)) {
       res.status(400).json({ error: "Drop player is not on your roster" });
       return;
     }
   } else {
-    if (team.roster.length >= league.settings.rosterSize) {
+    if (myTeam.roster.length >= league.settings.rosterSize) {
       res.status(400).json({ error: "Roster is full — must drop a player" });
       return;
     }
   }
 
-  await addWaiverClaim(league.id, teamId, addPlayerId, dropPlayerId || null, faabBid || 0);
+  await addWaiverClaim(league.id, myTeam.teamId, addPlayerId, dropPlayerId || null, faabBid || 0);
   res.json({ ok: true });
 });
 

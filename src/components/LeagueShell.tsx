@@ -8,6 +8,7 @@ import { BottomNav } from "./BottomNav";
 
 interface LeagueShellProps {
   leagueId: number;
+  myTeamId: number;
   activePage: string;
   isDark: boolean;
   colors: Theme;
@@ -16,7 +17,7 @@ interface LeagueShellProps {
   onChangePage: (id: string) => void;
 }
 
-export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleTheme, onBack, onChangePage }: LeagueShellProps) {
+export function LeagueShell({ leagueId, myTeamId, activePage, isDark, colors: C, onToggleTheme, onBack, onChangePage }: LeagueShellProps) {
   const [tournaments, setTournaments] = useState<TournamentListItem[]>([]);
   const [currentTournamentId, setCurrentTournamentId] = useState<number>(0);
   const [viewingWeek, setViewingWeek] = useState<number>(0);
@@ -53,6 +54,7 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
       <PageContent
         page={activePage}
         leagueId={leagueId}
+        myTeamId={myTeamId}
         colors={C}
         tournaments={tournaments}
         currentTournamentId={currentTournamentId}

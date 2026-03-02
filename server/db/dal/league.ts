@@ -1,7 +1,7 @@
 import { db } from "../index.js";
 import {
   leagues, teams, teamRosters, tournamentLineups,
-  waiverClaims, activityFeed, chatMessages,
+  waiverClaims, activityFeed, chatMessages, managers,
 } from "../schema/index.js";
 import { eq, and, desc, asc } from "drizzle-orm";
 
@@ -12,6 +12,7 @@ export interface TeamData {
   teamId: number;        // league-local ID
   teamName: string;
   managerName: string;
+  managerId: number | null;
   roster: number[];      // player IDs with slot='roster'
   reserve: number[];     // player IDs with slot='reserve'
   mulligansUsed: number;
@@ -50,6 +51,7 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
       teamId: t.teamId,
       teamName: t.teamName,
       managerName: t.managerName,
+      managerId: t.managerId,
       roster: rosterRows.filter((r) => r.slot === "roster").map((r) => r.playerId),
       reserve: rosterRows.filter((r) => r.slot === "reserve").map((r) => r.playerId),
       mulligansUsed: t.mulligansUsed,
@@ -244,6 +246,35 @@ export async function getOwnershipMap(leagueId: number): Promise<Map<number, { t
     }
   }
   return map;
+}
+
+// --- Manager queries ---
+
+export async function getTeamByManagerAndLeague(managerId: number, leagueId: number): Promise<TeamData | null> {
+  const [row] = await db.select().from(teams)
+    .where(and(eq(teams.managerId, managerId), eq(teams.leagueId, leagueId)));
+  if (!row) return null;
+
+  const rosterRows = await db.select().from(teamRosters)
+    .where(eq(teamRosters.teamPk, row.id));
+
+  return {
+    pk: row.id,
+    teamId: row.teamId,
+    teamName: row.teamName,
+    managerName: row.managerName,
+    managerId: row.managerId,
+    roster: rosterRows.filter((r) => r.slot === "roster").map((r) => r.playerId),
+    reserve: rosterRows.filter((r) => r.slot === "reserve").map((r) => r.playerId),
+    mulligansUsed: row.mulligansUsed,
+    seasonEarnings: row.seasonEarnings,
+  };
+}
+
+export async function getLeaguesForManager(managerId: number): Promise<number[]> {
+  const rows = await db.select({ leagueId: teams.leagueId }).from(teams)
+    .where(eq(teams.managerId, managerId));
+  return rows.map((r) => r.leagueId);
 }
 
 // --- Auto-copy lineups ---
