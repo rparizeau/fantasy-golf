@@ -1,19 +1,6 @@
 import { Router } from "express";
-import { readFileSync, writeFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
 import { loadPlayers, loadState } from "../sim/engine.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const LEAGUE_STATE_PATH = join(__dirname, "..", "state", "league-state.json");
-
-function loadLeagueState() {
-  return JSON.parse(readFileSync(LEAGUE_STATE_PATH, "utf-8"));
-}
-
-function saveLeagueState(state: unknown) {
-  writeFileSync(LEAGUE_STATE_PATH, JSON.stringify(state, null, 2));
-}
+import { loadLeagueState, saveLeagueState, getLineup, setLineupForTournament } from "../lib/league-helpers.js";
 
 const router = Router();
 
@@ -72,7 +59,7 @@ router.post("/:id/waiver/claim", (req, res) => {
   }
 
   // Check the add player is a free agent (roster + reserve)
-  const isOwned = league.teams.some((t: { roster: number[]; reserve?: number[] }) =>
+  const isOwned = league.teams.some((t) =>
     t.roster.includes(addPlayerId) || (t.reserve || []).includes(addPlayerId)
   );
   if (isOwned) {
@@ -80,7 +67,7 @@ router.post("/:id/waiver/claim", (req, res) => {
     return;
   }
 
-  const team = league.teams.find((t: { teamId: number }) => t.teamId === teamId);
+  const team = league.teams.find((t) => t.teamId === teamId);
   if (!team) {
     res.status(400).json({ error: "Team not found" });
     return;
@@ -122,6 +109,8 @@ router.post("/:id/waiver/process", (req, res) => {
     return;
   }
 
+  const simState = loadState();
+  const currentTournamentId = simState.tournamentId;
   const claims = league.waiverClaims;
   let processed = 0;
 
@@ -136,7 +125,7 @@ router.post("/:id/waiver/process", (req, res) => {
     // Skip if add player was already claimed
     if (processedPlayers.has(claim.addPlayerId)) continue;
 
-    const team = league.teams.find((t: { teamId: number }) => t.teamId === claim.teamId);
+    const team = league.teams.find((t) => t.teamId === claim.teamId);
     if (!team) continue;
 
     const allPlayers = loadPlayers();
@@ -147,10 +136,12 @@ router.post("/:id/waiver/process", (req, res) => {
       const dropIdx = team.roster.indexOf(claim.dropPlayerId);
       if (dropIdx === -1) continue;
       team.roster[dropIdx] = claim.addPlayerId;
-      // If dropped player was in active lineup, replace with added player
-      const activeIdx = team.activeLineup.indexOf(claim.dropPlayerId);
+      // If dropped player was in current tournament lineup, replace with added player
+      const lineup = getLineup(team, currentTournamentId);
+      const activeIdx = lineup.indexOf(claim.dropPlayerId);
       if (activeIdx !== -1) {
-        team.activeLineup[activeIdx] = claim.addPlayerId;
+        lineup[activeIdx] = claim.addPlayerId;
+        setLineupForTournament(team, currentTournamentId, lineup);
       }
 
       const dropName = allPlayers.find((p) => p.id === claim.dropPlayerId)?.name || `Player ${claim.dropPlayerId}`;

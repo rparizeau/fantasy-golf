@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   getSimState,
   advanceSim,
+  rewindSim,
   updatePlayer,
   resetSim,
   getLeaderboard,
@@ -22,14 +23,6 @@ const PHASE_LABELS: Record<string, string> = {
   final: "Tournament Final",
 };
 
-const NEXT_ACTION: Record<string, string> = {
-  idle: "Start Round 1",
-  round1: "Start Round 2",
-  round2: "Apply Cut",
-  cut: "Start Round 3",
-  round3: "Start Round 4",
-  round4: "Finalize Tournament",
-};
 
 // --- Player Edit Modal ---
 
@@ -447,15 +440,73 @@ export function SimPanel() {
     setLoading(false);
   };
 
-  const handleAdvance = async () => {
+  // Which rounds are "on" based on current phase
+  const PHASE_ROUND: Record<string, number> = { idle: 0, round1: 1, round2: 2, cut: 2, round3: 3, round4: 4, final: 4 };
+  const completedRound = sim ? PHASE_ROUND[sim.phase] ?? 0 : 0;
+  const isFinal = sim?.phase === "final";
+
+  /** Advance sim forward until we reach the target round. */
+  const handleAdvanceToRound = async (targetRound: number) => {
+    if (!sim) return;
     setLoading(true);
     try {
-      await advanceSim();
+      // Keep advancing until currentRound reaches target
+      let phase = sim.phase;
+      let round = sim.currentRound;
+      while (round < targetRound || (phase === "cut" && targetRound > 2)) {
+        const result = await advanceSim();
+        phase = result.phase;
+        round = result.currentRound;
+        if (phase === "final") break;
+      }
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Advance failed");
     }
     setLoading(false);
+  };
+
+  /** Rewind sim backward until we're before the target round. */
+  const handleRewindToRound = async (targetRound: number) => {
+    if (!sim) return;
+    setLoading(true);
+    try {
+      let phase = sim.phase;
+      let round = PHASE_ROUND[phase] ?? 0;
+      while (round >= targetRound && phase !== "idle") {
+        const result = await rewindSim();
+        phase = result.phase;
+        round = PHASE_ROUND[phase] ?? 0;
+      }
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Rewind failed");
+    }
+    setLoading(false);
+  };
+
+  const handleToggleRound = async (round: number) => {
+    const isOn = completedRound >= round;
+    if (isOn) {
+      await handleRewindToRound(round);
+    } else {
+      await handleAdvanceToRound(round);
+    }
+  };
+
+  const handleToggleScore = async () => {
+    if (isFinal) {
+      await handleRewindToRound(5); // rewind from final → round4
+    } else if (completedRound >= 4) {
+      setLoading(true);
+      try {
+        await advanceSim(); // round4 → final
+        await refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Score failed");
+      }
+      setLoading(false);
+    }
   };
 
   const handleReset = async () => {
@@ -534,60 +585,92 @@ export function SimPanel() {
 
       {error && <div style={styles.error}>{error}</div>}
 
-      {/* Status + Controls */}
+      {/* Tournament Info + Status */}
       <div style={styles.card}>
-        {activeTournament && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={styles.tournamentName}>{activeTournament.name}</div>
-            <div style={styles.tournamentMeta}>
-              {activeTournament.course} &middot; Par {activeTournament.par} &middot; ${(activeTournament.purse / 1_000_000).toFixed(1)}M purse
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          {activeTournament && (
+            <div>
+              <div style={styles.tournamentName}>{activeTournament.name}</div>
+              <div style={styles.tournamentMeta}>
+                {activeTournament.course} &middot; Par {activeTournament.par} &middot; ${(activeTournament.purse / 1_000_000).toFixed(1)}M purse
+              </div>
+            </div>
+          )}
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={styles.phasePill}>
+              <span style={{
+                ...styles.phaseDot,
+                background: sim.phase === "final" ? "#8E95A0" : sim.phase === "idle" ? "#E2A03F" : "#2D8B52",
+              }} />
+              {PHASE_LABELS[sim.phase] || sim.phase}
+            </div>
+            <div style={styles.statusGrid}>
+              <StatusItem label="Round" value={sim.currentRound || "-"} />
+              <StatusItem label="Field" value={sim.fieldSize} />
+              <StatusItem label="Active" value={sim.activePlayers} />
+              <StatusItem label="Cut" value={sim.cutPlayers} />
+              <StatusItem label="WD" value={sim.wdPlayers} />
+              {sim.cutLine !== null && <StatusItem label="Cut Line" value={sim.cutLine} />}
             </div>
           </div>
-        )}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div style={styles.phasePill}>
-            <span style={{
-              ...styles.phaseDot,
-              background: sim.phase === "final" ? "#8E95A0" : sim.phase === "idle" ? "#E2A03F" : "#2D8B52",
-            }} />
-            {PHASE_LABELS[sim.phase] || sim.phase}
-          </div>
-          <div style={styles.buttonRow}>
-            {sim.phase !== "final" && (
-              <button style={styles.primaryBtn} onClick={handleAdvance} disabled={loading}>
-                {loading ? "..." : NEXT_ACTION[sim.phase] || "Advance"}
-              </button>
-            )}
-            <button style={styles.dangerBtn} onClick={handleReset} disabled={loading}>
-              Reset
-            </button>
-          </div>
         </div>
-
-        <div style={styles.statusGrid}>
-          <StatusItem label="Round" value={sim.currentRound || "-"} />
-          <StatusItem label="Field" value={sim.fieldSize} />
-          <StatusItem label="Active" value={sim.activePlayers} />
-          <StatusItem label="Cut" value={sim.cutPlayers} />
-          <StatusItem label="WD" value={sim.wdPlayers} />
-          {sim.cutLine !== null && <StatusItem label="Cut Line" value={sim.cutLine} />}
-        </div>
-
       </div>
 
       {/* Leaderboard */}
       <div style={styles.card}>
-        <div style={{ marginBottom: 8 }}>
-          <div style={styles.cardHeader}>Leaderboard</div>
-        </div>
-
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <input
               type="text"
               placeholder="Search players..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
-              style={{ ...styles.input, marginBottom: 10 }}
+              style={{ ...styles.input, flex: 1 }}
             />
+            <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center" }}>
+              {[1, 2, 3, 4].map((r) => {
+                const isOn = completedRound >= r;
+                return (
+                  <button
+                    key={r}
+                    onClick={() => handleToggleRound(r)}
+                    disabled={loading}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: 6,
+                      border: isOn ? "1px solid #2D8B52" : "1px solid #E2E5EA",
+                      background: isOn ? "#2D8B52" : "#fff",
+                      color: isOn ? "#fff" : "#8E95A0",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    R{r}
+                  </button>
+                );
+              })}
+              <div style={{ width: 1, height: 20, background: "#E2E5EA", margin: "0 4px" }} />
+              <button
+                onClick={handleToggleScore}
+                disabled={loading || (completedRound < 4 && !isFinal)}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  border: isFinal ? "1px solid #2D8B52" : "1px solid #E2E5EA",
+                  background: isFinal ? "#2D8B52" : "#fff",
+                  color: isFinal ? "#fff" : completedRound >= 4 ? "#1A1D21" : "#CCC",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: completedRound >= 4 || isFinal ? "pointer" : "default",
+                }}
+              >
+                Score
+              </button>
+              <button style={styles.dangerBtn} onClick={handleReset} disabled={loading}>
+                Reset
+              </button>
+            </div>
+        </div>
             <table style={styles.table}>
               <colgroup>
                 <col style={{ width: 40 }} />
@@ -610,7 +693,7 @@ export function SimPanel() {
                   <th style={{ ...styles.th, textAlign: "right" }}>R2</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>R3</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>R4</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Score</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Tot</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>Purse</th>
                   <th style={styles.th}></th>
                 </tr>

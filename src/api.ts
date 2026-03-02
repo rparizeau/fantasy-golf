@@ -52,6 +52,10 @@ export function updatePlayer(playerId: number, updates: { rounds?: (number | nul
   });
 }
 
+export function rewindSim() {
+  return fetchJSON<{ phase: string; currentRound: number }>("/sim/rewind", { method: "POST" });
+}
+
 export function resetSim(tournamentId?: number) {
   return fetchJSON<{ phase: string; tournamentId: number; fieldSize: number }>("/sim/reset", {
     method: "POST",

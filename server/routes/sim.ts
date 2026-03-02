@@ -1,28 +1,31 @@
 import { Router } from "express";
-import { loadState, advance, setOverride, updatePlayer, reset, createFreshState, loadPayoutTable, getCurrentTournament } from "../sim/engine.js";
+import { loadState, saveState, advance, rewind, setOverride, updatePlayer, reset, createFreshState, loadPayoutTable, loadTournaments, getCurrentTournament } from "../sim/engine.js";
 import type { SimState } from "../sim/engine.js";
 import { loadLeagueState, saveLeagueState, getLineup, setLineupForTournament } from "../lib/league-helpers.js";
 
-function accumulateSeasonEarnings(simState: SimState): void {
-  if (simState.phase !== "final") return;
-
-  const tournament = getCurrentTournament();
-  if (simState.tournamentId !== tournament.id) return;
-
+function buildPlayerEarnings(simState: SimState, purse: number): Map<number, number> {
   const payoutTable = loadPayoutTable();
-
-  // Build player earnings map
-  const playerEarnings = new Map<number, number>();
+  const map = new Map<number, number>();
   for (const p of simState.players) {
     let earnings = 0;
     if (p.status === "active") {
       const payout = payoutTable.find((pt) => pt.position === p.position);
-      if (payout) earnings = Math.round(tournament.purse * (payout.pct / 100));
+      if (payout) earnings = Math.round(purse * (payout.pct / 100));
     }
-    playerEarnings.set(p.playerId, earnings);
+    map.set(p.playerId, earnings);
   }
+  return map;
+}
 
-  // Update each team's seasonEarnings across all leagues
+function accumulateSeasonEarnings(simState: SimState): void {
+  if (simState.phase !== "final") return;
+  if (simState.earningsAccumulated) return; // already done
+
+  const tournament = getCurrentTournament();
+  if (simState.tournamentId !== tournament.id) return;
+
+  const playerEarnings = buildPlayerEarnings(simState, tournament.purse);
+
   const leagueState = loadLeagueState();
   for (const league of Object.values(leagueState.leagues)) {
     for (const team of league.teams) {
@@ -34,6 +37,35 @@ function accumulateSeasonEarnings(simState: SimState): void {
     }
   }
   saveLeagueState(leagueState);
+
+  simState.earningsAccumulated = true;
+  saveState(simState);
+}
+
+function deaccumulateSeasonEarnings(simState: SimState): void {
+  if (!simState.earningsAccumulated) return; // nothing to undo
+  if (simState.players.length === 0) return;
+
+  const tournaments = loadTournaments();
+  const tournament = tournaments.find((t) => t.id === simState.tournamentId);
+  if (!tournament) return;
+
+  const playerEarnings = buildPlayerEarnings(simState, tournament.purse);
+
+  const leagueState = loadLeagueState();
+  for (const league of Object.values(leagueState.leagues)) {
+    for (const team of league.teams) {
+      const lineup = getLineup(team, simState.tournamentId);
+      const weekEarnings = lineup.reduce(
+        (sum, pid) => sum + (playerEarnings.get(pid) || 0), 0
+      );
+      team.seasonEarnings = Math.max(0, team.seasonEarnings - weekEarnings);
+    }
+  }
+  saveLeagueState(leagueState);
+
+  simState.earningsAccumulated = false;
+  saveState(simState);
 }
 
 /** When advancing from idle → round1, ensure every team has a lineup for the current tournament. */
@@ -142,6 +174,23 @@ router.post("/advance", (_req, res) => {
   });
 });
 
+// POST /api/sim/rewind — undo the most recent phase transition
+router.post("/rewind", (_req, res) => {
+  const state = loadState();
+
+  if (state.phase === "idle") {
+    res.status(400).json({ error: "Already at idle." });
+    return;
+  }
+
+  deaccumulateSeasonEarnings(state);
+  const updated = rewind(state);
+  res.json({
+    phase: updated.phase,
+    currentRound: updated.currentRound,
+  });
+});
+
 // POST /api/sim/override — set player outcome (score, WD)
 router.post("/override", (req, res) => {
   const { playerId, score, wd } = req.body;
@@ -194,6 +243,8 @@ router.post("/player/update", (req, res) => {
 // POST /api/sim/reset — reset to idle with fresh field
 router.post("/reset", (req, res) => {
   const { tournamentId } = req.body || {};
+  const prevState = loadState();
+  deaccumulateSeasonEarnings(prevState);
   const state = reset(tournamentId);
   res.json({
     phase: state.phase,

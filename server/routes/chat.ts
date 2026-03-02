@@ -1,18 +1,5 @@
 import { Router } from "express";
-import { readFileSync, writeFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const LEAGUE_STATE_PATH = join(__dirname, "..", "state", "league-state.json");
-
-function loadLeagueState() {
-  return JSON.parse(readFileSync(LEAGUE_STATE_PATH, "utf-8"));
-}
-
-function saveLeagueState(state: unknown) {
-  writeFileSync(LEAGUE_STATE_PATH, JSON.stringify(state, null, 2));
-}
+import { loadLeagueState, saveLeagueState } from "../lib/league-helpers.js";
 
 const router = Router();
 
@@ -57,7 +44,7 @@ router.post("/:id/chat", (req, res) => {
     return;
   }
 
-  const team = league.teams.find((t: { teamId: number }) => t.teamId === teamId);
+  const team = league.teams.find((t) => t.teamId === teamId);
   const msg = {
     id: `msg-${Date.now()}`,
     teamId,

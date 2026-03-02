@@ -1,19 +1,6 @@
 import { Router } from "express";
-import { readFileSync, writeFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { loadState, loadTournaments, loadPayoutTable, formatScore, getCurrentTournament } from "../sim/engine.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const LEAGUE_STATE_PATH = join(__dirname, "..", "state", "league-state.json");
-
-function loadLeagueState() {
-  return JSON.parse(readFileSync(LEAGUE_STATE_PATH, "utf-8"));
-}
-
-function saveLeagueState(state: unknown) {
-  writeFileSync(LEAGUE_STATE_PATH, JSON.stringify(state, null, 2));
-}
+import { loadState, loadPayoutTable, getCurrentTournament } from "../sim/engine.js";
+import { loadLeagueState, saveLeagueState, getLineup } from "../lib/league-helpers.js";
 
 const router = Router();
 
@@ -26,7 +13,7 @@ router.get("/:id/team/:teamId/mulligan", (req, res) => {
     return;
   }
 
-  const team = league.teams.find((t: { teamId: number }) => t.teamId === Number(req.params.teamId));
+  const team = league.teams.find((t) => t.teamId === Number(req.params.teamId));
   if (!team) {
     res.status(404).json({ error: "Team not found" });
     return;
@@ -41,8 +28,9 @@ router.get("/:id/team/:teamId/mulligan", (req, res) => {
   const remaining = league.settings.mulligansPerSeason - team.mulligansUsed;
 
   // Eligible players: active lineup players who made the cut but have negative earnings potential
-  const eligiblePlayers = team.activeLineup
-    .map((playerId: number) => {
+  const lineup = getLineup(team, simState.tournamentId);
+  const eligiblePlayers = lineup
+    .map((playerId) => {
       const simPlayer = simState.players.find((p) => p.playerId === playerId);
       if (!simPlayer || simPlayer.status !== "active") return null;
 
@@ -75,7 +63,7 @@ router.post("/:id/team/:teamId/mulligan", (req, res) => {
     return;
   }
 
-  const team = league.teams.find((t: { teamId: number }) => t.teamId === Number(req.params.teamId));
+  const team = league.teams.find((t) => t.teamId === Number(req.params.teamId));
   if (!team) {
     res.status(404).json({ error: "Team not found" });
     return;
@@ -101,7 +89,8 @@ router.post("/:id/team/:teamId/mulligan", (req, res) => {
   }
 
   const { playerId } = req.body;
-  if (!playerId || !team.activeLineup.includes(playerId)) {
+  const lineup = getLineup(team, simState.tournamentId);
+  if (!playerId || !lineup.includes(playerId)) {
     res.status(400).json({ error: "Player must be in your active lineup" });
     return;
   }

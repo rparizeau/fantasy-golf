@@ -39,6 +39,7 @@ export interface SimState {
   cutLine: number | null;
   fieldSize: number;
   overrides: Record<number, { score?: number; wd?: boolean }>;
+  earningsAccumulated?: boolean;
 }
 
 interface SeedPlayer {
@@ -107,7 +108,7 @@ export function setActiveTournamentId(tournamentId: number): void {
 
 // --- State Load / Save ---
 
-function saveState(state: SimState): void {
+export function saveState(state: SimState): void {
   writeFileSync(simTournamentPath(state.tournamentId), JSON.stringify(state, null, 2));
 }
 
@@ -208,57 +209,49 @@ function defaultHolePars(par: number): number[] {
 
 /** Generate 18 hole scores with realistic birdie/par/bogey distribution. */
 function generateHoleScores(holePars: number[], ranking: number): number[] {
-  // Rank 1 → ~2 under par round, rank 100 → ~2 over par round
-  const rankingBonus = -2 + (ranking - 1) * (4 / 99);
-  const coursePar = holePars.reduce((a, b) => a + b, 0);
-  const targetTotal = coursePar + rankingBonus;
+  // Skill factor: rank 1 = 1.0 (best), rank 100 = 0.0 (worst)
+  const skill = 1 - (ranking - 1) / 99;
 
-  // Generate initial scores per hole using weighted probabilities
+  // Scale probabilities by skill — top players birdie more, bogey less
+  // Plus random "hot/cold" factor for round-to-round variance
+  const hotCold = randomNormal(0, 0.08); // adds ±8% swing per round
+  const birdieBoost = Math.max(0, skill * 0.18 + hotCold);  // rank 1 ≈ +18%, rank 100 ≈ 0%
+  const bogeyReduce = Math.max(0, skill * 0.14 + hotCold);  // rank 1 ≈ -14% bogey, rank 100 ≈ 0%
+
   const scores: number[] = [];
   for (const par of holePars) {
-    // Base probabilities: eagle/double-eagle rare, birdie/bogey based on hole difficulty
     const r = Math.random();
     let score: number;
     if (par === 3) {
-      // Par 3: ~5% birdie, ~65% par, ~25% bogey, ~5% double+
-      if (r < 0.05) score = par - 1;
-      else if (r < 0.70) score = par;
-      else if (r < 0.95) score = par + 1;
+      const birdie = 0.05 + birdieBoost * 0.6;
+      const bogey = Math.max(0.05, 0.25 - bogeyReduce);
+      const dbl = Math.max(0.01, 0.05 - bogeyReduce * 0.3);
+      if (r < birdie) score = par - 1;
+      else if (r < birdie + (1 - birdie - bogey - dbl)) score = par;
+      else if (r < 1 - dbl) score = par + 1;
       else score = par + 2;
     } else if (par === 5) {
-      // Par 5: ~2% eagle, ~15% birdie, ~55% par, ~23% bogey, ~5% double+
-      if (r < 0.02) score = par - 2;
-      else if (r < 0.17) score = par - 1;
-      else if (r < 0.72) score = par;
-      else if (r < 0.95) score = par + 1;
+      const eagle = 0.02 + birdieBoost * 0.15;
+      const birdie = 0.15 + birdieBoost * 0.8;
+      const bogey = Math.max(0.05, 0.23 - bogeyReduce);
+      const dbl = Math.max(0.01, 0.05 - bogeyReduce * 0.3);
+      if (r < eagle) score = par - 2;
+      else if (r < eagle + birdie) score = par - 1;
+      else if (r < eagle + birdie + (1 - eagle - birdie - bogey - dbl)) score = par;
+      else if (r < 1 - dbl) score = par + 1;
       else score = par + 2;
     } else {
-      // Par 4: ~1% eagle, ~10% birdie, ~60% par, ~24% bogey, ~5% double+
-      if (r < 0.01) score = par - 2;
-      else if (r < 0.11) score = par - 1;
-      else if (r < 0.71) score = par;
-      else if (r < 0.95) score = par + 1;
+      const eagle = 0.005 + birdieBoost * 0.02;
+      const birdie = 0.10 + birdieBoost;
+      const bogey = Math.max(0.05, 0.24 - bogeyReduce);
+      const dbl = Math.max(0.01, 0.05 - bogeyReduce * 0.3);
+      if (r < eagle) score = par - 2;
+      else if (r < eagle + birdie) score = par - 1;
+      else if (r < eagle + birdie + (1 - eagle - birdie - bogey - dbl)) score = par;
+      else if (r < 1 - dbl) score = par + 1;
       else score = par + 2;
     }
     scores.push(score);
-  }
-
-  // Adjust to hit target total — nudge random holes toward par-relative target
-  const currentTotal = scores.reduce((a, b) => a + b, 0);
-  let diff = Math.round(targetTotal) - currentTotal;
-  const maxIterations = 20;
-  let iter = 0;
-  while (diff !== 0 && iter < maxIterations) {
-    const idx = Math.floor(Math.random() * 18);
-    const par = holePars[idx];
-    if (diff > 0 && scores[idx] < par + 2) {
-      scores[idx]++;
-      diff--;
-    } else if (diff < 0 && scores[idx] > par - 2) {
-      scores[idx]--;
-      diff++;
-    }
-    iter++;
   }
 
   return scores;
@@ -422,6 +415,47 @@ export function advance(state: SimState): SimState {
   } else if (nextPhase === "final") {
     state.phase = "final";
     rankPlayers(state.players, state.par, 4);
+  }
+
+  saveState(state);
+  return state;
+}
+
+/** Undo the most recent phase transition. */
+export function rewind(state: SimState): SimState {
+  const currentIdx = PHASE_ORDER.indexOf(state.phase);
+  if (currentIdx <= 0) return state; // Already at idle
+
+  if (state.phase === "final") {
+    state.phase = "round4";
+  } else if (state.phase === "cut") {
+    // Undo cut — restore cut players to active
+    for (const player of state.players) {
+      if (player.status === "cut") player.status = "active";
+    }
+    state.cutLine = null;
+    state.phase = "round2";
+    rankPlayers(state.players, state.par, 2);
+  } else {
+    // Undo a round — strip last round from active players
+    for (const player of state.players) {
+      if (player.status !== "active" && player.status !== "wd") continue;
+      // Only strip if player actually has this round's data
+      if (player.rounds.length >= state.currentRound) {
+        player.rounds.pop();
+        if (player.holeScores && player.holeScores.length > 0) player.holeScores.pop();
+        player.total = player.rounds.reduce((sum, s) => sum + s, 0);
+      }
+      // Restore WD players from this round back to active
+      if (player.status === "wd" && player.rounds.length === state.currentRound - 1) {
+        player.status = "active";
+      }
+    }
+    state.currentRound--;
+    state.phase = PHASE_ORDER[currentIdx - 1];
+    if (state.currentRound > 0) {
+      rankPlayers(state.players, state.par, state.currentRound);
+    }
   }
 
   saveState(state);

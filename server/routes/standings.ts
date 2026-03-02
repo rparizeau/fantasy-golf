@@ -1,14 +1,5 @@
 import { Router } from "express";
-import { readFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const LEAGUE_STATE_PATH = join(__dirname, "..", "state", "league-state.json");
-
-function loadLeagueState() {
-  return JSON.parse(readFileSync(LEAGUE_STATE_PATH, "utf-8"));
-}
+import { loadLeagueState } from "../lib/league-helpers.js";
 
 const router = Router();
 
@@ -22,27 +13,21 @@ router.get("/:id/standings", (req, res) => {
   }
 
   // Build standings from season earnings
-  const standings = league.teams.map((team: {
-    teamId: number;
-    teamName: string;
-    managerName: string;
-    seasonEarnings: number;
-    tournamentHistory?: { tournamentId: number; tournamentName: string; earnings: number }[];
-  }, _idx: number) => ({
+  const standings = league.teams.map((team) => ({
     teamId: team.teamId,
     teamName: team.teamName,
     managerName: team.managerName,
     totalEarnings: team.seasonEarnings,
     previousRank: 0,
     currentRank: 0,
-    tournamentEarnings: team.tournamentHistory || [],
+    tournamentEarnings: [] as { tournamentId: number; tournamentName: string; earnings: number }[],
   }));
 
   // Sort by earnings descending
-  standings.sort((a: { totalEarnings: number }, b: { totalEarnings: number }) => b.totalEarnings - a.totalEarnings);
+  standings.sort((a, b) => b.totalEarnings - a.totalEarnings);
 
   // Assign ranks
-  standings.forEach((s: { currentRank: number; previousRank: number }, idx: number) => {
+  standings.forEach((s, idx) => {
     s.currentRank = idx + 1;
     s.previousRank = s.currentRank; // No history yet
   });

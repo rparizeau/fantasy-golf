@@ -189,18 +189,28 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
     );
   }
 
+  const colStyle: React.CSSProperties = { color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 };
+
   const sectionHeader = (label: string, extra?: React.ReactNode) => (
     <div style={{ display: "flex", alignItems: "center", padding: "20px 16px 8px" }}>
-      <p style={{ color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6, margin: 0 }}>
-        {label}
-      </p>
-      {extra}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <p style={{ ...colStyle, margin: 0, whiteSpace: "nowrap" }}>{label}</p>
+        {extra}
+      </div>
+      <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 15 }}>
+        {["R1", "R2", "R3", "R4"].map((l) => (
+          <div key={l} style={{ width: COL.r, textAlign: "center" }}><span style={colStyle}>{l}</span></div>
+        ))}
+        <div style={{ width: COL.s, textAlign: "center" }}><span style={colStyle}>TOT</span></div>
+        <div style={{ width: COL.p, textAlign: "right" }}><span style={colStyle}>PURSE</span></div>
+      </div>
     </div>
   );
 
   const currentWeekIndex = tournaments.findIndex((t) => t.id === currentTournamentId);
   const isPastWeek = viewingWeek < currentWeekIndex;
   const canMove = !locked && !isPastWeek;
+  const par = tournaments[viewingWeek]?.par ?? 72;
 
   return (
     <div style={{ paddingBottom: 100 }}>
@@ -223,8 +233,9 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
           ) : undefined
         )}
         <div style={{ padding: "0 16px 6px" }}>
+
           {activePlayers.map((p) => (
-            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
+            <PlayerCard key={p.playerId} player={p} par={par} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
           ))}
           {Array.from({ length: emptyActive }).map((_, i) => (
             <EmptySlot key={`ea-${i}`} label="Active" colors={C} highlight={moving !== null} warn={canMove && moving === null} onClick={() => handleEmptySlotDrop("active")} />
@@ -236,8 +247,9 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       <div style={{ background: C.card }}>
         {sectionHeader(`Bench (${benchPlayers.length}/${benchSize})`)}
         <div style={{ padding: "0 16px 6px" }}>
+
           {benchPlayers.map((p) => (
-            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
+            <PlayerCard key={p.playerId} player={p} par={par} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
           ))}
           {Array.from({ length: emptyBench }).map((_, i) => (
             <EmptySlot key={`eb-${i}`} label="Bench" colors={C} highlight={moving !== null} onClick={() => handleEmptySlotDrop("bench")} />
@@ -249,8 +261,9 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       <div style={{ background: C.bg }}>
         {sectionHeader(`Reserve (${sortedReserve.length}/${reserveSize})`)}
         <div style={{ padding: "0 16px 6px" }}>
+
           {sortedReserve.map((p) => (
-            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
+            <PlayerCard key={p.playerId} player={p} par={par} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
           ))}
           {Array.from({ length: emptyReserve }).map((_, i) => (
             <EmptySlot key={`er-${i}`} label="Reserve" colors={C} highlight={moving !== null} onClick={() => handleEmptySlotDrop("reserve")} />
@@ -423,6 +436,34 @@ export function WeekNav({
   );
 }
 
+// Column widths shared between headers and card data
+const COL = { r: 26, s: 36, p: 46, gap: 2 };
+
+function fmtPurse(n: number): string {
+  if (n <= 0) return "$0";
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${n}`;
+}
+
+function fmtPos(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function fmtToPar(diff: number): string {
+  if (diff < 0) return String(diff);
+  if (diff > 0) return `+${diff}`;
+  return "E";
+}
+
+function toParClr(diff: number, C: Theme): string {
+  if (diff < 0) return C.green;
+  if (diff > 0) return C.red;
+  return C.txt3;
+}
+
 function EmptySlot({ label, colors: C, highlight, warn, onClick }: { label: string; colors: Theme; highlight?: boolean; warn?: boolean; onClick?: () => void }) {
   const borderColor = highlight ? C.green : warn ? C.red : C.border;
   const textColor = highlight ? C.green : warn ? C.red : C.txt3;
@@ -450,6 +491,7 @@ function EmptySlot({ label, colors: C, highlight, warn, onClick }: { label: stri
 
 function PlayerCard({
   player: p,
+  par,
   colors: C,
   moving,
   disabled,
@@ -457,6 +499,7 @@ function PlayerCard({
   onTap,
 }: {
   player: RosterPlayer;
+  par: number;
   colors: Theme;
   moving: boolean;
   disabled: boolean;
@@ -464,6 +507,8 @@ function PlayerCard({
   onTap: () => void;
 }) {
   const btnSize = 36;
+  const hasRounds = p.rounds.length > 0;
+
   return (
     <div
       onClick={onTap}
@@ -507,7 +552,7 @@ function PlayerCard({
 
       {/* Player info */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ color: C.txt, fontSize: 14, fontWeight: 600, margin: 0 }}>{p.name}</p>
+        <p style={{ color: C.txt, fontSize: 14, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</p>
         <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
           <span style={{ fontSize: 11, color: C.txt3 }}>#{p.ranking}</span>
           <span style={{ fontSize: 11, color: C.txt3 }}>{p.country}</span>
@@ -523,23 +568,41 @@ function PlayerCard({
         </div>
       </div>
 
-      {/* Score */}
-      <div style={{ textAlign: "right" }}>
-        <p
-          style={{
-            fontSize: 14,
-            fontWeight: 600,
-            margin: 0,
-            color: p.toPar < 0 ? C.red : p.toPar > 0 ? C.txt2 : C.txt3,
-          }}
-        >
-          {p.toParDisplay}
-        </p>
-        {p.earnings > 0 && (
-          <p style={{ fontSize: 11, color: C.greenBright, fontWeight: 600, margin: 0 }}>
-            ${p.earnings.toLocaleString()}
+      {/* Data columns: R1 R2 R3 R4 | SCORE | PURSE */}
+      <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "flex-start" }}>
+        {/* R1–R4 */}
+        {[0, 1, 2, 3].map((i) => {
+          const score = p.rounds[i];
+          const played = score != null;
+          const diff = played ? score - par : 0;
+          return (
+            <div key={i} style={{ width: COL.r, textAlign: "center" }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: played ? toParClr(diff, C) : C.txt3, margin: 0, lineHeight: 1.3 }}>
+                {played ? fmtToPar(diff) : "-"}
+              </p>
+              <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3 }}>
+                {played ? score : "-"}
+              </p>
+            </div>
+          );
+        })}
+
+        {/* SCORE */}
+        <div style={{ width: COL.s, textAlign: "center" }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: hasRounds && p.status !== "cut" ? toParClr(p.toPar, C) : C.txt3, margin: 0, lineHeight: 1.3 }}>
+            {hasRounds && p.status !== "cut" ? p.toParDisplay : "-"}
           </p>
-        )}
+          <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3 }}>
+            {hasRounds && p.status !== "cut" && p.position > 0 ? fmtPos(p.position) : "-"}
+          </p>
+        </div>
+
+        {/* PURSE */}
+        <div style={{ width: COL.p, textAlign: "right" }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: p.earnings > 0 ? C.green : C.txt3, margin: 0, lineHeight: 1.3 }}>
+            {hasRounds && p.status !== "cut" ? fmtPurse(p.earnings) : "-"}
+          </p>
+        </div>
       </div>
     </div>
   );
