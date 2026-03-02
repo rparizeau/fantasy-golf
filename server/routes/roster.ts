@@ -2,7 +2,7 @@ import { Router } from "express";
 import { readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { loadState, loadTournaments, loadPayoutTable, formatScore } from "../sim/engine.js";
+import { loadState, loadTournaments, loadPayoutTable, formatScore, getCurrentTournament } from "../sim/engine.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LEAGUE_STATE_PATH = join(__dirname, "..", "state", "league-state.json");
@@ -33,12 +33,11 @@ router.get("/:id/team/:teamId/mulligan", (req, res) => {
   }
 
   const simState = loadState();
-  const tournaments = loadTournaments();
-  const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
+  const tournament = getCurrentTournament();
   const payoutTable = loadPayoutTable();
 
   // Window is open after cut phase, before round 3 starts, and not during majors
-  const windowOpen = simState.phase === "cut" && !tournament.isMajor;
+  const windowOpen = simState.phase === "cut" && simState.tournamentId === tournament.id && !tournament.isMajor;
   const remaining = league.settings.mulligansPerSeason - team.mulligansUsed;
 
   // Eligible players: active lineup players who made the cut but have negative earnings potential
@@ -83,8 +82,7 @@ router.post("/:id/team/:teamId/mulligan", (req, res) => {
   }
 
   const simState = loadState();
-  const tournaments = loadTournaments();
-  const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
+  const tournament = getCurrentTournament();
 
   if (tournament.isMajor) {
     res.status(403).json({ error: "Mulligans are disabled during major championships" });

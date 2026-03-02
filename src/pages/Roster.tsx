@@ -1,38 +1,41 @@
-import { useState, useEffect, useCallback } from "react";
-import { getRoster, setLineup, type RosterPlayer, type RosterData } from "../api";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getRoster, setLineup, type RosterPlayer, type RosterData, type TournamentListItem } from "../api";
 import type { Theme } from "../theme";
 
 interface RosterProps {
   leagueId: number;
   teamId: number;
   colors: Theme;
+  tournaments: TournamentListItem[];
+  currentTournamentId: number;
+  viewingWeek: number;
+  onChangeWeek: (week: number) => void;
 }
 
-export function Roster({ leagueId, teamId, colors: C }: RosterProps) {
+export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek }: RosterProps) {
   const [data, setData] = useState<RosterData | null>(null);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [reserve, setReserve] = useState<RosterPlayer[]>([]);
   const [locked, setLocked] = useState(false);
-  const [phase, setPhase] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const d = await getRoster(leagueId, teamId);
+      const tid = tournaments[viewingWeek]?.id;
+      const d = await getRoster(leagueId, teamId, tid);
       setData(d);
       setRoster(d.roster);
       setReserve(d.reserve);
       setLocked(d.locked);
-      setPhase(d.phase);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, [leagueId, teamId]);
+  }, [leagueId, teamId, viewingWeek, tournaments]);
 
   useEffect(() => {
     refresh();
@@ -210,34 +213,24 @@ export function Roster({ leagueId, teamId, colors: C }: RosterProps) {
     </div>
   );
 
+  const currentWeekIndex = tournaments.findIndex((t) => t.id === currentTournamentId);
+
   return (
     <div style={{ paddingBottom: 100 }}>
+      {tournaments.length > 0 && (
+        <WeekNav
+          tournaments={tournaments}
+          viewingWeek={viewingWeek}
+          currentWeekIndex={currentWeekIndex}
+          onChangeWeek={onChangeWeek}
+          colors={C}
+        />
+      )}
+
       {error && (
         <div style={{ padding: "12px 16px 0" }}>
           <div style={{ background: C.redDim, color: C.red, padding: "10px 14px", borderRadius: 10, fontSize: 13 }}>
             {error}
-          </div>
-        </div>
-      )}
-
-      {/* Lock status */}
-      {locked && (
-        <div style={{ padding: "12px 16px 0" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 12px",
-              background: C.bg,
-              borderRadius: 10,
-              border: `1px solid ${C.border}`,
-            }}
-          >
-            <span style={{ fontSize: 14 }}>🔒</span>
-            <span style={{ fontSize: 12, color: C.txt2 }}>
-              Lineups are locked — {phase === "final" ? "tournament is final" : "tournament in progress"}
-            </span>
           </div>
         </div>
       )}
@@ -287,6 +280,165 @@ export function Roster({ leagueId, teamId, colors: C }: RosterProps) {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function WeekNav({
+  tournaments,
+  viewingWeek,
+  currentWeekIndex,
+  onChangeWeek,
+  colors: C,
+}: {
+  tournaments: TournamentListItem[];
+  viewingWeek: number;
+  currentWeekIndex: number;
+  onChangeWeek: (week: number) => void;
+  colors: Theme;
+}) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const isCurrent = viewingWeek === currentWeekIndex;
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [dropdownOpen]);
+
+  return (
+    <div style={{ position: "relative" }} ref={dropdownRef}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          height: 44,
+          padding: "0 16px",
+          background: C.card,
+          borderBottom: `1px solid ${C.border}`,
+        }}
+      >
+        {/* Left arrow */}
+        <button
+          onClick={() => onChangeWeek(viewingWeek - 1)}
+          disabled={viewingWeek <= 0}
+          style={{
+            background: "none",
+            border: "none",
+            width: 22,
+            height: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: viewingWeek <= 0 ? "default" : "pointer",
+            color: viewingWeek <= 0 ? C.txt3 : C.txt2,
+            fontSize: 20,
+            lineHeight: 1,
+            opacity: viewingWeek <= 0 ? 0.4 : 1,
+          }}
+        >
+          ‹
+        </button>
+
+        {/* Center label */}
+        <button
+          onClick={() => setDropdownOpen(!dropdownOpen)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: "4px 12px",
+            cursor: "pointer",
+            fontSize: 14,
+            fontWeight: 600,
+            color: C.txt,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          <span>Week {viewingWeek + 1}</span>
+          {tournaments[viewingWeek]?.isMajor && <span style={{ color: C.gold }}>★</span>}
+          {isCurrent && <span style={{ color: C.green }}>(current)</span>}
+          <span style={{ fontSize: 10, color: C.txt3, marginLeft: 2 }}>{dropdownOpen ? "▲" : "▼"}</span>
+        </button>
+
+        {/* Right arrow */}
+        <button
+          onClick={() => onChangeWeek(viewingWeek + 1)}
+          disabled={viewingWeek >= tournaments.length - 1}
+          style={{
+            background: "none",
+            border: "none",
+            width: 22,
+            height: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: viewingWeek >= tournaments.length - 1 ? "default" : "pointer",
+            color: viewingWeek >= tournaments.length - 1 ? C.txt3 : C.txt2,
+            fontSize: 20,
+            lineHeight: 1,
+            opacity: viewingWeek >= tournaments.length - 1 ? 0.4 : 1,
+          }}
+        >
+          ›
+        </button>
+      </div>
+
+      {/* Dropdown overlay */}
+      {dropdownOpen && (
+        <div
+          style={{
+            position: "absolute",
+            top: 44,
+            left: 0,
+            right: 0,
+            zIndex: 50,
+            background: C.card,
+            border: `1px solid ${C.border}`,
+            borderTop: "none",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            maxHeight: 300,
+            overflowY: "auto",
+          }}
+        >
+          {tournaments.map((t, i) => {
+            const isCurrentWeek = i === currentWeekIndex;
+            const isSelected = i === viewingWeek;
+            return (
+              <div
+                key={t.id}
+                onClick={() => { onChangeWeek(i); setDropdownOpen(false); }}
+                style={{
+                  padding: "12px 16px",
+                  cursor: "pointer",
+                  background: isSelected ? C.greenDim : "transparent",
+                  borderBottom: i < tournaments.length - 1 ? `1px solid ${C.border}` : "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                {t.isMajor && <span style={{ color: C.gold, fontSize: 13 }}>★</span>}
+                <span style={{ fontSize: 13, fontWeight: isSelected ? 600 : 400, color: C.txt }}>
+                  Week {i + 1} — {t.name}
+                </span>
+                {isCurrentWeek && (
+                  <span style={{ fontSize: 11, color: C.green, fontWeight: 600 }}>(current)</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

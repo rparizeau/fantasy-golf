@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Theme } from "../theme";
-import type { TournamentInfo } from "../api";
-import { getTournament, getLeagueInfo } from "../api";
+import type { TournamentListItem } from "../api";
+import { getLeagueInfo } from "../api";
 import { ThemeToggle } from "./ThemeToggle";
 
 interface LeagueHeaderProps {
@@ -10,6 +10,7 @@ interface LeagueHeaderProps {
   colors: Theme;
   onToggleTheme: () => void;
   onBack: () => void;
+  viewedTournament: TournamentListItem | null;
 }
 
 function formatPurse(n: number): string {
@@ -17,27 +18,12 @@ function formatPurse(n: number): string {
   return `$${n.toLocaleString()}`;
 }
 
-export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, onBack }: LeagueHeaderProps) {
-  const [tourney, setTourney] = useState<TournamentInfo | null>(null);
+export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, onBack, viewedTournament: t }: LeagueHeaderProps) {
   const [leagueName, setLeagueName] = useState("");
 
   useEffect(() => {
-    getTournament().then(setTourney);
     getLeagueInfo(leagueId).then((info) => setLeagueName(info.name));
   }, [leagueId]);
-
-  const phase = tourney?.phase || "idle";
-  const status = phase === "idle" ? "upcoming" : phase === "final" ? "done" : "live";
-  const statusColor = status === "live" ? C.greenBright : status === "done" ? C.blue : C.txt3;
-  const statusLabel = status === "live" ? `Live • R${tourney?.currentRound || 0}` : status === "done" ? "Final" : "Upcoming";
-
-  // Format cut line
-  let cutDisplay = "—";
-  if (tourney && tourney.cutLine !== null) {
-    const cl = tourney.cutLine;
-    const strokes = tourney.par * 2 + cl;
-    cutDisplay = cl === 0 ? `E (${strokes})` : cl > 0 ? `+${cl} (${strokes})` : `${cl} (${strokes})`;
-  }
 
   return (
     <div
@@ -79,55 +65,27 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
         <ThemeToggle isDark={dk} colors={C} onToggle={onToggleTheme} />
       </div>
 
-      {!tourney ? (
+      {!t ? (
         <div style={{ height: 52 }} />
       ) : (
         <>
-          {/* Row 2: Tournament Name | Status */}
+          {/* Row 2: Tournament Name + Major star */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, marginBottom: 4 }}>
-            <p style={{ color: C.txt, fontSize: 17, fontWeight: 700, margin: 0 }}>{tourney.name}</p>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span
-                style={{
-                  padding: "2px 8px",
-                  borderRadius: 8,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: statusColor,
-                  background: statusColor + (dk ? "20" : "15"),
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-              >
-                {status === "live" && (
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: C.greenBright,
-                      boxShadow: `0 0 6px ${C.green}`,
-                      animation: "pulse 2s infinite",
-                      flexShrink: 0,
-                    }}
-                  />
-                )}
-                {statusLabel}
-              </span>
-            </div>
+            <p style={{ color: C.txt, fontSize: 17, fontWeight: 700, margin: 0 }}>
+              {t.isMajor && <span style={{ color: C.gold, marginRight: 6 }}>★</span>}
+              {t.name}
+            </p>
           </div>
 
           {/* Row 3: Course | Purse */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-            <p style={{ color: C.txt2, fontSize: 13, margin: 0 }}>{tourney.course}</p>
-            <p style={{ color: C.txt2, fontSize: 13, margin: 0 }}>Purse: {formatPurse(tourney.purse)}</p>
+            <p style={{ color: C.txt2, fontSize: 13, margin: 0 }}>{t.course}</p>
+            <p style={{ color: C.txt2, fontSize: 13, margin: 0 }}>Purse: {formatPurse(t.purse)}</p>
           </div>
 
-          {/* Row 4: Location | Cut */}
+          {/* Row 4: Location */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <p style={{ color: C.txt3, fontSize: 12, margin: 0 }}>📍 {tourney.location}</p>
-            <p style={{ color: C.txt3, fontSize: 12, margin: 0 }}>Cut: {cutDisplay}</p>
+            <p style={{ color: C.txt3, fontSize: 12, margin: 0 }}>📍 {t.location}</p>
           </div>
         </>
       )}

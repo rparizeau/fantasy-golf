@@ -1,4 +1,5 @@
 import type { Theme } from "../theme";
+import type { TournamentListItem } from "../api";
 import { Home } from "../pages/Home";
 import { Roster } from "../pages/Roster";
 import { Golfers } from "../pages/Golfers";
@@ -9,9 +10,13 @@ interface PageContentProps {
   page: string;
   leagueId: number;
   colors: Theme;
+  tournaments: TournamentListItem[];
+  currentTournamentId: number;
+  viewingWeek: number;
+  onChangeWeek: (week: number) => void;
 }
 
-export function PageContent({ page, leagueId, colors: C }: PageContentProps) {
+export function PageContent({ page, leagueId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek }: PageContentProps) {
   const myTeamId = 1;
 
   switch (page) {
@@ -24,7 +29,15 @@ export function PageContent({ page, leagueId, colors: C }: PageContentProps) {
     case "scorecard":
       return (
         <div style={{ flex: 1 }}>
-          <Roster leagueId={leagueId} teamId={myTeamId} colors={C} />
+          <Roster
+            leagueId={leagueId}
+            teamId={myTeamId}
+            colors={C}
+            tournaments={tournaments}
+            currentTournamentId={currentTournamentId}
+            viewingWeek={viewingWeek}
+            onChangeWeek={onChangeWeek}
+          />
         </div>
       );
     case "golfers":

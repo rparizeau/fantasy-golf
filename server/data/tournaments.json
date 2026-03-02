@@ -1,32 +1,193 @@
 [
   {
     "id": 1,
-    "name": "Arnold Palmer Invitational",
-    "course": "Bay Hill Club & Lodge",
-    "location": "Orlando, FL",
-    "purse": 20000000,
-    "par": 72,
-    "isMajor": false,
-    "dates": { "start": "2026-03-05", "end": "2026-03-08" }
-  },
-  {
-    "id": 2,
     "name": "THE PLAYERS Championship",
     "course": "TPC Sawgrass (Stadium)",
     "location": "Ponte Vedra Beach, FL",
     "purse": 25000000,
     "par": 72,
     "isMajor": false,
-    "dates": { "start": "2026-03-12", "end": "2026-03-15" }
+    "current": true,
+    "dates": { "start": "2026-03-11", "end": "2026-03-14" }
+  },
+  {
+    "id": 2,
+    "name": "Valspar Championship",
+    "course": "Innisbrook (Copperhead)",
+    "location": "Palm Harbor, FL",
+    "purse": 8400000,
+    "par": 71,
+    "isMajor": false,
+    "dates": { "start": "2026-03-18", "end": "2026-03-21" }
   },
   {
     "id": 3,
+    "name": "Houston Open",
+    "course": "Memorial Park Golf Course",
+    "location": "Houston, TX",
+    "purse": 9000000,
+    "par": 70,
+    "isMajor": false,
+    "dates": { "start": "2026-03-25", "end": "2026-03-28" }
+  },
+  {
+    "id": 4,
+    "name": "Valero Texas Open",
+    "course": "TPC San Antonio (Oaks)",
+    "location": "San Antonio, TX",
+    "purse": 9100000,
+    "par": 72,
+    "isMajor": false,
+    "dates": { "start": "2026-04-01", "end": "2026-04-04" }
+  },
+  {
+    "id": 5,
     "name": "The Masters",
     "course": "Augusta National Golf Club",
     "location": "Augusta, GA",
     "purse": 20000000,
     "par": 72,
     "isMajor": true,
-    "dates": { "start": "2026-04-09", "end": "2026-04-12" }
+    "dates": { "start": "2026-04-08", "end": "2026-04-11" }
+  },
+  {
+    "id": 6,
+    "name": "RBC Heritage",
+    "course": "Harbour Town Golf Links",
+    "location": "Hilton Head, SC",
+    "purse": 20000000,
+    "par": 71,
+    "isMajor": false,
+    "dates": { "start": "2026-04-15", "end": "2026-04-18" }
+  },
+  {
+    "id": 7,
+    "name": "Zurich Classic of New Orleans",
+    "course": "TPC Louisiana",
+    "location": "Avondale, LA",
+    "purse": 8800000,
+    "par": 72,
+    "isMajor": false,
+    "dates": { "start": "2026-04-22", "end": "2026-04-25" }
+  },
+  {
+    "id": 8,
+    "name": "Cadillac Championship",
+    "course": "Trump National Doral (Blue Monster)",
+    "location": "Doral, FL",
+    "purse": 20000000,
+    "par": 72,
+    "isMajor": false,
+    "dates": { "start": "2026-04-29", "end": "2026-05-02" }
+  },
+  {
+    "id": 9,
+    "name": "Truist Championship",
+    "course": "Quail Hollow Club",
+    "location": "Charlotte, NC",
+    "purse": 20000000,
+    "par": 71,
+    "isMajor": false,
+    "dates": { "start": "2026-05-06", "end": "2026-05-09" }
+  },
+  {
+    "id": 10,
+    "name": "PGA Championship",
+    "course": "Aronimink Golf Club",
+    "location": "Newtown Square, PA",
+    "purse": 17500000,
+    "par": 70,
+    "isMajor": true,
+    "dates": { "start": "2026-05-13", "end": "2026-05-16" }
+  },
+  {
+    "id": 11,
+    "name": "CJ Cup Byron Nelson",
+    "course": "TPC Craig Ranch",
+    "location": "McKinney, TX",
+    "purse": 9500000,
+    "par": 72,
+    "isMajor": false,
+    "dates": { "start": "2026-05-20", "end": "2026-05-23" }
+  },
+  {
+    "id": 12,
+    "name": "Charles Schwab Challenge",
+    "course": "Colonial Country Club",
+    "location": "Fort Worth, TX",
+    "purse": 9100000,
+    "par": 70,
+    "isMajor": false,
+    "dates": { "start": "2026-05-27", "end": "2026-05-30" }
+  },
+  {
+    "id": 13,
+    "name": "the Memorial Tournament",
+    "course": "Muirfield Village Golf Club",
+    "location": "Dublin, OH",
+    "purse": 20000000,
+    "par": 72,
+    "isMajor": false,
+    "dates": { "start": "2026-06-03", "end": "2026-06-06" }
+  },
+  {
+    "id": 14,
+    "name": "RBC Canadian Open",
+    "course": "TPC Toronto",
+    "location": "Caledon, ON",
+    "purse": 9400000,
+    "par": 72,
+    "isMajor": false,
+    "dates": { "start": "2026-06-10", "end": "2026-06-13" }
+  },
+  {
+    "id": 15,
+    "name": "U.S. Open",
+    "course": "Shinnecock Hills Golf Club",
+    "location": "Southampton, NY",
+    "purse": 21500000,
+    "par": 70,
+    "isMajor": true,
+    "dates": { "start": "2026-06-17", "end": "2026-06-20" }
+  },
+  {
+    "id": 16,
+    "name": "Travelers Championship",
+    "course": "TPC River Highlands",
+    "location": "Cromwell, CT",
+    "purse": 20000000,
+    "par": 70,
+    "isMajor": false,
+    "dates": { "start": "2026-06-24", "end": "2026-06-27" }
+  },
+  {
+    "id": 17,
+    "name": "John Deere Classic",
+    "course": "TPC Deere Run",
+    "location": "Silvis, IL",
+    "purse": 8400000,
+    "par": 71,
+    "isMajor": false,
+    "dates": { "start": "2026-07-01", "end": "2026-07-04" }
+  },
+  {
+    "id": 18,
+    "name": "Genesis Scottish Open",
+    "course": "The Renaissance Club",
+    "location": "North Berwick, Scotland",
+    "purse": 9000000,
+    "par": 70,
+    "isMajor": false,
+    "dates": { "start": "2026-07-08", "end": "2026-07-11" }
+  },
+  {
+    "id": 19,
+    "name": "The Open Championship",
+    "course": "Royal Birkdale Golf Club",
+    "location": "Southport, England",
+    "purse": 17000000,
+    "par": 70,
+    "isMajor": true,
+    "dates": { "start": "2026-07-15", "end": "2026-07-18" }
   }
 ]

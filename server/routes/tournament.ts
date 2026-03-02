@@ -1,13 +1,13 @@
 import { Router } from "express";
-import { loadState, loadTournaments, loadPayoutTable, formatScore } from "../sim/engine.js";
+import { loadState, loadTournaments, loadPayoutTable, formatScore, getCurrentTournament } from "../sim/engine.js";
 
 const router = Router();
 
 // GET /api/tournament/current — tournament info + status
 router.get("/current", (_req, res) => {
+  const tournament = getCurrentTournament();
   const state = loadState();
-  const tournaments = loadTournaments();
-  const tournament = tournaments.find((t) => t.id === state.tournamentId) || tournaments[0];
+  const simMatchesCurrent = state.tournamentId === tournament.id;
 
   res.json({
     id: tournament.id,
@@ -18,11 +18,11 @@ router.get("/current", (_req, res) => {
     par: tournament.par,
     isMajor: tournament.isMajor,
     dates: tournament.dates,
-    phase: state.phase,
-    currentRound: state.currentRound,
-    fieldSize: state.fieldSize,
-    activePlayers: state.players.filter((p) => p.status === "active").length,
-    cutLine: state.cutLine,
+    phase: simMatchesCurrent ? state.phase : "idle",
+    currentRound: simMatchesCurrent ? state.currentRound : 0,
+    fieldSize: simMatchesCurrent ? state.fieldSize : 0,
+    activePlayers: simMatchesCurrent ? state.players.filter((p) => p.status === "active").length : 0,
+    cutLine: simMatchesCurrent ? state.cutLine : null,
   });
 });
 

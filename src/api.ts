@@ -109,6 +109,7 @@ export interface TournamentListItem {
   purse: number;
   par: number;
   isMajor: boolean;
+  current?: boolean;
 }
 
 export function getTournamentList() {
@@ -210,8 +211,9 @@ export interface RosterData {
   reserve: RosterPlayer[];
 }
 
-export function getRoster(leagueId: number, teamId: number) {
-  return fetchJSON<RosterData>(`/league/${leagueId}/team/${teamId}/roster`);
+export function getRoster(leagueId: number, teamId: number, tournamentId?: number) {
+  const qs = tournamentId != null ? `?tournamentId=${tournamentId}` : "";
+  return fetchJSON<RosterData>(`/league/${leagueId}/team/${teamId}/roster${qs}`);
 }
 
 export function setLineup(leagueId: number, teamId: number, activePlayerIds: number[]) {

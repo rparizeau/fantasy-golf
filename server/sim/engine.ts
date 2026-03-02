@@ -49,6 +49,7 @@ interface SeedTournament {
   purse: number;
   par: number;
   isMajor: boolean;
+  current?: boolean;
   dates: { start: string; end: string };
 }
 
@@ -80,6 +81,11 @@ export function loadTournaments(): SeedTournament[] {
 
 export function loadPayoutTable(): { position: number; pct: number }[] {
   return loadJSON<{ position: number; pct: number }[]>(join(DATA_DIR, "payout-table.json"));
+}
+
+export function getCurrentTournament(): SeedTournament {
+  const tournaments = loadTournaments();
+  return tournaments.find((t) => t.current) || tournaments[0];
 }
 
 // Box-Muller transform for normal distribution

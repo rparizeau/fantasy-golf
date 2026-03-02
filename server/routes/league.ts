@@ -2,7 +2,7 @@ import { Router } from "express";
 import { readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { loadState, loadTournaments, loadPayoutTable, formatScore } from "../sim/engine.js";
+import { loadState, loadTournaments, loadPayoutTable, loadPlayers, formatScore, getCurrentTournament } from "../sim/engine.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LEAGUE_STATE_PATH = join(__dirname, "..", "state", "league-state.json");
@@ -47,28 +47,30 @@ const router = Router();
 router.get("/all", (_req, res) => {
   const leagueState = loadLeagueState();
   const simState = loadState();
-  const tournaments = loadTournaments();
-  const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
+  const tournament = getCurrentTournament();
   const payoutTable = loadPayoutTable();
+  const simMatchesCurrent = simState.tournamentId === tournament.id;
 
   // Compute per-player this-week earnings
   const playerEarningsMap = new Map<number, number>();
-  for (const p of simState.players) {
-    let earnings = 0;
-    if (simState.phase === "final" && p.status === "active") {
-      const payout = payoutTable.find((pt) => pt.position === p.position);
-      if (payout) earnings = Math.round(tournament.purse * (payout.pct / 100));
+  if (simMatchesCurrent) {
+    for (const p of simState.players) {
+      let earnings = 0;
+      if (simState.phase === "final" && p.status === "active") {
+        const payout = payoutTable.find((pt) => pt.position === p.position);
+        if (payout) earnings = Math.round(tournament.purse * (payout.pct / 100));
+      }
+      playerEarningsMap.set(p.playerId, earnings);
     }
-    playerEarningsMap.set(p.playerId, earnings);
   }
 
-  const phase = simState.phase;
+  const phase = simMatchesCurrent ? simState.phase : "idle";
   const status = phase === "idle" ? "upcoming" : phase === "final" ? "done" : "live";
-  const round = simState.currentRound;
+  const round = simMatchesCurrent ? simState.currentRound : 0;
 
   // Format cut line
   let cutDisplay = "—";
-  if (simState.cutLine !== null) {
+  if (simMatchesCurrent && simState.cutLine !== null) {
     const cl = simState.cutLine;
     const strokes = tournament.par * 2 + cl;
     cutDisplay = cl === 0 ? `E (${strokes})` : cl > 0 ? `+${cl} (${strokes})` : `${cl} (${strokes})`;
@@ -241,72 +243,121 @@ router.get("/:id/team/:teamId/roster", (req, res) => {
 
   const simState = loadState();
   const tournaments = loadTournaments();
-  const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
-  const payoutTable = loadPayoutTable();
-  const locked = simState.phase !== "idle";
+  const currentTournament = getCurrentTournament();
+  const reqTournamentId = req.query.tournamentId ? Number(req.query.tournamentId) : undefined;
+  const isLiveTournament = (!reqTournamentId || reqTournamentId === currentTournament.id) && simState.tournamentId === currentTournament.id;
 
-  const roster = team.roster.map((playerId) => {
-    const simPlayer = simState.players.find((p) => p.playerId === playerId);
-    let earnings = 0;
-    if (simState.phase === "final" && simPlayer?.status === "active") {
-      const payout = payoutTable.find((pt) => pt.position === simPlayer.position);
-      if (payout) {
-        earnings = Math.round(tournament.purse * (payout.pct / 100));
+  // Validate requested tournament exists
+  if (reqTournamentId && !tournaments.find((t) => t.id === reqTournamentId)) {
+    res.status(404).json({ error: "Tournament not found" });
+    return;
+  }
+
+  if (isLiveTournament) {
+    // Live tournament — full sim data
+    const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
+    const payoutTable = loadPayoutTable();
+    const locked = simState.phase !== "idle";
+
+    const roster = team.roster.map((playerId) => {
+      const simPlayer = simState.players.find((p) => p.playerId === playerId);
+      let earnings = 0;
+      if (simState.phase === "final" && simPlayer?.status === "active") {
+        const payout = payoutTable.find((pt) => pt.position === simPlayer.position);
+        if (payout) {
+          earnings = Math.round(tournament.purse * (payout.pct / 100));
+        }
       }
-    }
 
-    return {
-      playerId,
-      name: simPlayer?.name || `Player ${playerId}`,
-      country: simPlayer?.country || "",
-      ranking: simPlayer?.ranking || 0,
-      isActive: team.activeLineup.includes(playerId),
-      inField: !!simPlayer,
-      toPar: simPlayer?.toPar ?? 0,
-      toParDisplay: simPlayer && simPlayer.rounds.length > 0 ? formatScore(simPlayer.toPar) : "-",
-      position: simPlayer?.position ?? 0,
-      status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
-      rounds: simPlayer?.rounds ?? [],
-      earnings: team.activeLineup.includes(playerId) ? earnings : 0,
-    };
-  });
+      return {
+        playerId,
+        name: simPlayer?.name || `Player ${playerId}`,
+        country: simPlayer?.country || "",
+        ranking: simPlayer?.ranking || 0,
+        isActive: team.activeLineup.includes(playerId),
+        inField: !!simPlayer,
+        toPar: simPlayer?.toPar ?? 0,
+        toParDisplay: simPlayer && simPlayer.rounds.length > 0 ? formatScore(simPlayer.toPar) : "-",
+        position: simPlayer?.position ?? 0,
+        status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
+        rounds: simPlayer?.rounds ?? [],
+        earnings: team.activeLineup.includes(playerId) ? earnings : 0,
+      };
+    });
 
-  const reserve = (team.reserve || []).map((playerId) => {
-    const simPlayer = simState.players.find((p) => p.playerId === playerId);
-    let earnings = 0;
-    if (simState.phase === "final" && simPlayer?.status === "active") {
-      const payout = payoutTable.find((pt) => pt.position === simPlayer.position);
-      if (payout) {
-        earnings = Math.round(tournament.purse * (payout.pct / 100));
+    const reserve = (team.reserve || []).map((playerId) => {
+      const simPlayer = simState.players.find((p) => p.playerId === playerId);
+      let earnings = 0;
+      if (simState.phase === "final" && simPlayer?.status === "active") {
+        const payout = payoutTable.find((pt) => pt.position === simPlayer.position);
+        if (payout) {
+          earnings = Math.round(tournament.purse * (payout.pct / 100));
+        }
       }
-    }
 
-    return {
-      playerId,
-      name: simPlayer?.name || `Player ${playerId}`,
-      country: simPlayer?.country || "",
-      ranking: simPlayer?.ranking || 0,
-      isActive: false,
-      inField: !!simPlayer,
-      toPar: simPlayer?.toPar ?? 0,
-      toParDisplay: simPlayer && simPlayer.rounds.length > 0 ? formatScore(simPlayer.toPar) : "-",
-      position: simPlayer?.position ?? 0,
-      status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
-      rounds: simPlayer?.rounds ?? [],
-      earnings: 0,
+      return {
+        playerId,
+        name: simPlayer?.name || `Player ${playerId}`,
+        country: simPlayer?.country || "",
+        ranking: simPlayer?.ranking || 0,
+        isActive: false,
+        inField: !!simPlayer,
+        toPar: simPlayer?.toPar ?? 0,
+        toParDisplay: simPlayer && simPlayer.rounds.length > 0 ? formatScore(simPlayer.toPar) : "-",
+        position: simPlayer?.position ?? 0,
+        status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
+        rounds: simPlayer?.rounds ?? [],
+        earnings: 0,
+      };
+    });
+
+    res.json({
+      teamId: team.teamId,
+      teamName: team.teamName,
+      leagueId: league.id,
+      locked,
+      phase: simState.phase,
+      settings: league.settings,
+      roster,
+      reserve,
+    });
+  } else {
+    // Non-live tournament — base player info only
+    const seedPlayers = loadPlayers();
+    const seedMap = new Map(seedPlayers.map((p) => [p.id, p]));
+
+    const buildStatic = (playerId: number, isActive: boolean) => {
+      const seed = seedMap.get(playerId);
+      return {
+        playerId,
+        name: seed?.name || `Player ${playerId}`,
+        country: seed?.country || "",
+        ranking: seed?.ranking || 0,
+        isActive,
+        inField: true,
+        toPar: 0,
+        toParDisplay: "-",
+        position: 0,
+        status: "active" as const,
+        rounds: [] as number[],
+        earnings: 0,
+      };
     };
-  });
 
-  res.json({
-    teamId: team.teamId,
-    teamName: team.teamName,
-    leagueId: league.id,
-    locked,
-    phase: simState.phase,
-    settings: league.settings,
-    roster,
-    reserve,
-  });
+    const roster = team.roster.map((pid) => buildStatic(pid, team.activeLineup.includes(pid)));
+    const reserve = (team.reserve || []).map((pid) => buildStatic(pid, false));
+
+    res.json({
+      teamId: team.teamId,
+      teamName: team.teamName,
+      leagueId: league.id,
+      locked: true,
+      phase: "idle",
+      settings: league.settings,
+      roster,
+      reserve,
+    });
+  }
 });
 
 // POST /api/league/:id/team/:teamId/lineup — set active lineup
