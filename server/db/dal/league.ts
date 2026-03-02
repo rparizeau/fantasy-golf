@@ -3,7 +3,7 @@ import {
   leagues, teams, teamRosters, tournamentLineups,
   waiverClaims, activityFeed, chatMessages, managers,
 } from "../schema/index.js";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, inArray } from "drizzle-orm";
 
 // --- Types matching existing API shapes ---
 
@@ -31,6 +31,35 @@ export interface LeagueData {
   teams: TeamData[];
 }
 
+// --- Internal helper: build TeamData[] from team rows + batched rosters ---
+
+function buildTeamDataList(
+  teamRows: (typeof teams.$inferSelect)[],
+  allRosterRows: (typeof teamRosters.$inferSelect)[],
+): TeamData[] {
+  const rosterByPk = new Map<number, (typeof teamRosters.$inferSelect)[]>();
+  for (const r of allRosterRows) {
+    const arr = rosterByPk.get(r.teamPk) ?? [];
+    arr.push(r);
+    rosterByPk.set(r.teamPk, arr);
+  }
+
+  return teamRows.map((t) => {
+    const rows = rosterByPk.get(t.id) ?? [];
+    return {
+      pk: t.id,
+      teamId: t.teamId,
+      teamName: t.teamName,
+      managerName: t.managerName,
+      managerId: t.managerId,
+      roster: rows.filter((r) => r.slot === "roster").map((r) => r.playerId),
+      reserve: rows.filter((r) => r.slot === "reserve").map((r) => r.playerId),
+      mulligansUsed: t.mulligansUsed,
+      seasonEarnings: t.seasonEarnings,
+    };
+  });
+}
+
 // --- League queries ---
 
 export async function getLeague(leagueId: number): Promise<LeagueData | null> {
@@ -41,23 +70,10 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
     .where(eq(teams.leagueId, leagueId))
     .orderBy(teams.teamId);
 
-  const teamDataList: TeamData[] = [];
-  for (const t of teamRows) {
-    const rosterRows = await db.select().from(teamRosters)
-      .where(eq(teamRosters.teamPk, t.id));
-
-    teamDataList.push({
-      pk: t.id,
-      teamId: t.teamId,
-      teamName: t.teamName,
-      managerName: t.managerName,
-      managerId: t.managerId,
-      roster: rosterRows.filter((r) => r.slot === "roster").map((r) => r.playerId),
-      reserve: rosterRows.filter((r) => r.slot === "reserve").map((r) => r.playerId),
-      mulligansUsed: t.mulligansUsed,
-      seasonEarnings: t.seasonEarnings,
-    });
-  }
+  const teamPks = teamRows.map((t) => t.id);
+  const allRosterRows = teamPks.length > 0
+    ? await db.select().from(teamRosters).where(inArray(teamRosters.teamPk, teamPks))
+    : [];
 
   return {
     id: league.id,
@@ -68,18 +84,35 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
       reserveSize: league.reserveSize,
       mulligansPerSeason: league.mulligansPerSeason,
     },
-    teams: teamDataList,
+    teams: buildTeamDataList(teamRows, allRosterRows),
   };
 }
 
 export async function getAllLeagues(): Promise<LeagueData[]> {
-  const leagueRows = await db.select().from(leagues).orderBy(leagues.id);
-  const result: LeagueData[] = [];
-  for (const l of leagueRows) {
-    const data = await getLeague(l.id);
-    if (data) result.push(data);
-  }
-  return result;
+  const [leagueRows, allTeamRows] = await Promise.all([
+    db.select().from(leagues).orderBy(leagues.id),
+    db.select().from(teams).orderBy(teams.leagueId, teams.teamId),
+  ]);
+
+  const allTeamPks = allTeamRows.map((t) => t.id);
+  const allRosterRows = allTeamPks.length > 0
+    ? await db.select().from(teamRosters).where(inArray(teamRosters.teamPk, allTeamPks))
+    : [];
+
+  return leagueRows.map((league) => {
+    const leagueTeams = allTeamRows.filter((t) => t.leagueId === league.id);
+    return {
+      id: league.id,
+      name: league.name,
+      settings: {
+        rosterSize: league.rosterSize,
+        activeSize: league.activeSize,
+        reserveSize: league.reserveSize,
+        mulligansPerSeason: league.mulligansPerSeason,
+      },
+      teams: buildTeamDataList(leagueTeams, allRosterRows),
+    };
+  });
 }
 
 // --- Team queries ---
@@ -99,6 +132,22 @@ export async function getLineup(teamPk: number, tournamentId: number): Promise<n
       eq(tournamentLineups.tournamentId, tournamentId),
     ));
   return rows.map((r) => r.playerId);
+}
+
+export async function getLineupsForTeams(teamPks: number[], tournamentId: number): Promise<Map<number, number[]>> {
+  if (teamPks.length === 0) return new Map();
+  const rows = await db.select().from(tournamentLineups)
+    .where(and(
+      inArray(tournamentLineups.teamPk, teamPks),
+      eq(tournamentLineups.tournamentId, tournamentId),
+    ));
+  const map = new Map<number, number[]>();
+  for (const r of rows) {
+    const arr = map.get(r.teamPk) ?? [];
+    arr.push(r.playerId);
+    map.set(r.teamPk, arr);
+  }
+  return map;
 }
 
 export async function setLineup(teamPk: number, tournamentId: number, playerIds: number[]): Promise<void> {
@@ -223,12 +272,9 @@ export async function isPlayerOwned(leagueId: number, playerId: number): Promise
   const teamPks = teamRows.map((t) => t.id);
   if (teamPks.length === 0) return false;
 
-  for (const pk of teamPks) {
-    const [row] = await db.select().from(teamRosters)
-      .where(and(eq(teamRosters.teamPk, pk), eq(teamRosters.playerId, playerId)));
-    if (row) return true;
-  }
-  return false;
+  const [row] = await db.select().from(teamRosters)
+    .where(and(inArray(teamRosters.teamPk, teamPks), eq(teamRosters.playerId, playerId)));
+  return !!row;
 }
 
 // --- Build ownership map for a league ---
@@ -236,14 +282,17 @@ export async function isPlayerOwned(leagueId: number, playerId: number): Promise
 export async function getOwnershipMap(leagueId: number): Promise<Map<number, { teamId: number; teamName: string }>> {
   const teamRows = await db.select().from(teams)
     .where(eq(teams.leagueId, leagueId));
+  const teamPks = teamRows.map((t) => t.id);
+  if (teamPks.length === 0) return new Map();
 
+  const allRosterRows = await db.select().from(teamRosters)
+    .where(inArray(teamRosters.teamPk, teamPks));
+
+  const teamMap = new Map(teamRows.map((t) => [t.id, t]));
   const map = new Map<number, { teamId: number; teamName: string }>();
-  for (const t of teamRows) {
-    const rosterRows = await db.select().from(teamRosters)
-      .where(eq(teamRosters.teamPk, t.id));
-    for (const r of rosterRows) {
-      map.set(r.playerId, { teamId: t.teamId, teamName: t.teamName });
-    }
+  for (const r of allRosterRows) {
+    const t = teamMap.get(r.teamPk)!;
+    map.set(r.playerId, { teamId: t.teamId, teamName: t.teamName });
   }
   return map;
 }

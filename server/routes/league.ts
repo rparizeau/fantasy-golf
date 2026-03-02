@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { loadActiveSimState, getActiveTournamentId } from "../db/dal/sim.js";
 import { loadTournaments, loadPayoutTable, loadPlayers } from "../db/dal/seed-data.js";
-import { getLeague, getAllLeagues, getLineup, setLineup } from "../db/dal/league.js";
+import { getLeague, getAllLeagues, getLineup, getLineupsForTeams, setLineup } from "../db/dal/league.js";
 import { formatScore } from "../sim/engine.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 
@@ -9,12 +9,14 @@ const router = Router();
 
 // GET /api/league/all — all leagues summary for lobby
 router.get("/all", async (_req: AuthenticatedRequest, res) => {
-  const allLeagues = await getAllLeagues();
-  const simState = await loadActiveSimState();
-  const tournaments = await loadTournaments();
-  const activeId = await getActiveTournamentId();
+  const [allLeagues, simState, tournaments, activeId, payoutTable] = await Promise.all([
+    getAllLeagues(),
+    loadActiveSimState(),
+    loadTournaments(),
+    getActiveTournamentId(),
+    loadPayoutTable(),
+  ]);
   const tournament = tournaments.find((t) => t.id === activeId) || tournaments[0];
-  const payoutTable = await loadPayoutTable();
   const simMatchesCurrent = simState.tournamentId === tournament.id;
 
   const playerEarningsMap = new Map<number, number>();
@@ -42,12 +44,16 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
 
   const managerId = (_req as AuthenticatedRequest).manager?.id;
 
-  const summaries = await Promise.all(allLeagues.map(async (league) => {
-    const teamWeekEarnings = await Promise.all(league.teams.map(async (team) => {
-      const lineup = await getLineup(team.pk, tournament.id);
+  // Batch fetch all lineups in one query
+  const allTeamPks = allLeagues.flatMap((l) => l.teams.map((t) => t.pk));
+  const allLineups = await getLineupsForTeams(allTeamPks, tournament.id);
+
+  const summaries = allLeagues.map((league) => {
+    const teamWeekEarnings = league.teams.map((team) => {
+      const lineup = allLineups.get(team.pk) ?? [];
       const weekEarnings = lineup.reduce((sum, pid) => sum + (playerEarningsMap.get(pid) || 0), 0);
       return { teamId: team.teamId, weekEarnings };
-    }));
+    });
 
     const sorted = [...league.teams].sort((a, b) => b.seasonEarnings - a.seasonEarnings);
     const myTeam = league.teams.find((t) => t.managerId === managerId);
@@ -73,7 +79,7 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
       phase,
       myTeamId: myTeam?.teamId ?? null,
     };
-  }));
+  });
 
   // Only return leagues where the manager has a team
   res.json(summaries.filter((s) => s.myTeamId !== null));
@@ -107,10 +113,12 @@ router.get("/:id/leaderboard", async (req, res) => {
     return;
   }
 
-  const simState = await loadActiveSimState();
-  const tournaments = await loadTournaments();
+  const [simState, tournaments, payoutTable] = await Promise.all([
+    loadActiveSimState(),
+    loadTournaments(),
+    loadPayoutTable(),
+  ]);
   const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
-  const payoutTable = await loadPayoutTable();
 
   const playerEarningsMap = new Map<number, { earnings: number; position: number; toPar: number; toParDisplay: string; status: string }>();
   for (const p of simState.players) {
@@ -128,8 +136,11 @@ router.get("/:id/leaderboard", async (req, res) => {
     });
   }
 
-  const teams = await Promise.all(league.teams.map(async (team) => {
-    const lineup = await getLineup(team.pk, simState.tournamentId);
+  const leagueTeamPks = league.teams.map((t) => t.pk);
+  const leagueLineups = await getLineupsForTeams(leagueTeamPks, simState.tournamentId);
+
+  const teams = league.teams.map((team) => {
+    const lineup = leagueLineups.get(team.pk) ?? [];
     const players = team.roster.map((playerId) => {
       const simPlayer = simState.players.find((p) => p.playerId === playerId);
       const earningsData = playerEarningsMap.get(playerId);
@@ -156,7 +167,7 @@ router.get("/:id/leaderboard", async (req, res) => {
       totalEarnings,
       players,
     };
-  }));
+  });
 
   teams.sort((a, b) => b.totalEarnings - a.totalEarnings);
 
