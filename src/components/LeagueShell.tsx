@@ -44,6 +44,11 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
         onToggleTheme={onToggleTheme}
         onBack={onBack}
         viewedTournament={viewedTournament}
+        activePage={activePage}
+        tournaments={tournaments}
+        currentTournamentId={currentTournamentId}
+        viewingWeek={viewingWeek}
+        onChangeWeek={setViewingWeek}
       />
       <PageContent
         page={activePage}

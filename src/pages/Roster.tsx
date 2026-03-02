@@ -217,16 +217,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
 
   return (
     <div style={{ paddingBottom: 100 }}>
-      {tournaments.length > 0 && (
-        <WeekNav
-          tournaments={tournaments}
-          viewingWeek={viewingWeek}
-          currentWeekIndex={currentWeekIndex}
-          onChangeWeek={onChangeWeek}
-          colors={C}
-        />
-      )}
-
       {error && (
         <div style={{ padding: "12px 16px 0" }}>
           <div style={{ background: C.redDim, color: C.red, padding: "10px 14px", borderRadius: 10, fontSize: 13 }}>
@@ -284,7 +274,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   );
 }
 
-function WeekNav({
+export function WeekNav({
   tournaments,
   viewingWeek,
   currentWeekIndex,
@@ -323,7 +313,6 @@ function WeekNav({
           height: 44,
           padding: "0 16px",
           background: C.card,
-          borderBottom: `1px solid ${C.border}`,
         }}
       >
         {/* Left arrow */}

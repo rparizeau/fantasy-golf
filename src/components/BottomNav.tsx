@@ -77,7 +77,7 @@ export function BottomNav({ activePage, colors: C, onChangePage }: BottomNavProp
         left: "50%",
         transform: "translateX(-50%)",
         width: "100%",
-        maxWidth: 430,
+        maxWidth: "100%",
         background: C.navBg,
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",

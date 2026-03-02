@@ -21,8 +21,7 @@ export default function App() {
   return (
     <div
       style={{
-        maxWidth: 430,
-        margin: "0 auto",
+        width: "100%",
         minHeight: "100vh",
         background: C.card,
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -31,7 +30,7 @@ export default function App() {
         flexDirection: activeLeague ? "column" : undefined,
       }}
     >
-      <style>{`*{box-sizing:border-box}html,body{margin:0;padding:0;height:100%}::-webkit-scrollbar{display:none}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+      <style>{`*{box-sizing:border-box}html,body{margin:0;padding:0;height:100%;overscroll-behavior:none}::-webkit-scrollbar{display:none}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
 
       {activeLeague ? (
         <LeagueShell
