@@ -1,5 +1,44 @@
 import { Router } from "express";
-import { loadState, advance, setOverride, reset, createFreshState } from "../sim/engine.js";
+import { readFileSync, writeFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+import { loadState, advance, setOverride, reset, createFreshState, loadPayoutTable, getCurrentTournament } from "../sim/engine.js";
+import type { SimState } from "../sim/engine.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const LEAGUE_STATE_PATH = join(__dirname, "..", "state", "league-state.json");
+
+function accumulateSeasonEarnings(simState: SimState): void {
+  if (simState.phase !== "final") return;
+
+  const tournament = getCurrentTournament();
+  if (simState.tournamentId !== tournament.id) return;
+
+  const payoutTable = loadPayoutTable();
+
+  // Build player earnings map
+  const playerEarnings = new Map<number, number>();
+  for (const p of simState.players) {
+    let earnings = 0;
+    if (p.status === "active") {
+      const payout = payoutTable.find((pt) => pt.position === p.position);
+      if (payout) earnings = Math.round(tournament.purse * (payout.pct / 100));
+    }
+    playerEarnings.set(p.playerId, earnings);
+  }
+
+  // Update each team's seasonEarnings across all leagues
+  const leagueState = JSON.parse(readFileSync(LEAGUE_STATE_PATH, "utf-8"));
+  for (const league of Object.values(leagueState.leagues) as any[]) {
+    for (const team of league.teams) {
+      const weekEarnings = (team.activeLineup as number[]).reduce(
+        (sum: number, pid: number) => sum + (playerEarnings.get(pid) || 0), 0
+      );
+      team.seasonEarnings += weekEarnings;
+    }
+  }
+  writeFileSync(LEAGUE_STATE_PATH, JSON.stringify(leagueState, null, 2));
+}
 
 const router = Router();
 
@@ -42,6 +81,9 @@ router.post("/advance", (_req, res) => {
   }
 
   const updated = advance(state);
+  if (updated.phase === "final") {
+    accumulateSeasonEarnings(updated);
+  }
   res.json({
     phase: updated.phase,
     currentRound: updated.currentRound,

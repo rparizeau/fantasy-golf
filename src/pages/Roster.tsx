@@ -199,6 +199,8 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   );
 
   const currentWeekIndex = tournaments.findIndex((t) => t.id === currentTournamentId);
+  const isPastWeek = viewingWeek < currentWeekIndex;
+  const canMove = !locked && !isPastWeek;
 
   return (
     <div style={{ paddingBottom: 100 }}>
@@ -222,10 +224,10 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         )}
         <div style={{ padding: "0 16px 6px" }}>
           {activePlayers.map((p) => (
-            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} locked={locked} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
+            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
           ))}
           {Array.from({ length: emptyActive }).map((_, i) => (
-            <EmptySlot key={`ea-${i}`} label="Active" colors={C} highlight={moving !== null} warn={!locked && moving === null} onClick={() => handleEmptySlotDrop("active")} />
+            <EmptySlot key={`ea-${i}`} label="Active" colors={C} highlight={moving !== null} warn={canMove && moving === null} onClick={() => handleEmptySlotDrop("active")} />
           ))}
         </div>
       </div>
@@ -235,7 +237,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         {sectionHeader(`Bench (${benchPlayers.length}/${benchSize})`)}
         <div style={{ padding: "0 16px 6px" }}>
           {benchPlayers.map((p) => (
-            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} locked={locked} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
+            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
           ))}
           {Array.from({ length: emptyBench }).map((_, i) => (
             <EmptySlot key={`eb-${i}`} label="Bench" colors={C} highlight={moving !== null} onClick={() => handleEmptySlotDrop("bench")} />
@@ -248,7 +250,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         {sectionHeader(`Reserve (${sortedReserve.length}/${reserveSize})`)}
         <div style={{ padding: "0 16px 6px" }}>
           {sortedReserve.map((p) => (
-            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} locked={locked} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
+            <PlayerCard key={p.playerId} player={p} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
           ))}
           {Array.from({ length: emptyReserve }).map((_, i) => (
             <EmptySlot key={`er-${i}`} label="Reserve" colors={C} highlight={moving !== null} onClick={() => handleEmptySlotDrop("reserve")} />
@@ -398,7 +400,7 @@ export function WeekNav({
                 style={{
                   padding: "12px 16px",
                   cursor: "pointer",
-                  background: isSelected ? C.greenDim : "transparent",
+                  background: isSelected ? (t.isMajor ? C.goldDim : C.greenDim) : "transparent",
                   borderBottom: i < tournaments.length - 1 ? `1px solid ${C.border}` : "none",
                   display: "flex",
                   alignItems: "center",
@@ -450,14 +452,14 @@ function PlayerCard({
   player: p,
   colors: C,
   moving,
-  locked,
+  disabled,
   onMove,
   onTap,
 }: {
   player: RosterPlayer;
   colors: Theme;
   moving: boolean;
-  locked: boolean;
+  disabled: boolean;
   onMove: () => void;
   onTap: () => void;
 }) {
@@ -479,29 +481,29 @@ function PlayerCard({
       }}
     >
       {/* Move button */}
-      {!locked && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onMove(); }}
-          style={{
-            width: btnSize,
-            height: btnSize,
-            flexShrink: 0,
-            marginRight: 10,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 8,
-            border: `1.5px solid ${moving ? C.green : C.border}`,
-            background: moving ? C.greenDim : "transparent",
-            cursor: "pointer",
-            padding: 0,
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 2v12M8 2L5 5M8 2l3 3M8 14L5 11M8 14l3-3M2 8h12M2 8l3-3M2 8l3 3M14 8l-3-3M14 8l-3 3" stroke={moving ? C.green : C.txt3} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-      )}
+      <button
+        onClick={(e) => { e.stopPropagation(); if (!disabled) onMove(); }}
+        disabled={disabled}
+        style={{
+          width: btnSize,
+          height: btnSize,
+          flexShrink: 0,
+          marginRight: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 8,
+          border: `1.5px solid ${moving ? C.green : C.border}`,
+          background: moving ? C.greenDim : "transparent",
+          cursor: disabled ? "default" : "pointer",
+          padding: 0,
+          opacity: disabled ? 0.35 : 1,
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2v12M8 2L5 5M8 2l3 3M8 14L5 11M8 14l3-3M2 8h12M2 8l3-3M2 8l3 3M14 8l-3-3M14 8l-3 3" stroke={moving ? C.green : C.txt3} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
 
       {/* Player info */}
       <div style={{ flex: 1, minWidth: 0 }}>

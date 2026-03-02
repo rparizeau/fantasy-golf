@@ -23,14 +23,14 @@
             46
           ],
           "activeLineup": [
+            1,
             7,
             15,
             25,
-            42,
-            46
+            42
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1245800,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -53,7 +53,7 @@
             50
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1102400,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -76,7 +76,7 @@
             44
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 987600,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -99,7 +99,7 @@
             48
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1356200,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -122,7 +122,7 @@
             55
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 876500,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -145,7 +145,7 @@
             52
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1198700,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -168,7 +168,7 @@
             56
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 934800,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -191,7 +191,7 @@
             47
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1067300,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -214,7 +214,7 @@
             59
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 812900,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -237,7 +237,7 @@
             64
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 745600,
+          "seasonEarnings": 0,
           "reserve": []
         }
       ],
@@ -290,7 +290,7 @@
             44
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1892100,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -313,7 +313,7 @@
             51
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1654300,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -336,7 +336,7 @@
             55
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1423700,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -359,7 +359,7 @@
             60
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1567900,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -382,7 +382,7 @@
             58
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1234500,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -405,7 +405,7 @@
             62
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1345600,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -428,7 +428,7 @@
             65
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1178200,
+          "seasonEarnings": 0,
           "reserve": []
         },
         {
@@ -451,7 +451,7 @@
             68
           ],
           "mulligansUsed": 0,
-          "seasonEarnings": 1089400,
+          "seasonEarnings": 0,
           "reserve": []
         }
       ],
