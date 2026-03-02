@@ -5,7 +5,7 @@ import {
   type SimState,
 } from "../db/dal/sim.js";
 import { loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
-import { getAllLeagues, getLineup, updateSeasonEarnings, autoCopyLineups } from "../db/dal/league.js";
+import { getAllLeagues, getLineupsForTeams, updateSeasonEarnings, autoCopyLineups } from "../db/dal/league.js";
 import { advance, rewind, setOverride, updatePlayer } from "../sim/engine.js";
 
 function buildPlayerEarnings(simState: SimState, purse: number, payoutTable: { position: number; pct: number }[]): Map<number, number> {
@@ -21,29 +21,40 @@ function buildPlayerEarnings(simState: SimState, purse: number, payoutTable: { p
   return map;
 }
 
+async function computeTeamEarnings(simState: SimState): Promise<{ teamPk: number; weekEarnings: number }[]> {
+  const [tournaments, payoutTable, allLeagues] = await Promise.all([
+    loadTournaments(),
+    loadPayoutTable(),
+    getAllLeagues(),
+  ]);
+  const tournament = tournaments.find((t) => t.id === simState.tournamentId);
+  if (!tournament) return [];
+
+  const playerEarnings = buildPlayerEarnings(simState, tournament.purse, payoutTable);
+  const allTeamPks = allLeagues.flatMap((l) => l.teams.map((t) => t.pk));
+  const allLineups = await getLineupsForTeams(allTeamPks, simState.tournamentId);
+
+  const results: { teamPk: number; weekEarnings: number }[] = [];
+  for (const league of allLeagues) {
+    for (const team of league.teams) {
+      const lineup = allLineups.get(team.pk) ?? [];
+      const weekEarnings = lineup.reduce((sum, pid) => sum + (playerEarnings.get(pid) || 0), 0);
+      if (weekEarnings > 0) results.push({ teamPk: team.pk, weekEarnings });
+    }
+  }
+  return results;
+}
+
 async function accumulateSeasonEarnings(simState: SimState): Promise<void> {
   if (simState.phase !== "final") return;
   if (simState.earningsAccumulated) return;
 
-  const tournaments = await loadTournaments();
   const activeId = await getActiveTournamentId();
-  const tournament = tournaments.find((t) => t.id === activeId);
-  if (!tournament || simState.tournamentId !== tournament.id) return;
+  if (simState.tournamentId !== activeId) return;
 
-  const payoutTable = await loadPayoutTable();
-  const playerEarnings = buildPlayerEarnings(simState, tournament.purse, payoutTable);
-
-  const allLeagues = await getAllLeagues();
-  for (const league of allLeagues) {
-    for (const team of league.teams) {
-      const lineup = await getLineup(team.pk, simState.tournamentId);
-      const weekEarnings = lineup.reduce(
-        (sum, pid) => sum + (playerEarnings.get(pid) || 0), 0
-      );
-      if (weekEarnings > 0) {
-        await updateSeasonEarnings(team.pk, weekEarnings);
-      }
-    }
+  const teamEarnings = await computeTeamEarnings(simState);
+  for (const { teamPk, weekEarnings } of teamEarnings) {
+    await updateSeasonEarnings(teamPk, weekEarnings);
   }
 
   simState.earningsAccumulated = true;
@@ -54,24 +65,9 @@ async function deaccumulateSeasonEarnings(simState: SimState): Promise<void> {
   if (!simState.earningsAccumulated) return;
   if (simState.players.length === 0) return;
 
-  const tournaments = await loadTournaments();
-  const tournament = tournaments.find((t) => t.id === simState.tournamentId);
-  if (!tournament) return;
-
-  const payoutTable = await loadPayoutTable();
-  const playerEarnings = buildPlayerEarnings(simState, tournament.purse, payoutTable);
-
-  const allLeagues = await getAllLeagues();
-  for (const league of allLeagues) {
-    for (const team of league.teams) {
-      const lineup = await getLineup(team.pk, simState.tournamentId);
-      const weekEarnings = lineup.reduce(
-        (sum, pid) => sum + (playerEarnings.get(pid) || 0), 0
-      );
-      if (weekEarnings > 0) {
-        await updateSeasonEarnings(team.pk, -weekEarnings);
-      }
-    }
+  const teamEarnings = await computeTeamEarnings(simState);
+  for (const { teamPk, weekEarnings } of teamEarnings) {
+    await updateSeasonEarnings(teamPk, -weekEarnings);
   }
 
   simState.earningsAccumulated = false;

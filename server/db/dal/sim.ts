@@ -1,4 +1,4 @@
-import { db } from "../index.js";
+import { db, client } from "../index.js";
 import { simActive, simTournaments, simPlayers } from "../schema/index.js";
 import { eq } from "drizzle-orm";
 import { loadPlayers, loadTournaments, loadCourse } from "./seed-data.js";
@@ -102,11 +102,22 @@ export async function loadTournamentState(tournamentId: number): Promise<SimStat
 }
 
 export async function saveSimState(state: SimState): Promise<void> {
-  await db.transaction(async (tx) => {
-    // Upsert tournament row
-    await tx.insert(simTournaments)
-      .values({
-        tournamentId: state.tournamentId,
+  // Upsert tournament row
+  await db.insert(simTournaments)
+    .values({
+      tournamentId: state.tournamentId,
+      phase: state.phase,
+      currentRound: state.currentRound,
+      par: state.par,
+      holePars: state.holePars ?? null,
+      cutLine: state.cutLine ?? null,
+      fieldSize: state.fieldSize,
+      overrides: state.overrides as Record<number, { score?: number; wd?: boolean }>,
+      earningsAccumulated: state.earningsAccumulated ?? false,
+    })
+    .onConflictDoUpdate({
+      target: simTournaments.tournamentId,
+      set: {
         phase: state.phase,
         currentRound: state.currentRound,
         par: state.par,
@@ -115,50 +126,47 @@ export async function saveSimState(state: SimState): Promise<void> {
         fieldSize: state.fieldSize,
         overrides: state.overrides as Record<number, { score?: number; wd?: boolean }>,
         earningsAccumulated: state.earningsAccumulated ?? false,
-      })
-      .onConflictDoUpdate({
-        target: simTournaments.tournamentId,
-        set: {
-          phase: state.phase,
-          currentRound: state.currentRound,
-          par: state.par,
-          holePars: state.holePars ?? null,
-          cutLine: state.cutLine ?? null,
-          fieldSize: state.fieldSize,
-          overrides: state.overrides as Record<number, { score?: number; wd?: boolean }>,
-          earningsAccumulated: state.earningsAccumulated ?? false,
-        },
-      });
+      },
+    });
 
-    // Update all players
-    for (const p of state.players) {
-      await tx.insert(simPlayers)
-        .values({
-          tournamentId: state.tournamentId,
-          playerId: p.playerId,
-          name: p.name,
-          country: p.country,
-          ranking: p.ranking,
-          rounds: p.rounds,
-          holeScores: p.holeScores ?? null,
-          total: p.total,
-          toPar: p.toPar,
-          position: p.position,
-          status: p.status,
-        })
-        .onConflictDoUpdate({
-          target: [simPlayers.tournamentId, simPlayers.playerId],
-          set: {
-            rounds: p.rounds,
-            holeScores: p.holeScores ?? null,
-            total: p.total,
-            toPar: p.toPar,
-            position: p.position,
-            status: p.status,
-          },
-        });
-    }
-  });
+  // Bulk upsert all players in a single query using unnest arrays
+  if (state.players.length > 0) {
+    const tournamentIds = state.players.map(() => state.tournamentId);
+    const playerIds = state.players.map((p) => p.playerId);
+    const names = state.players.map((p) => p.name);
+    const countries = state.players.map((p) => p.country);
+    const rankings = state.players.map((p) => p.ranking);
+    const rounds = state.players.map((p) => JSON.stringify(p.rounds));
+    const holeScores = state.players.map((p) => p.holeScores ? JSON.stringify(p.holeScores) : null);
+    const totals = state.players.map((p) => p.total);
+    const toPars = state.players.map((p) => p.toPar);
+    const positions = state.players.map((p) => p.position);
+    const statuses = state.players.map((p) => p.status);
+
+    await client`
+      INSERT INTO sim_players (tournament_id, player_id, name, country, ranking, rounds, hole_scores, total, to_par, position, status)
+      SELECT * FROM unnest(
+        ${tournamentIds}::int[],
+        ${playerIds}::int[],
+        ${names}::varchar[],
+        ${countries}::varchar[],
+        ${rankings}::int[],
+        ${rounds}::jsonb[],
+        ${holeScores}::jsonb[],
+        ${totals}::int[],
+        ${toPars}::int[],
+        ${positions}::int[],
+        ${statuses}::varchar[]
+      )
+      ON CONFLICT (tournament_id, player_id) DO UPDATE SET
+        rounds = EXCLUDED.rounds,
+        hole_scores = EXCLUDED.hole_scores,
+        total = EXCLUDED.total,
+        to_par = EXCLUDED.to_par,
+        position = EXCLUDED.position,
+        status = EXCLUDED.status
+    `;
+  }
 }
 
 /** Generate a synthetic par layout when no course data exists. */
