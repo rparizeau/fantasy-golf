@@ -5,8 +5,8 @@ import {
   type SimState,
 } from "../db/dal/sim.js";
 import { loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
-import { getAllLeagues, getLineupsForTeams, updateSeasonEarnings, autoCopyLineups } from "../db/dal/league.js";
-import { advance, rewind, setOverride, updatePlayer } from "../sim/engine.js";
+import { getAllLeagues, getLineupsForTeams, updateSeasonEarnings, updateSeasonPoints, autoCopyLineups } from "../db/dal/league.js";
+import { advance, rewind, setOverride, updatePlayer, calculatePlayerPoints } from "../sim/engine.js";
 
 function buildPlayerEarnings(simState: SimState, purse: number, payoutTable: { position: number; pct: number }[]): Map<number, number> {
   const map = new Map<number, number>();
@@ -58,6 +58,61 @@ async function accumulateSeasonEarnings(simState: SimState): Promise<void> {
   }
 
   simState.earningsAccumulated = true;
+  await saveSimState(simState);
+}
+
+async function computeTeamPoints(simState: SimState): Promise<{ teamPk: number; weekPoints: number }[]> {
+  const allLeagues = await getAllLeagues();
+  const holePars = simState.holePars ?? [];
+  const allTeamPks = allLeagues.flatMap((l) => l.teams.map((t) => t.pk));
+  const allLineups = await getLineupsForTeams(allTeamPks, simState.tournamentId);
+
+  const playerMap = new Map(simState.players.map((p) => [p.playerId, p]));
+  const results: { teamPk: number; weekPoints: number }[] = [];
+
+  for (const league of allLeagues) {
+    const scoring = league.settings.scoringSettings;
+    for (const team of league.teams) {
+      const lineup = allLineups.get(team.pk) ?? [];
+      let weekPoints = 0;
+      for (const pid of lineup) {
+        const player = playerMap.get(pid);
+        if (player) {
+          weekPoints += calculatePlayerPoints(player.holeScores, holePars, scoring);
+        }
+      }
+      if (weekPoints !== 0) results.push({ teamPk: team.pk, weekPoints });
+    }
+  }
+  return results;
+}
+
+async function accumulateSeasonPoints(simState: SimState): Promise<void> {
+  if (simState.phase !== "final") return;
+  if (simState.pointsAccumulated) return;
+
+  const activeId = await getActiveTournamentId();
+  if (simState.tournamentId !== activeId) return;
+
+  const teamPoints = await computeTeamPoints(simState);
+  for (const { teamPk, weekPoints } of teamPoints) {
+    await updateSeasonPoints(teamPk, weekPoints);
+  }
+
+  simState.pointsAccumulated = true;
+  await saveSimState(simState);
+}
+
+async function deaccumulateSeasonPoints(simState: SimState): Promise<void> {
+  if (!simState.pointsAccumulated) return;
+  if (simState.players.length === 0) return;
+
+  const teamPoints = await computeTeamPoints(simState);
+  for (const { teamPk, weekPoints } of teamPoints) {
+    await updateSeasonPoints(teamPk, -weekPoints);
+  }
+
+  simState.pointsAccumulated = false;
   await saveSimState(simState);
 }
 
@@ -130,6 +185,7 @@ router.post("/advance", async (_req, res) => {
 
   if (updated.phase === "final") {
     await accumulateSeasonEarnings(updated);
+    await accumulateSeasonPoints(updated);
   }
 
   res.json({
@@ -151,6 +207,7 @@ router.post("/rewind", async (_req, res) => {
   }
 
   await deaccumulateSeasonEarnings(state);
+  await deaccumulateSeasonPoints(state);
   const updated = rewind(state);
   await saveSimState(updated);
 
@@ -214,6 +271,7 @@ router.post("/reset", async (req, res) => {
   const { tournamentId } = req.body || {};
   const prevState = await loadActiveSimState();
   await deaccumulateSeasonEarnings(prevState);
+  await deaccumulateSeasonPoints(prevState);
   const state = await resetSimState(tournamentId);
   res.json({
     phase: state.phase,

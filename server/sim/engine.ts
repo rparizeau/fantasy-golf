@@ -29,6 +29,73 @@ export interface SimState {
   fieldSize: number;
   overrides: Record<number, { score?: number; wd?: boolean }>;
   earningsAccumulated?: boolean;
+  pointsAccumulated?: boolean;
+}
+
+// --- Scoring Settings ---
+
+export interface ScoringSettings {
+  albatross: number;
+  eagle: number;
+  birdie: number;
+  par: number;
+  bogey: number;
+  doubleBogey: number;
+  triplePlus: number;
+}
+
+export const DEFAULT_SCORING: ScoringSettings = {
+  albatross: 8, eagle: 5, birdie: 3, par: 1, bogey: -1, doubleBogey: -2, triplePlus: -3,
+};
+
+/** Map a single hole score to points based on diff from par. */
+export function holeToPoints(holeScore: number, holePar: number, scoring: ScoringSettings): number {
+  const diff = holeScore - holePar;
+  if (diff <= -3) return scoring.albatross;
+  if (diff === -2) return scoring.eagle;
+  if (diff === -1) return scoring.birdie;
+  if (diff === 0) return scoring.par;
+  if (diff === 1) return scoring.bogey;
+  if (diff === 2) return scoring.doubleBogey;
+  return scoring.triplePlus;
+}
+
+/** Sum points across all rounds of hole scores. */
+export function calculatePlayerPoints(
+  holeScores: (number | null)[][] | undefined,
+  holePars: number[],
+  scoring: ScoringSettings,
+): number {
+  if (!holeScores || holeScores.length === 0) return 0;
+  let total = 0;
+  for (const round of holeScores) {
+    for (let h = 0; h < round.length; h++) {
+      const score = round[h];
+      if (score != null) {
+        total += holeToPoints(score, holePars[h] ?? 4, scoring);
+      }
+    }
+  }
+  return total;
+}
+
+/** Points broken down per round. */
+export function calculateRoundPoints(
+  holeScores: (number | null)[][] | undefined,
+  holePars: number[],
+  scoring: ScoringSettings,
+): number[] {
+  if (!holeScores || holeScores.length === 0) return [];
+  return holeScores.map((round) => {
+    let total = 0;
+    for (let h = 0; h < round.length; h++) {
+      const score = round[h];
+      if (score != null) {
+        total += holeToPoints(score, holePars[h] ?? 4, scoring);
+      }
+    }
+    return total;
+  });
 }
 
 // --- Helpers ---

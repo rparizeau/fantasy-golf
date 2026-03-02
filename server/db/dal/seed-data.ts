@@ -17,6 +17,7 @@ export async function loadTournaments() {
     par: t.par,
     isMajor: t.isMajor,
     current: t.isCurrent,
+    color: t.color,
     dates: { start: t.dateStart, end: t.dateEnd },
   }));
 }

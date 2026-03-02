@@ -101,6 +101,7 @@ export interface LeaderboardPlayer {
   position: number;
   status: "active" | "cut" | "wd";
   earnings: number;
+  points: number;
 }
 
 export interface Leaderboard {
@@ -131,6 +132,7 @@ export interface TournamentListItem {
   par: number;
   isMajor: boolean;
   current?: boolean;
+  color?: string;
 }
 
 export function getTournamentList() {
@@ -147,6 +149,9 @@ export interface LeagueSummary {
   of: number;
   money: number;
   weekMoney: number;
+  points: number;
+  weekPoints: number;
+  showMoney: boolean;
   members: number;
   tournament: string;
   course: string;
@@ -170,6 +175,7 @@ export interface FantasyTeamSummary {
   teamName: string;
   managerName: string;
   totalEarnings: number;
+  totalPoints: number;
   players: {
     playerId: number;
     name: string;
@@ -178,6 +184,7 @@ export interface FantasyTeamSummary {
     toParDisplay: string;
     status: "active" | "cut" | "wd";
     earnings: number;
+    points: number;
     isActive: boolean;
   }[];
 }
@@ -187,6 +194,7 @@ export interface FantasyLeaderboard {
   leagueName: string;
   tournamentName: string;
   phase: string;
+  showMoney: boolean;
   teams: FantasyTeamSummary[];
 }
 
@@ -194,11 +202,16 @@ export function getFantasyLeaderboard(leagueId: number) {
   return fetchJSON<FantasyLeaderboard>(`/league/${leagueId}/leaderboard`);
 }
 
+export interface ScoringSettings {
+  albatross: number; eagle: number; birdie: number; par: number;
+  bogey: number; doubleBogey: number; triplePlus: number;
+}
+
 export interface LeagueInfo {
   id: number;
   name: string;
   members: { teamId: number; teamName: string; managerName: string }[];
-  settings: { rosterSize: number; activeSize: number; reserveSize: number; mulligansPerSeason: number };
+  settings: { rosterSize: number; activeSize: number; reserveSize: number; mulligansPerSeason: number; scoringSettings: ScoringSettings; showMoney: boolean };
 }
 
 export function getLeagueInfo(leagueId: number) {
@@ -219,7 +232,9 @@ export interface RosterPlayer {
   position: number;
   status: "active" | "cut" | "wd";
   rounds: number[];
+  roundPoints: number[];
   earnings: number;
+  points: number;
 }
 
 export interface RosterData {
@@ -281,6 +296,7 @@ export interface SeasonStanding {
   teamName: string;
   managerName: string;
   totalEarnings: number;
+  totalPoints: number;
   previousRank: number;
   currentRank: number;
   tournamentEarnings: { tournamentId: number; tournamentName: string; earnings: number }[];
@@ -335,6 +351,7 @@ export interface PlayerDetail {
   status: "active" | "cut" | "wd";
   rounds: number[];
   earnings: number;
+  points: number;
 }
 
 export function getPlayer(id: number) {

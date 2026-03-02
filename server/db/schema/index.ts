@@ -34,6 +34,7 @@ export const tournaments = pgTable("tournaments", {
   isCurrent: boolean("is_current").notNull().default(false),
   dateStart: varchar("date_start", { length: 20 }).notNull(),
   dateEnd: varchar("date_end", { length: 20 }).notNull(),
+  color: varchar("color", { length: 10 }).notNull().default("#003C80"),
 });
 
 export const courses = pgTable("courses", {
@@ -56,6 +57,11 @@ export const leagues = pgTable("leagues", {
   activeSize: integer("active_size").notNull(),
   reserveSize: integer("reserve_size").notNull(),
   mulligansPerSeason: integer("mulligans_per_season").notNull(),
+  scoringSettings: jsonb("scoring_settings").notNull().$type<{
+    albatross: number; eagle: number; birdie: number; par: number;
+    bogey: number; doubleBogey: number; triplePlus: number;
+  }>().default({ albatross: 8, eagle: 5, birdie: 3, par: 1, bogey: -1, doubleBogey: -2, triplePlus: -3 }),
+  showMoney: boolean("show_money").notNull().default(true),
 });
 
 export const teams = pgTable("teams", {
@@ -67,6 +73,7 @@ export const teams = pgTable("teams", {
   managerId: integer("manager_id").references(() => managers.id),
   mulligansUsed: integer("mulligans_used").notNull().default(0),
   seasonEarnings: integer("season_earnings").notNull().default(0),
+  seasonPoints: integer("season_points").notNull().default(0),
 });
 
 export const teamRosters = pgTable("team_rosters", {
@@ -102,6 +109,7 @@ export const simTournaments = pgTable("sim_tournaments", {
   fieldSize: integer("field_size").notNull().default(100),
   overrides: jsonb("overrides").$type<Record<number, { score?: number; wd?: boolean }>>(),
   earningsAccumulated: boolean("earnings_accumulated").notNull().default(false),
+  pointsAccumulated: boolean("points_accumulated").notNull().default(false),
 });
 
 export const simPlayers = pgTable("sim_players", {

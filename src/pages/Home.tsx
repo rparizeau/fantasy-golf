@@ -194,17 +194,17 @@ export function Home({ leagueId, myTeamId, colors: C }: HomeProps) {
                 <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>{team.managerName}</p>
               </div>
 
-              {/* Earnings */}
+              {/* Points */}
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <p
                   style={{
-                    color: team.totalEarnings > 0 ? C.greenBright : C.txt3,
+                    color: team.totalPoints > 0 ? C.greenBright : C.txt3,
                     fontSize: 15,
                     fontWeight: 700,
                     margin: 0,
                   }}
                 >
-                  {team.totalEarnings > 0 ? `$${team.totalEarnings.toLocaleString()}` : "$0"}
+                  {team.totalPoints} pts
                 </p>
                 <p style={{ color: C.txt3, fontSize: 10, margin: "1px 0 0" }}>this week</p>
               </div>
@@ -306,17 +306,17 @@ export function Home({ leagueId, myTeamId, colors: C }: HomeProps) {
                         </p>
                       </div>
 
-                      {/* Earnings */}
-                      <div style={{ textAlign: "right", width: 80 }}>
+                      {/* Points */}
+                      <div style={{ textAlign: "right", width: 60 }}>
                         <p
                           style={{
                             fontSize: 13,
                             fontWeight: 600,
                             margin: 0,
-                            color: player.earnings > 0 ? C.greenBright : C.txt3,
+                            color: player.points > 0 ? C.greenBright : C.txt3,
                           }}
                         >
-                          {player.earnings > 0 ? `$${player.earnings.toLocaleString()}` : "$0"}
+                          {player.points} pts
                         </p>
                       </div>
                     </div>
@@ -336,7 +336,7 @@ export function Home({ leagueId, myTeamId, colors: C }: HomeProps) {
             fontSize: 13,
           }}
         >
-          Tournament hasn't started yet. Earnings will update as rounds are played.
+          Tournament hasn't started yet. Points will update as rounds are played.
         </div>
       )}
     </div>

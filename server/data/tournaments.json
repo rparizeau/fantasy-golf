@@ -8,6 +8,7 @@
     "par": 72,
     "isMajor": false,
     "current": true,
+    "color": "#003C80",
     "dates": { "start": "2026-03-11", "end": "2026-03-14" }
   },
   {
@@ -18,6 +19,7 @@
     "purse": 8400000,
     "par": 71,
     "isMajor": false,
+    "color": "#61879D",
     "dates": { "start": "2026-03-18", "end": "2026-03-21" }
   },
   {
@@ -28,6 +30,7 @@
     "purse": 9000000,
     "par": 70,
     "isMajor": false,
+    "color": "#003C80",
     "dates": { "start": "2026-03-25", "end": "2026-03-28" }
   },
   {
@@ -38,6 +41,7 @@
     "purse": 9100000,
     "par": 72,
     "isMajor": false,
+    "color": "#006C87",
     "dates": { "start": "2026-04-01", "end": "2026-04-04" }
   },
   {
@@ -48,6 +52,7 @@
     "purse": 20000000,
     "par": 72,
     "isMajor": true,
+    "color": "#006B54",
     "dates": { "start": "2026-04-08", "end": "2026-04-11" }
   },
   {
@@ -58,6 +63,7 @@
     "purse": 20000000,
     "par": 71,
     "isMajor": false,
+    "color": "#CC0000",
     "dates": { "start": "2026-04-15", "end": "2026-04-18" }
   },
   {
@@ -68,6 +74,7 @@
     "purse": 8800000,
     "par": 72,
     "isMajor": false,
+    "color": "#4066B3",
     "dates": { "start": "2026-04-22", "end": "2026-04-25" }
   },
   {
@@ -78,6 +85,7 @@
     "purse": 20000000,
     "par": 72,
     "isMajor": false,
+    "color": "#CBA529",
     "dates": { "start": "2026-04-29", "end": "2026-05-02" }
   },
   {
@@ -88,6 +96,7 @@
     "purse": 20000000,
     "par": 71,
     "isMajor": false,
+    "color": "#2D1A47",
     "dates": { "start": "2026-05-06", "end": "2026-05-09" }
   },
   {
@@ -98,6 +107,7 @@
     "purse": 17500000,
     "par": 70,
     "isMajor": true,
+    "color": "#063156",
     "dates": { "start": "2026-05-13", "end": "2026-05-16" }
   },
   {
@@ -108,6 +118,7 @@
     "purse": 9500000,
     "par": 72,
     "isMajor": false,
+    "color": "#E4002B",
     "dates": { "start": "2026-05-20", "end": "2026-05-23" }
   },
   {
@@ -118,6 +129,7 @@
     "purse": 9100000,
     "par": 70,
     "isMajor": false,
+    "color": "#00A0DF",
     "dates": { "start": "2026-05-27", "end": "2026-05-30" }
   },
   {
@@ -128,6 +140,7 @@
     "purse": 20000000,
     "par": 72,
     "isMajor": false,
+    "color": "#1C2841",
     "dates": { "start": "2026-06-03", "end": "2026-06-06" }
   },
   {
@@ -138,6 +151,7 @@
     "purse": 9400000,
     "par": 72,
     "isMajor": false,
+    "color": "#005DAA",
     "dates": { "start": "2026-06-10", "end": "2026-06-13" }
   },
   {
@@ -148,6 +162,7 @@
     "purse": 21500000,
     "par": 70,
     "isMajor": true,
+    "color": "#00365F",
     "dates": { "start": "2026-06-17", "end": "2026-06-20" }
   },
   {
@@ -158,6 +173,7 @@
     "purse": 20000000,
     "par": 70,
     "isMajor": false,
+    "color": "#E31837",
     "dates": { "start": "2026-06-24", "end": "2026-06-27" }
   },
   {
@@ -168,6 +184,7 @@
     "purse": 8400000,
     "par": 71,
     "isMajor": false,
+    "color": "#367C2B",
     "dates": { "start": "2026-07-01", "end": "2026-07-04" }
   },
   {
@@ -178,6 +195,7 @@
     "purse": 9000000,
     "par": 70,
     "isMajor": false,
+    "color": "#1A1A1A",
     "dates": { "start": "2026-07-08", "end": "2026-07-11" }
   },
   {
@@ -188,6 +206,7 @@
     "purse": 17000000,
     "par": 70,
     "isMajor": true,
+    "color": "#1A2744",
     "dates": { "start": "2026-07-15", "end": "2026-07-18" }
   }
 ]

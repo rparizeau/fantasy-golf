@@ -52,7 +52,7 @@ async function seed() {
   const tournaments = loadJSON<{
     id: number; name: string; course: string; location: string;
     purse: number; par: number; isMajor: boolean; current?: boolean;
-    dates: { start: string; end: string };
+    color?: string; dates: { start: string; end: string };
   }[]>(join(DATA_DIR, "tournaments.json"));
 
   await db.insert(schema.tournaments).values(
@@ -67,6 +67,7 @@ async function seed() {
       isCurrent: t.current ?? false,
       dateStart: t.dates.start,
       dateEnd: t.dates.end,
+      color: t.color ?? "#003C80",
     }))
   );
   console.log(`  ✓ tournaments: ${tournaments.length} rows`);

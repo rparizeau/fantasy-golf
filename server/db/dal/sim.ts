@@ -31,6 +31,7 @@ export interface SimState {
   fieldSize: number;
   overrides: Record<number, { score?: number; wd?: boolean }>;
   earningsAccumulated?: boolean;
+  pointsAccumulated?: boolean;
 }
 
 // --- Active Tournament ---
@@ -98,6 +99,7 @@ export async function loadTournamentState(tournamentId: number): Promise<SimStat
     fieldSize: tourney.fieldSize,
     overrides: (tourney.overrides ?? {}) as Record<number, { score?: number; wd?: boolean }>,
     earningsAccumulated: tourney.earningsAccumulated,
+    pointsAccumulated: tourney.pointsAccumulated,
   };
 }
 
@@ -114,6 +116,7 @@ export async function saveSimState(state: SimState): Promise<void> {
       fieldSize: state.fieldSize,
       overrides: state.overrides as Record<number, { score?: number; wd?: boolean }>,
       earningsAccumulated: state.earningsAccumulated ?? false,
+      pointsAccumulated: state.pointsAccumulated ?? false,
     })
     .onConflictDoUpdate({
       target: simTournaments.tournamentId,
@@ -126,6 +129,7 @@ export async function saveSimState(state: SimState): Promise<void> {
         fieldSize: state.fieldSize,
         overrides: state.overrides as Record<number, { score?: number; wd?: boolean }>,
         earningsAccumulated: state.earningsAccumulated ?? false,
+        pointsAccumulated: state.pointsAccumulated ?? false,
       },
     });
 

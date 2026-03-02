@@ -22,6 +22,7 @@ router.get("/current", async (_req, res) => {
     purse: tournament.purse,
     par: tournament.par,
     isMajor: tournament.isMajor,
+    color: tournament.color,
     dates: tournament.dates,
     phase: simMatchesCurrent ? state.phase : "idle",
     currentRound: simMatchesCurrent ? state.currentRound : 0,

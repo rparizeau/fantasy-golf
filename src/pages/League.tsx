@@ -131,7 +131,7 @@ export function LeagueStandings({ leagueId, colors: C }: LeagueStandingsProps) {
               {/* Total */}
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <p style={{ color: C.greenBright, fontSize: 15, fontWeight: 700, margin: 0 }}>
-                  ${team.totalEarnings.toLocaleString()}
+                  {team.totalPoints} pts
                 </p>
                 <p style={{ color: C.txt3, fontSize: 10, margin: 0 }}>season</p>
               </div>

@@ -205,11 +205,11 @@ function LeagueCard({
       <div style={{ display: "flex", borderTop: `1px solid ${C.border}` }}>
         <div style={{ flex: 1, padding: "10px 16px", borderRight: `1px solid ${C.border}` }}>
           <p style={{ color: C.txt3, fontSize: 10, margin: "0 0 1px", textTransform: "uppercase" }}>Season</p>
-          <p style={{ color: C.txt, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatMoney(l.money)}</p>
+          <p style={{ color: C.txt, fontSize: 14, fontWeight: 700, margin: 0 }}>{l.points} pts</p>
         </div>
         <div style={{ flex: 1, padding: "10px 16px", borderRight: `1px solid ${C.border}` }}>
           <p style={{ color: C.txt3, fontSize: 10, margin: "0 0 1px", textTransform: "uppercase" }}>This Week</p>
-          <p style={{ color: C.greenBright, fontSize: 14, fontWeight: 700, margin: 0 }}>{formatMoney(l.weekMoney)}</p>
+          <p style={{ color: C.greenBright, fontSize: 14, fontWeight: 700, margin: 0 }}>{l.weekPoints} pts</p>
         </div>
         <div style={{ width: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <span style={{ color: C.txt3, fontSize: 20 }}>›</span>

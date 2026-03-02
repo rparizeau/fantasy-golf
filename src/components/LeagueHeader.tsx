@@ -31,8 +31,7 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
     getLeagueInfo(leagueId).then((info) => setLeagueName(info.name));
   }, [leagueId]);
 
-  const isMajor = t?.isMajor ?? false;
-  const tintColor = isMajor ? C.goldDim : C.greenDim;
+  const tournamentColor = t?.color ?? "#003C80";
 
   return (
     <div
@@ -40,11 +39,11 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
         position: "sticky",
         top: 0,
         zIndex: 40,
-        background: `linear-gradient(to bottom, ${C.card} 0%, ${tintColor} 100%)`,
+        background: C.card,
       }}
     >
       {/* Tournament info section */}
-      <div style={{ padding: "0 16px 16px", borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ padding: "0 16px 16px", borderBottom: `1px solid ${C.border}`, background: `linear-gradient(to bottom, transparent 0%, ${tournamentColor}20 100%)` }}>
         {/* Row 1: Back + League Name | Toggle */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 64 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -80,8 +79,8 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
             {/* Row 2: Tournament Name + Status */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, marginBottom: 4 }}>
               <p style={{ color: C.txt, fontSize: 17, fontWeight: 700, margin: 0 }}>
-                {t.isMajor && <span style={{ color: C.gold, marginRight: 6 }}>★</span>}
                 {t.name}
+                {t.isMajor && <span style={{ color: C.gold, marginLeft: 6 }}>★</span>}
               </p>
               {(() => {
                 const currentIdx = tournaments.findIndex((t2) => t2.id === currentTournamentId);
@@ -107,21 +106,22 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
               })()}
             </div>
 
-            {/* Row 3: Course | Purse */}
+            {/* Row 3: Course | Par */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
               <p style={{ color: C.txt2, fontSize: 13, margin: 0 }}>{t.course}</p>
-              <p style={{ color: C.txt2, fontSize: 13, margin: 0 }}>Purse: {formatPurse(t.purse)}</p>
+              <p style={{ color: C.txt2, fontSize: 13, margin: 0 }}>Par: {t.par}</p>
             </div>
 
-            {/* Row 4: Location */}
+            {/* Row 4: Location | Purse */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p style={{ color: C.txt3, fontSize: 12, margin: 0 }}>📍 {t.location}</p>
+              <p style={{ color: C.txt3, fontSize: 12, margin: 0 }}>Purse: {formatPurse(t.purse)}</p>
             </div>
           </>
         )}
       </div>
       {activePage === "scorecard" && tournaments.length > 0 && (
-        <div style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ borderBottom: `1px solid ${C.border}`, background: `${tournamentColor}20` }}>
           <WeekNav
             tournaments={tournaments}
             viewingWeek={viewingWeek}

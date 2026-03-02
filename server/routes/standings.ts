@@ -16,12 +16,13 @@ router.get("/:id/standings", async (req, res) => {
     teamName: team.teamName,
     managerName: team.managerName,
     totalEarnings: team.seasonEarnings,
+    totalPoints: team.seasonPoints,
     previousRank: 0,
     currentRank: 0,
     tournamentEarnings: [] as { tournamentId: number; tournamentName: string; earnings: number }[],
   }));
 
-  standings.sort((a, b) => b.totalEarnings - a.totalEarnings);
+  standings.sort((a, b) => b.totalPoints - a.totalPoints || b.totalEarnings - a.totalEarnings);
   standings.forEach((s, idx) => {
     s.currentRank = idx + 1;
     s.previousRank = s.currentRank;

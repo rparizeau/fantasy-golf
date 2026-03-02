@@ -4,6 +4,7 @@ import {
   waiverClaims, activityFeed, chatMessages, managers,
 } from "../schema/index.js";
 import { eq, and, desc, asc, inArray } from "drizzle-orm";
+import type { ScoringSettings } from "../../sim/engine.js";
 
 // --- Types matching existing API shapes ---
 
@@ -17,6 +18,7 @@ export interface TeamData {
   reserve: number[];     // player IDs with slot='reserve'
   mulligansUsed: number;
   seasonEarnings: number;
+  seasonPoints: number;
 }
 
 export interface LeagueData {
@@ -27,6 +29,8 @@ export interface LeagueData {
     activeSize: number;
     reserveSize: number;
     mulligansPerSeason: number;
+    scoringSettings: ScoringSettings;
+    showMoney: boolean;
   };
   teams: TeamData[];
 }
@@ -56,6 +60,7 @@ function buildTeamDataList(
       reserve: rows.filter((r) => r.slot === "reserve").map((r) => r.playerId),
       mulligansUsed: t.mulligansUsed,
       seasonEarnings: t.seasonEarnings,
+      seasonPoints: t.seasonPoints,
     };
   });
 }
@@ -83,6 +88,8 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
       activeSize: league.activeSize,
       reserveSize: league.reserveSize,
       mulligansPerSeason: league.mulligansPerSeason,
+      scoringSettings: league.scoringSettings,
+      showMoney: league.showMoney,
     },
     teams: buildTeamDataList(teamRows, allRosterRows),
   };
@@ -109,6 +116,8 @@ export async function getAllLeagues(): Promise<LeagueData[]> {
         activeSize: league.activeSize,
         reserveSize: league.reserveSize,
         mulligansPerSeason: league.mulligansPerSeason,
+        scoringSettings: league.scoringSettings,
+        showMoney: league.showMoney,
       },
       teams: buildTeamDataList(leagueTeams, allRosterRows),
     };
@@ -205,6 +214,15 @@ export async function updateSeasonEarnings(teamPk: number, delta: number): Promi
   if (!team) return;
   const newEarnings = Math.max(0, team.seasonEarnings + delta);
   await db.update(teams).set({ seasonEarnings: newEarnings }).where(eq(teams.id, teamPk));
+}
+
+// --- Season points ---
+
+export async function updateSeasonPoints(teamPk: number, delta: number): Promise<void> {
+  const [team] = await db.select().from(teams).where(eq(teams.id, teamPk));
+  if (!team) return;
+  const newPoints = team.seasonPoints + delta;
+  await db.update(teams).set({ seasonPoints: newPoints }).where(eq(teams.id, teamPk));
 }
 
 // --- Mulligans ---
@@ -317,6 +335,7 @@ export async function getTeamByManagerAndLeague(managerId: number, leagueId: num
     reserve: rosterRows.filter((r) => r.slot === "reserve").map((r) => r.playerId),
     mulligansUsed: row.mulligansUsed,
     seasonEarnings: row.seasonEarnings,
+    seasonPoints: row.seasonPoints,
   };
 }
 

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { loadActiveSimState, getActiveTournamentId } from "../db/dal/sim.js";
 import { loadTournaments, loadPayoutTable, loadPlayers } from "../db/dal/seed-data.js";
 import { getLeague, getAllLeagues, getLineup, getLineupsForTeams, setLineup } from "../db/dal/league.js";
-import { formatScore } from "../sim/engine.js";
+import { formatScore, calculatePlayerPoints, calculateRoundPoints } from "../sim/engine.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 
 const router = Router();
@@ -23,7 +23,7 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
   if (simMatchesCurrent) {
     for (const p of simState.players) {
       let earnings = 0;
-      if (simState.phase === "final" && p.status === "active") {
+      if (p.status === "active" && p.rounds.length > 0) {
         const payout = payoutTable.find((pt) => pt.position === p.position);
         if (payout) earnings = Math.round(tournament.purse * (payout.pct / 100));
       }
@@ -48,17 +48,30 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
   const allTeamPks = allLeagues.flatMap((l) => l.teams.map((t) => t.pk));
   const allLineups = await getLineupsForTeams(allTeamPks, tournament.id);
 
+  // Build a map of player objects for quick lookup
+  const playerMap = new Map(simState.players.map((p) => [p.playerId, p]));
+  const holePars = simState.holePars ?? [];
+
   const summaries = allLeagues.map((league) => {
-    const teamWeekEarnings = league.teams.map((team) => {
+    const scoring = league.settings.scoringSettings;
+
+    const teamWeekData = league.teams.map((team) => {
       const lineup = allLineups.get(team.pk) ?? [];
       const weekEarnings = lineup.reduce((sum, pid) => sum + (playerEarningsMap.get(pid) || 0), 0);
-      return { teamId: team.teamId, weekEarnings };
+      let weekPoints = 0;
+      if (simMatchesCurrent) {
+        for (const pid of lineup) {
+          const player = playerMap.get(pid);
+          if (player) weekPoints += calculatePlayerPoints(player.holeScores, holePars, scoring);
+        }
+      }
+      return { teamId: team.teamId, weekEarnings, weekPoints };
     });
 
-    const sorted = [...league.teams].sort((a, b) => b.seasonEarnings - a.seasonEarnings);
+    const sorted = [...league.teams].sort((a, b) => b.seasonPoints - a.seasonPoints || b.seasonEarnings - a.seasonEarnings);
     const myTeam = league.teams.find((t) => t.managerId === managerId);
     const myRank = myTeam ? sorted.findIndex((t) => t.teamId === myTeam.teamId) + 1 : 0;
-    const myWeek = myTeam ? teamWeekEarnings.find((t) => t.teamId === myTeam.teamId)?.weekEarnings || 0 : 0;
+    const myWeekData = myTeam ? teamWeekData.find((t) => t.teamId === myTeam.teamId) : undefined;
 
     return {
       id: league.id,
@@ -67,7 +80,10 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
       rank: myRank,
       of: league.teams.length,
       money: myTeam?.seasonEarnings || 0,
-      weekMoney: myWeek,
+      weekMoney: myWeekData?.weekEarnings || 0,
+      points: myTeam?.seasonPoints || 0,
+      weekPoints: myWeekData?.weekPoints || 0,
+      showMoney: league.settings.showMoney,
       members: league.teams.length,
       tournament: tournament.name,
       course: tournament.course,
@@ -123,7 +139,7 @@ router.get("/:id/leaderboard", async (req, res) => {
   const playerEarningsMap = new Map<number, { earnings: number; position: number; toPar: number; toParDisplay: string; status: string }>();
   for (const p of simState.players) {
     let earnings = 0;
-    if (simState.phase === "final" && p.status === "active") {
+    if (p.status === "active" && p.rounds.length > 0) {
       const payout = payoutTable.find((pt) => pt.position === p.position);
       if (payout) earnings = Math.round(tournament.purse * (payout.pct / 100));
     }
@@ -138,6 +154,8 @@ router.get("/:id/leaderboard", async (req, res) => {
 
   const leagueTeamPks = league.teams.map((t) => t.pk);
   const leagueLineups = await getLineupsForTeams(leagueTeamPks, simState.tournamentId);
+  const holePars = simState.holePars ?? [];
+  const scoring = league.settings.scoringSettings;
 
   const teams = league.teams.map((team) => {
     const lineup = leagueLineups.get(team.pk) ?? [];
@@ -145,6 +163,7 @@ router.get("/:id/leaderboard", async (req, res) => {
       const simPlayer = simState.players.find((p) => p.playerId === playerId);
       const earningsData = playerEarningsMap.get(playerId);
       const isActive = lineup.includes(playerId);
+      const pts = simPlayer ? calculatePlayerPoints(simPlayer.holeScores, holePars, scoring) : 0;
 
       return {
         playerId,
@@ -154,28 +173,32 @@ router.get("/:id/leaderboard", async (req, res) => {
         toParDisplay: earningsData?.toParDisplay ?? "-",
         status: (earningsData?.status ?? "active") as "active" | "cut" | "wd",
         earnings: isActive ? (earningsData?.earnings ?? 0) : 0,
+        points: isActive ? pts : 0,
         isActive,
       };
     });
 
     const totalEarnings = players.reduce((sum, p) => sum + p.earnings, 0);
+    const totalPoints = players.reduce((sum, p) => sum + p.points, 0);
 
     return {
       teamId: team.teamId,
       teamName: team.teamName,
       managerName: team.managerName,
       totalEarnings,
+      totalPoints,
       players,
     };
   });
 
-  teams.sort((a, b) => b.totalEarnings - a.totalEarnings);
+  teams.sort((a, b) => b.totalPoints - a.totalPoints || b.totalEarnings - a.totalEarnings);
 
   res.json({
     leagueId: league.id,
     leagueName: league.name,
     tournamentName: tournament.name,
     phase: simState.phase,
+    showMoney: league.settings.showMoney,
     teams,
   });
 });
@@ -239,15 +262,19 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
     const payoutTable = await loadPayoutTable();
     const locked = simState.phase !== "idle";
     const lineup = await getLineup(team.pk, simState.tournamentId);
+    const rosterHolePars = simState.holePars ?? [];
+    const rosterScoring = league.settings.scoringSettings;
 
     const roster = team.roster.map((playerId) => {
       const simPlayer = simState.players.find((p) => p.playerId === playerId);
       let earnings = 0;
-      if (simState.phase === "final" && simPlayer?.status === "active") {
+      if (simPlayer?.status === "active" && simPlayer.rounds.length > 0) {
         const payout = payoutTable.find((pt) => pt.position === simPlayer.position);
         if (payout) earnings = Math.round(tournament.purse * (payout.pct / 100));
       }
       const isActive = lineup.includes(playerId);
+      const pts = simPlayer ? calculatePlayerPoints(simPlayer.holeScores, rosterHolePars, rosterScoring) : 0;
+      const rPts = simPlayer ? calculateRoundPoints(simPlayer.holeScores, rosterHolePars, rosterScoring) : [];
       return {
         playerId,
         name: simPlayer?.name || `Player ${playerId}`,
@@ -260,12 +287,16 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
         position: simPlayer?.position ?? 0,
         status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
         rounds: simPlayer?.rounds ?? [],
+        roundPoints: rPts,
         earnings: isActive ? earnings : 0,
+        points: pts,
       };
     });
 
     const reserve = team.reserve.map((playerId) => {
       const simPlayer = simState.players.find((p) => p.playerId === playerId);
+      const pts = simPlayer ? calculatePlayerPoints(simPlayer.holeScores, rosterHolePars, rosterScoring) : 0;
+      const rPts = simPlayer ? calculateRoundPoints(simPlayer.holeScores, rosterHolePars, rosterScoring) : [];
       return {
         playerId,
         name: simPlayer?.name || `Player ${playerId}`,
@@ -278,7 +309,9 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
         position: simPlayer?.position ?? 0,
         status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
         rounds: simPlayer?.rounds ?? [],
+        roundPoints: rPts,
         earnings: 0,
+        points: pts,
       };
     });
 
@@ -312,7 +345,9 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
         position: 0,
         status: "active" as const,
         rounds: [] as number[],
+        roundPoints: [] as number[],
         earnings: 0,
+        points: 0,
       };
     };
 
