@@ -1,11 +1,11 @@
 import type { Request, Response, NextFunction } from "express";
 import { supabaseAdmin } from "../lib/supabase-admin.js";
 import { db } from "../db/index.js";
-import { managers } from "../db/schema/index.js";
+import { users, managers } from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
 
 export interface ManagerRecord {
-  id: number;
+  id: number;           // users.id
   supabaseUserId: string;
   email: string;
   displayName: string;
@@ -18,8 +18,8 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Verifies the Supabase JWT and attaches the manager record to req.manager.
- * Returns 401 if no valid token or no manager record found.
+ * Verifies the Supabase JWT and attaches the user record to req.manager.
+ * Returns 401 if no valid token or no user record found.
  */
 export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
@@ -35,28 +35,51 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     return;
   }
 
-  const [manager] = await db.select().from(managers)
-    .where(eq(managers.supabaseUserId, data.user.id));
+  let [user] = await db.select().from(users)
+    .where(eq(users.supabaseUserId, data.user.id));
 
-  if (!manager) {
-    res.status(401).json({ error: "No manager profile found — please register first" });
-    return;
+  // Migration fallback: if no user found by supabase ID, try matching by email
+  // and link the real supabase ID to the existing seeded user record
+  if (!user && data.user.email) {
+    const [byEmail] = await db.select().from(users)
+      .where(eq(users.email, data.user.email));
+    if (byEmail) {
+      await db.update(users)
+        .set({ supabaseUserId: data.user.id })
+        .where(eq(users.id, byEmail.id));
+      user = { ...byEmail, supabaseUserId: data.user.id };
+    }
   }
 
+  // Auto-create user record if JWT is valid but no users row exists
+  if (!user) {
+    const [created] = await db.insert(users).values({
+      supabaseUserId: data.user.id,
+      email: data.user.email ?? "",
+      name: data.user.user_metadata?.display_name ?? data.user.email?.split("@")[0] ?? "User",
+    }).returning();
+    user = created;
+  }
+
+  // Check if user is commissioner in any league
+  const [commish] = await db.select().from(managers)
+    .where(eq(managers.userId, user.id));
+  const isAdmin = commish?.isCommissioner ?? false;
+
   req.manager = {
-    id: manager.id,
-    supabaseUserId: manager.supabaseUserId,
-    email: manager.email,
-    displayName: manager.displayName,
-    isAdmin: manager.isAdmin,
+    id: user.id,
+    supabaseUserId: user.supabaseUserId,
+    email: user.email,
+    displayName: user.name,
+    isAdmin,
   };
 
   next();
 }
 
 /**
- * Verifies the Supabase JWT only (no manager record required).
- * Used for the register endpoint where the manager record doesn't exist yet.
+ * Verifies the Supabase JWT only (no user record required).
+ * Used for the register endpoint where the user record doesn't exist yet.
  */
 export async function requireSupabaseAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
@@ -77,7 +100,7 @@ export async function requireSupabaseAuth(req: AuthenticatedRequest, res: Respon
 }
 
 /**
- * Extends requireAuth — also checks that the manager is an admin.
+ * Extends requireAuth — also checks that the user is an admin (commissioner).
  */
 export async function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   await requireAuth(req, res, () => {

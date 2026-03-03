@@ -5,7 +5,7 @@ import {
   type SimState,
 } from "../db/dal/sim.js";
 import { loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
-import { getAllLeagues, getLineupsForTeams, updateSeasonEarnings, updateSeasonPoints, autoCopyLineups } from "../db/dal/league.js";
+import { getAllLeagues, getLineupsForTeams, autoCopyLineups } from "../db/dal/league.js";
 import { advance, rewind, setOverride, updatePlayer, calculatePlayerPoints } from "../sim/engine.js";
 
 function buildPlayerEarnings(simState: SimState, purse: number, payoutTable: { position: number; pct: number }[]): Map<number, number> {
@@ -22,11 +22,11 @@ function buildPlayerEarnings(simState: SimState, purse: number, payoutTable: { p
 }
 
 async function computeTeamEarnings(simState: SimState): Promise<{ teamPk: number; weekEarnings: number }[]> {
-  const [tournaments, payoutTable, allLeagues] = await Promise.all([
+  const [tournaments, allLeagues] = await Promise.all([
     loadTournaments(),
-    loadPayoutTable(),
     getAllLeagues(),
   ]);
+  const payoutTable = loadPayoutTable();
   const tournament = tournaments.find((t) => t.id === simState.tournamentId);
   if (!tournament) return [];
 
@@ -43,22 +43,6 @@ async function computeTeamEarnings(simState: SimState): Promise<{ teamPk: number
     }
   }
   return results;
-}
-
-async function accumulateSeasonEarnings(simState: SimState): Promise<void> {
-  if (simState.phase !== "final") return;
-  if (simState.earningsAccumulated) return;
-
-  const activeId = await getActiveTournamentId();
-  if (simState.tournamentId !== activeId) return;
-
-  const teamEarnings = await computeTeamEarnings(simState);
-  for (const { teamPk, weekEarnings } of teamEarnings) {
-    await updateSeasonEarnings(teamPk, weekEarnings);
-  }
-
-  simState.earningsAccumulated = true;
-  await saveSimState(simState);
 }
 
 async function computeTeamPoints(simState: SimState): Promise<{ teamPk: number; weekPoints: number }[]> {
@@ -85,48 +69,6 @@ async function computeTeamPoints(simState: SimState): Promise<{ teamPk: number; 
     }
   }
   return results;
-}
-
-async function accumulateSeasonPoints(simState: SimState): Promise<void> {
-  if (simState.phase !== "final") return;
-  if (simState.pointsAccumulated) return;
-
-  const activeId = await getActiveTournamentId();
-  if (simState.tournamentId !== activeId) return;
-
-  const teamPoints = await computeTeamPoints(simState);
-  for (const { teamPk, weekPoints } of teamPoints) {
-    await updateSeasonPoints(teamPk, weekPoints);
-  }
-
-  simState.pointsAccumulated = true;
-  await saveSimState(simState);
-}
-
-async function deaccumulateSeasonPoints(simState: SimState): Promise<void> {
-  if (!simState.pointsAccumulated) return;
-  if (simState.players.length === 0) return;
-
-  const teamPoints = await computeTeamPoints(simState);
-  for (const { teamPk, weekPoints } of teamPoints) {
-    await updateSeasonPoints(teamPk, -weekPoints);
-  }
-
-  simState.pointsAccumulated = false;
-  await saveSimState(simState);
-}
-
-async function deaccumulateSeasonEarnings(simState: SimState): Promise<void> {
-  if (!simState.earningsAccumulated) return;
-  if (simState.players.length === 0) return;
-
-  const teamEarnings = await computeTeamEarnings(simState);
-  for (const { teamPk, weekEarnings } of teamEarnings) {
-    await updateSeasonEarnings(teamPk, -weekEarnings);
-  }
-
-  simState.earningsAccumulated = false;
-  await saveSimState(simState);
 }
 
 const router = Router();
@@ -183,11 +125,6 @@ router.post("/advance", async (_req, res) => {
   const updated = advance(state);
   await saveSimState(updated);
 
-  if (updated.phase === "final") {
-    await accumulateSeasonEarnings(updated);
-    await accumulateSeasonPoints(updated);
-  }
-
   res.json({
     phase: updated.phase,
     currentRound: updated.currentRound,
@@ -206,8 +143,6 @@ router.post("/rewind", async (_req, res) => {
     return;
   }
 
-  await deaccumulateSeasonEarnings(state);
-  await deaccumulateSeasonPoints(state);
   const updated = rewind(state);
   await saveSimState(updated);
 
@@ -269,9 +204,6 @@ router.post("/player/update", async (req, res) => {
 // POST /api/sim/reset — reset to idle with fresh field
 router.post("/reset", async (req, res) => {
   const { tournamentId } = req.body || {};
-  const prevState = await loadActiveSimState();
-  await deaccumulateSeasonEarnings(prevState);
-  await deaccumulateSeasonPoints(prevState);
   const state = await resetSimState(tournamentId);
   res.json({
     phase: state.phase,

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { loadActiveSimState, getActiveTournamentId } from "../db/dal/sim.js";
-import { loadPlayers, loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
+import { loadGolfers, loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
 import { formatScore, calculatePlayerPoints, DEFAULT_SCORING } from "../sim/engine.js";
 
 const router = Router();
@@ -13,8 +13,8 @@ router.get("/:id", async (req, res) => {
     return;
   }
 
-  const players = await loadPlayers();
-  const seed = players.find((p) => p.id === id);
+  const golfers = await loadGolfers();
+  const seed = golfers.find((p) => p.id === id);
   if (!seed) {
     res.status(404).json({ error: "Player not found" });
     return;
@@ -29,7 +29,7 @@ router.get("/:id", async (req, res) => {
 
   let earnings = 0;
   if (sim && state.phase === "final" && sim.status === "active") {
-    const payoutTable = await loadPayoutTable();
+    const payoutTable = loadPayoutTable();
     const payout = payoutTable.find((pt) => pt.position === sim.position);
     if (payout) {
       earnings = Math.round(tournament.purse * (payout.pct / 100));

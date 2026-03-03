@@ -37,7 +37,7 @@ router.get("/leaderboard", async (_req, res) => {
   const state = await loadActiveSimState();
   const tournaments = await loadTournaments();
   const tournament = tournaments.find((t) => t.id === state.tournamentId) || tournaments[0];
-  const payoutTable = await loadPayoutTable();
+  const payoutTable = loadPayoutTable();
 
   const leaderboard = state.players.map((p) => {
     let earnings = 0;

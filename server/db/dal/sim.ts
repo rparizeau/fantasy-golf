@@ -1,7 +1,7 @@
 import { db, client } from "../index.js";
-import { simActive, simTournaments, simPlayers } from "../schema/index.js";
+import { simActive, simTournaments, simPlayers, tournaments as tournamentsTable } from "../schema/index.js";
 import { eq } from "drizzle-orm";
-import { loadPlayers, loadTournaments, loadCourse } from "./seed-data.js";
+import { loadGolfers, loadTournaments, loadCourse } from "./seed-data.js";
 
 // --- Types (same as engine.ts) ---
 
@@ -40,9 +40,9 @@ export async function getActiveTournamentId(): Promise<number> {
   const [row] = await db.select().from(simActive).where(eq(simActive.id, 1));
   if (row) return row.activeTournamentId;
 
-  // Default to first current tournament
+  // Default to first tournament
   const tournaments = await loadTournaments();
-  const first = tournaments.find((t) => t.current) || tournaments[0];
+  const first = tournaments[0];
   await setActiveTournamentId(first.id);
   return first.id;
 }
@@ -84,22 +84,22 @@ export async function loadTournamentState(tournamentId: number): Promise<SimStat
     par: tourney.par,
     holePars: tourney.holePars ?? undefined,
     players: playerRows.map((p) => ({
-      playerId: p.playerId,
+      playerId: p.golferId,
       name: p.name,
-      country: p.country,
+      country: p.origin,
       ranking: p.ranking,
       rounds: p.rounds,
       holeScores: p.holeScores ?? undefined,
       total: p.total,
       toPar: p.toPar,
       position: p.position,
-      status: p.status,
+      status: p.statusEnum,
     })),
     cutLine: tourney.cutLine ?? null,
     fieldSize: tourney.fieldSize,
     overrides: (tourney.overrides ?? {}) as Record<number, { score?: number; wd?: boolean }>,
-    earningsAccumulated: tourney.earningsAccumulated,
-    pointsAccumulated: tourney.pointsAccumulated,
+    earningsAccumulated: tourney.isEarningsAccumulated,
+    pointsAccumulated: tourney.isPointsAccumulated,
   };
 }
 
@@ -115,8 +115,8 @@ export async function saveSimState(state: SimState): Promise<void> {
       cutLine: state.cutLine ?? null,
       fieldSize: state.fieldSize,
       overrides: state.overrides as Record<number, { score?: number; wd?: boolean }>,
-      earningsAccumulated: state.earningsAccumulated ?? false,
-      pointsAccumulated: state.pointsAccumulated ?? false,
+      isEarningsAccumulated: state.earningsAccumulated ?? false,
+      isPointsAccumulated: state.pointsAccumulated ?? false,
     })
     .onConflictDoUpdate({
       target: simTournaments.tournamentId,
@@ -128,17 +128,17 @@ export async function saveSimState(state: SimState): Promise<void> {
         cutLine: state.cutLine ?? null,
         fieldSize: state.fieldSize,
         overrides: state.overrides as Record<number, { score?: number; wd?: boolean }>,
-        earningsAccumulated: state.earningsAccumulated ?? false,
-        pointsAccumulated: state.pointsAccumulated ?? false,
+        isEarningsAccumulated: state.earningsAccumulated ?? false,
+        isPointsAccumulated: state.pointsAccumulated ?? false,
       },
     });
 
   // Bulk upsert all players in a single query using unnest arrays
   if (state.players.length > 0) {
     const tournamentIds = state.players.map(() => state.tournamentId);
-    const playerIds = state.players.map((p) => p.playerId);
+    const golferIds = state.players.map((p) => p.playerId);
     const names = state.players.map((p) => p.name);
-    const countries = state.players.map((p) => p.country);
+    const origins = state.players.map((p) => p.country);
     const rankings = state.players.map((p) => p.ranking);
     const rounds = state.players.map((p) => JSON.stringify(p.rounds));
     const holeScores = state.players.map((p) => p.holeScores ? JSON.stringify(p.holeScores) : null);
@@ -148,12 +148,12 @@ export async function saveSimState(state: SimState): Promise<void> {
     const statuses = state.players.map((p) => p.status);
 
     await client`
-      INSERT INTO sim_players (tournament_id, player_id, name, country, ranking, rounds, hole_scores, total, to_par, position, status)
+      INSERT INTO sim_players (tournament_id, golfer_id, name, origin, ranking, rounds, hole_scores, total, to_par, position, status_enum)
       SELECT * FROM unnest(
         ${tournamentIds}::int[],
-        ${playerIds}::int[],
+        ${golferIds}::int[],
         ${names}::varchar[],
-        ${countries}::varchar[],
+        ${origins}::varchar[],
         ${rankings}::int[],
         ${rounds}::jsonb[],
         ${holeScores}::jsonb[],
@@ -162,13 +162,13 @@ export async function saveSimState(state: SimState): Promise<void> {
         ${positions}::int[],
         ${statuses}::varchar[]
       )
-      ON CONFLICT (tournament_id, player_id) DO UPDATE SET
+      ON CONFLICT (tournament_id, golfer_id) DO UPDATE SET
         rounds = EXCLUDED.rounds,
         hole_scores = EXCLUDED.hole_scores,
         total = EXCLUDED.total,
         to_par = EXCLUDED.to_par,
         position = EXCLUDED.position,
-        status = EXCLUDED.status
+        status_enum = EXCLUDED.status_enum
     `;
   }
 }
@@ -198,12 +198,15 @@ function defaultHolePars(par: number): number[] {
 }
 
 export async function createFreshState(tournamentId: number): Promise<SimState> {
-  const allPlayers = await loadPlayers();
+  const allGolfers = await loadGolfers();
   const tournaments = await loadTournaments();
   const tournament = tournaments.find((t) => t.id === tournamentId) || tournaments[0];
 
-  const courseData = await loadCourse(tournament.id);
-  const holePars = courseData ? courseData.holes : defaultHolePars(tournament.par);
+  // Load course by looking up courseId from the tournament table
+  const [tournamentRow] = await db.select({ courseId: tournamentsTable.courseId })
+    .from(tournamentsTable).where(eq(tournamentsTable.id, tournament.id));
+  const courseData = tournamentRow ? await loadCourse(tournamentRow.courseId) : null;
+  const holePars = courseData ? (courseData.holes as number[]) : defaultHolePars(tournament.par);
 
   const state: SimState = {
     phase: "idle",
@@ -211,7 +214,7 @@ export async function createFreshState(tournamentId: number): Promise<SimState> 
     currentRound: 0,
     par: tournament.par,
     holePars,
-    players: allPlayers.map((p) => ({
+    players: allGolfers.map((p) => ({
       playerId: p.id,
       name: p.name,
       country: p.country,
@@ -224,7 +227,7 @@ export async function createFreshState(tournamentId: number): Promise<SimState> 
       status: "active" as const,
     })),
     cutLine: null,
-    fieldSize: allPlayers.length,
+    fieldSize: allGolfers.length,
     overrides: {},
   };
 

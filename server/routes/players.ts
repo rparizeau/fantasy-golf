@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { loadPlayers } from "../db/dal/seed-data.js";
+import { loadGolfers } from "../db/dal/seed-data.js";
 import { loadActiveSimState } from "../db/dal/sim.js";
 import {
   getLeague, getOwnershipMap, isPlayerOwned,
-  getTeamPk, addWaiverClaim, getTeamByManagerAndLeague,
+  addWaiverClaim, getTeamByManagerAndLeague,
   getWaiverClaims, clearWaiverClaims,
   swapRosterPlayer, addToRoster, getLineup, setLineup,
   addActivityFeedEntry,
@@ -20,11 +20,11 @@ router.get("/:id/players", async (req, res) => {
     return;
   }
 
-  const allPlayers = await loadPlayers();
+  const allGolfers = await loadGolfers();
   const simState = await loadActiveSimState();
   const ownershipMap = await getOwnershipMap(league.id);
 
-  const pool = allPlayers.map((p) => {
+  const pool = allGolfers.map((p) => {
     const simPlayer = simState.players.find((sp) => sp.playerId === p.id);
     return {
       playerId: p.id,
@@ -79,7 +79,7 @@ router.post("/:id/waiver/claim", async (req: AuthenticatedRequest, res) => {
     }
   }
 
-  await addWaiverClaim(league.id, myTeam.teamId, addPlayerId, dropPlayerId || null, faabBid || 0);
+  await addWaiverClaim(league.id, myTeam.pk, addPlayerId, dropPlayerId || null, faabBid || 0);
   res.json({ ok: true });
 });
 
@@ -94,41 +94,41 @@ router.post("/:id/waiver/process", async (req, res) => {
   const simState = await loadActiveSimState();
   const currentTournamentId = simState.tournamentId;
   const claims = await getWaiverClaims(league.id);
-  const allPlayers = await loadPlayers();
+  const allGolfers = await loadGolfers();
   let processed = 0;
   const processedPlayers = new Set<number>();
 
   for (const claim of claims) {
-    if (processedPlayers.has(claim.addPlayerId)) continue;
+    if (processedPlayers.has(claim.addGolferId)) continue;
 
-    const team = league.teams.find((t) => t.teamId === claim.teamId);
+    const team = league.teams.find((t) => t.pk === claim.managerId);
     if (!team) continue;
 
-    const addName = allPlayers.find((p) => p.id === claim.addPlayerId)?.name || `Player ${claim.addPlayerId}`;
+    const addName = allGolfers.find((p) => p.id === claim.addGolferId)?.name || `Player ${claim.addGolferId}`;
 
-    if (claim.dropPlayerId) {
-      const dropIdx = team.roster.indexOf(claim.dropPlayerId);
+    if (claim.dropGolferId) {
+      const dropIdx = team.roster.indexOf(claim.dropGolferId);
       if (dropIdx === -1) continue;
 
-      await swapRosterPlayer(team.pk, claim.dropPlayerId, claim.addPlayerId);
+      await swapRosterPlayer(team.pk, claim.dropGolferId, claim.addGolferId);
 
       // Update lineup if dropped player was active
       const lineup = await getLineup(team.pk, currentTournamentId);
-      const activeIdx = lineup.indexOf(claim.dropPlayerId);
+      const activeIdx = lineup.indexOf(claim.dropGolferId);
       if (activeIdx !== -1) {
-        lineup[activeIdx] = claim.addPlayerId;
+        lineup[activeIdx] = claim.addGolferId;
         await setLineup(team.pk, currentTournamentId, lineup);
       }
 
-      const dropName = allPlayers.find((p) => p.id === claim.dropPlayerId)?.name || `Player ${claim.dropPlayerId}`;
+      const dropName = allGolfers.find((p) => p.id === claim.dropGolferId)?.name || `Player ${claim.dropGolferId}`;
       await addActivityFeedEntry(league.id, "waiver", `${team.teamName} added ${addName} and dropped ${dropName}`);
     } else {
       if (team.roster.length >= league.settings.rosterSize) continue;
-      await addToRoster(team.pk, claim.addPlayerId);
+      await addToRoster(team.pk, claim.addGolferId);
       await addActivityFeedEntry(league.id, "waiver", `${team.teamName} added ${addName}`);
     }
 
-    processedPlayers.add(claim.addPlayerId);
+    processedPlayers.add(claim.addGolferId);
     processed++;
   }
 

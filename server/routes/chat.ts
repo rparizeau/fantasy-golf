@@ -30,8 +30,8 @@ router.get("/:id/chat", async (req, res) => {
     return;
   }
 
-  const messages = await getChatMessages(league.id);
-  res.json(messages.map((m) => ({
+  const msgs = await getChatMessages(league.id);
+  res.json(msgs.map((m) => ({
     id: `msg-${m.id}`,
     teamId: m.teamId,
     teamName: m.teamName,
@@ -61,7 +61,7 @@ router.post("/:id/chat", async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const msg = await addChatMessage(league.id, myTeam.teamId, myTeam.teamName, message.trim());
+  const msg = await addChatMessage(league.id, myTeam.pk, myTeam.teamName, message.trim());
 
   res.json({
     id: `msg-${msg.id}`,

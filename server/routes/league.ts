@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { loadActiveSimState, getActiveTournamentId } from "../db/dal/sim.js";
-import { loadTournaments, loadPayoutTable, loadPlayers } from "../db/dal/seed-data.js";
+import { loadTournaments, loadPayoutTable, loadGolfers } from "../db/dal/seed-data.js";
 import { getLeague, getAllLeagues, getLineup, getLineupsForTeams, setLineup } from "../db/dal/league.js";
 import { formatScore, calculatePlayerPoints, calculateRoundPoints } from "../sim/engine.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
@@ -9,13 +9,13 @@ const router = Router();
 
 // GET /api/league/all — all leagues summary for lobby
 router.get("/all", async (_req: AuthenticatedRequest, res) => {
-  const [allLeagues, simState, tournaments, activeId, payoutTable] = await Promise.all([
+  const [allLeagues, simState, tournaments, activeId] = await Promise.all([
     getAllLeagues(),
     loadActiveSimState(),
     loadTournaments(),
     getActiveTournamentId(),
-    loadPayoutTable(),
   ]);
+  const payoutTable = loadPayoutTable();
   const tournament = tournaments.find((t) => t.id === activeId) || tournaments[0];
   const simMatchesCurrent = simState.tournamentId === tournament.id;
 
@@ -42,7 +42,7 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
     cutDisplay = cl === 0 ? `E (${strokes})` : cl > 0 ? `+${cl} (${strokes})` : `${cl} (${strokes})`;
   }
 
-  const managerId = (_req as AuthenticatedRequest).manager?.id;
+  const userId = (_req as AuthenticatedRequest).manager?.id;
 
   // Batch fetch all lineups in one query
   const allTeamPks = allLeagues.flatMap((l) => l.teams.map((t) => t.pk));
@@ -69,7 +69,7 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
     });
 
     const sorted = [...league.teams].sort((a, b) => b.seasonPoints - a.seasonPoints || b.seasonEarnings - a.seasonEarnings);
-    const myTeam = league.teams.find((t) => t.managerId === managerId);
+    const myTeam = league.teams.find((t) => t.managerId === userId);
     const myRank = myTeam ? sorted.findIndex((t) => t.teamId === myTeam.teamId) + 1 : 0;
     const myWeekData = myTeam ? teamWeekData.find((t) => t.teamId === myTeam.teamId) : undefined;
 
@@ -97,7 +97,7 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
     };
   });
 
-  // Only return leagues where the manager has a team
+  // Only return leagues where the user has a team
   res.json(summaries.filter((s) => s.myTeamId !== null));
 });
 
@@ -129,11 +129,11 @@ router.get("/:id/leaderboard", async (req, res) => {
     return;
   }
 
-  const [simState, tournaments, payoutTable] = await Promise.all([
+  const [simState, tournaments] = await Promise.all([
     loadActiveSimState(),
     loadTournaments(),
-    loadPayoutTable(),
   ]);
+  const payoutTable = loadPayoutTable();
   const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
 
   const playerEarningsMap = new Map<number, { earnings: number; position: number; toPar: number; toParDisplay: string; status: string }>();
@@ -217,8 +217,6 @@ router.get("/:id/team/:teamId", async (req, res) => {
     return;
   }
 
-  // Return in the existing shape with tournamentLineups reconstructed
-  // (For backwards compat — routes that need lineup use getLineup directly)
   res.json({
     teamId: team.teamId,
     teamName: team.teamName,
@@ -259,7 +257,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
 
   if (isLiveTournament) {
     const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
-    const payoutTable = await loadPayoutTable();
+    const payoutTable = loadPayoutTable();
     const locked = simState.phase !== "idle";
     const lineup = await getLineup(team.pk, simState.tournamentId);
     const rosterHolePars = simState.holePars ?? [];
@@ -328,8 +326,8 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
   } else {
     const viewTournamentId = reqTournamentId || currentTournament.id;
     const lineup = await getLineup(team.pk, viewTournamentId);
-    const seedPlayers = await loadPlayers();
-    const seedMap = new Map(seedPlayers.map((p) => [p.id, p]));
+    const seedGolfers = await loadGolfers();
+    const seedMap = new Map(seedGolfers.map((p) => [p.id, p]));
 
     const buildStatic = (playerId: number, isActive: boolean) => {
       const seed = seedMap.get(playerId);

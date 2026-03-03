@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { db } from "../db/index.js";
-import { managers, teams } from "../db/schema/index.js";
+import { users, managers, leagues } from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
 import { requireSupabaseAuth, requireAuth, type AuthenticatedRequest } from "../middleware/auth.js";
 
 const router = Router();
 
-// POST /api/auth/register — create manager record after Supabase signup
+// POST /api/auth/register — create user record after Supabase signup
 router.post("/register", requireSupabaseAuth, async (req: AuthenticatedRequest, res) => {
   const { displayName, email } = req.body;
 
@@ -15,41 +15,61 @@ router.post("/register", requireSupabaseAuth, async (req: AuthenticatedRequest, 
     return;
   }
 
-  // Check if manager already exists
-  const [existing] = await db.select().from(managers)
-    .where(eq(managers.supabaseUserId, req.supabaseUserId!));
+  // Check if user already exists by supabase ID
+  const [existing] = await db.select().from(users)
+    .where(eq(users.supabaseUserId, req.supabaseUserId!));
 
   if (existing) {
-    res.json({ id: existing.id, displayName: existing.displayName, email: existing.email, isAdmin: existing.isAdmin });
+    res.json({ id: existing.id, displayName: existing.name, email: existing.email, isAdmin: false });
     return;
   }
 
-  const [manager] = await db.insert(managers).values({
+  // Migration fallback: match seeded user by email and link real supabase ID
+  const [byEmail] = await db.select().from(users)
+    .where(eq(users.email, email));
+
+  if (byEmail) {
+    await db.update(users)
+      .set({ supabaseUserId: req.supabaseUserId! })
+      .where(eq(users.id, byEmail.id));
+    res.json({ id: byEmail.id, displayName: byEmail.name, email: byEmail.email, isAdmin: false });
+    return;
+  }
+
+  const [user] = await db.insert(users).values({
     supabaseUserId: req.supabaseUserId!,
     email,
-    displayName,
+    name: displayName,
   }).returning();
 
-  res.json({ id: manager.id, displayName: manager.displayName, email: manager.email, isAdmin: manager.isAdmin });
+  res.json({ id: user.id, displayName: user.name, email: user.email, isAdmin: false });
 });
 
-// GET /api/auth/me — return manager profile + their teams across leagues
+// GET /api/auth/me — return user profile + their managed leagues
 router.get("/me", requireAuth, async (req: AuthenticatedRequest, res) => {
-  const manager = req.manager!;
+  const user = req.manager!;
 
-  const teamRows = await db.select().from(teams)
-    .where(eq(teams.managerId, manager.id));
+  const managerRows = await db
+    .select({
+      managerId: managers.id,
+      leagueId: managers.leagueId,
+      leagueName: leagues.name,
+      isCommissioner: managers.isCommissioner,
+    })
+    .from(managers)
+    .innerJoin(leagues, eq(managers.leagueId, leagues.id))
+    .where(eq(managers.userId, user.id));
 
   res.json({
-    id: manager.id,
-    displayName: manager.displayName,
-    email: manager.email,
-    isAdmin: manager.isAdmin,
-    teams: teamRows.map((t) => ({
-      pk: t.id,
-      leagueId: t.leagueId,
-      teamId: t.teamId,
-      teamName: t.teamName,
+    id: user.id,
+    displayName: user.displayName,
+    email: user.email,
+    isAdmin: user.isAdmin,
+    teams: managerRows.map((m) => ({
+      pk: m.managerId,
+      leagueId: m.leagueId,
+      teamId: m.managerId,
+      teamName: m.leagueName,
     })),
   });
 });
