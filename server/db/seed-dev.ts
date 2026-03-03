@@ -138,7 +138,7 @@ async function seedDev() {
     for (const team of league.teams) {
       const userId = userMap.get(team.managerName)!;
       const [manager] = await db.insert(schema.managers).values({
-        userId, leagueId: league.id, isCommissioner: team.teamId === 1,
+        userId, leagueId: league.id, teamName: team.teamName, isCommissioner: team.teamId === 1,
       }).returning();
       managerIdMap.set(`${league.id}-${team.teamId}`, manager.id);
     }
@@ -149,6 +149,19 @@ async function seedDev() {
   let golferLinkCount = 0;
   for (const league of Object.values(leagueState.leagues)) {
     if (typeof league !== "object" || !league.teams) continue;
+    const rosterSize = league.settings.rosterSize; // e.g. 12
+
+    // Track which golfer IDs are taken in this league
+    const takenInLeague = new Set<number>();
+    for (const team of league.teams) {
+      for (const gid of team.roster) takenInLeague.add(gid);
+      for (const gid of team.reserve || []) takenInLeague.add(gid);
+    }
+
+    // Pool of available golfer IDs (1-100) for filling rosters
+    const available = Array.from({ length: 100 }, (_, i) => i + 1).filter((id) => !takenInLeague.has(id));
+    let availIdx = 0;
+
     for (const team of league.teams) {
       const managerId = managerIdMap.get(`${league.id}-${team.teamId}`)!;
       const [mr] = await db.insert(schema.managerRosters).values({ managerId }).returning();
@@ -156,8 +169,14 @@ async function seedDev() {
         rosterableId: mr.id, rosterableType: "manager_roster",
       }).returning();
 
+      // Pad roster to rosterSize with available golfers
+      const fullRoster = [...team.roster];
+      while (fullRoster.length < rosterSize && availIdx < available.length) {
+        fullRoster.push(available[availIdx++]);
+      }
+
       const entries = [
-        ...team.roster.map((gid) => ({ golferId: gid, rosterId: roster.id, statusEnum: "active" as const })),
+        ...fullRoster.map((gid) => ({ golferId: gid, rosterId: roster.id, statusEnum: "active" as const })),
         ...(team.reserve || []).map((gid) => ({ golferId: gid, rosterId: roster.id, statusEnum: "bench" as const })),
       ];
       if (entries.length > 0) {

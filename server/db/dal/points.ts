@@ -1,6 +1,7 @@
 import { db } from "../index.js";
 import {
   managerPoints, golferRoster, rosters, managerRosters, tournamentRosters,
+  leagueTournament, simTournaments,
 } from "../schema/index.js";
 import { eq, and, sql } from "drizzle-orm";
 import { holeToPoints, type ScoringSettings } from "../../sim/engine.js";
@@ -63,7 +64,12 @@ export async function getSeasonPoints(managerId: number): Promise<number> {
         sql`${rosters.rosterableType} = 'tournament_roster'`,
       ),
     )
-    .where(eq(tournamentRosters.managerId, managerId));
+    .innerJoin(leagueTournament, eq(tournamentRosters.leagueTournamentId, leagueTournament.id))
+    .innerJoin(simTournaments, eq(leagueTournament.tournamentId, simTournaments.tournamentId))
+    .where(and(
+      eq(tournamentRosters.managerId, managerId),
+      eq(simTournaments.phase, "final"),
+    ));
 
   return (result[0]?.total ?? 0) / 100;
 }

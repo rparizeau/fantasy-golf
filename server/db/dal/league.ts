@@ -2,7 +2,8 @@ import { db } from "../index.js";
 import {
   leagues, managers, users, leagueSettings, leagueScores,
   managerRosters, rosters, golferRoster, tournamentRosters,
-  waivers, activities, messages, golfers,
+  managerPoints, waivers, activities, messages, golfers,
+  leagueTournament, simTournaments,
 } from "../schema/index.js";
 import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 import type { ScoringSettings } from "../../sim/engine.js";
@@ -112,41 +113,105 @@ function buildScoringSettings(scores: typeof leagueScores.$inferSelect): Scoring
 // --- League queries ---
 
 export async function getLeague(leagueId: number): Promise<LeagueData | null> {
-  const [league] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
-  if (!league) return null;
-
-  const [settings] = await db.select().from(leagueSettings).where(eq(leagueSettings.leagueId, leagueId));
-  const [scores] = await db.select().from(leagueScores).where(eq(leagueScores.leagueId, leagueId));
-
-  const managerRows = await db
-    .select({
+  // Batch: fetch league, settings, scores, and managers in parallel
+  const [leagueRows, settingsRows, scoresRows, managerRows] = await Promise.all([
+    db.select().from(leagues).where(eq(leagues.id, leagueId)),
+    db.select().from(leagueSettings).where(eq(leagueSettings.leagueId, leagueId)),
+    db.select().from(leagueScores).where(eq(leagueScores.leagueId, leagueId)),
+    db.select({
       managerId: managers.id,
       userId: managers.userId,
       userName: users.name,
+      teamName: managers.teamName,
       isCommissioner: managers.isCommissioner,
     })
     .from(managers)
     .innerJoin(users, eq(managers.userId, users.id))
     .where(eq(managers.leagueId, leagueId))
-    .orderBy(managers.id);
+    .orderBy(managers.id),
+  ]);
 
-  const teamDataList: TeamData[] = [];
-  for (const m of managerRows) {
-    const rosterData = await getManagerRosterGolfers(m.managerId);
-    const seasonPts = await getSeasonPoints(m.managerId);
-    teamDataList.push({
+  const league = leagueRows[0];
+  if (!league) return null;
+  const settings = settingsRows[0];
+  const scores = scoresRows[0];
+
+  const managerIds = managerRows.map((m) => m.managerId);
+
+  // Batch: fetch all rosters + points for all managers in 3 queries
+  const [mrRows, pointsResult] = await Promise.all([
+    managerIds.length > 0
+      ? db.select().from(managerRosters).where(inArray(managerRosters.managerId, managerIds))
+      : Promise.resolve([]),
+    managerIds.length > 0
+      ? db.select({
+          managerId: sql<number>`${tournamentRosters.managerId}`,
+          total: sql<number>`COALESCE(SUM(${managerPoints.pointsVal}), 0)`,
+        })
+        .from(managerPoints)
+        .innerJoin(golferRoster, eq(managerPoints.golferRosterId, golferRoster.id))
+        .innerJoin(rosters, eq(golferRoster.rosterId, rosters.id))
+        .innerJoin(tournamentRosters, and(
+          eq(rosters.rosterableId, tournamentRosters.id),
+          sql`${rosters.rosterableType} = 'tournament_roster'`,
+        ))
+        .innerJoin(leagueTournament, eq(tournamentRosters.leagueTournamentId, leagueTournament.id))
+        .innerJoin(simTournaments, eq(leagueTournament.tournamentId, simTournaments.tournamentId))
+        .where(and(
+          inArray(tournamentRosters.managerId, managerIds),
+          eq(simTournaments.phase, "final"),
+        ))
+        .groupBy(tournamentRosters.managerId)
+      : Promise.resolve([]),
+  ]);
+
+  // Build points lookup
+  const pointsMap = new Map(pointsResult.map((r) => [r.managerId, (r.total ?? 0) / 100]));
+
+  // Batch: fetch all roster rows + golfer_roster rows
+  const mrIds = mrRows.map((r) => r.id);
+  const rosterRows = mrIds.length > 0
+    ? await db.select().from(rosters).where(and(
+        inArray(rosters.rosterableId, mrIds),
+        eq(rosters.rosterableType, "manager_roster"),
+      ))
+    : [];
+
+  const rosterIds = rosterRows.map((r) => r.id);
+  const grRows = rosterIds.length > 0
+    ? await db.select().from(golferRoster).where(inArray(golferRoster.rosterId, rosterIds))
+    : [];
+
+  // Build lookup: managerId → { active, bench }
+  const mrToManagerId = new Map(mrRows.map((r) => [r.id, r.managerId]));
+  const rosterToMrId = new Map(rosterRows.map((r) => [r.id, r.rosterableId]));
+  const rosterMap = new Map<number, { active: number[]; bench: number[] }>();
+  for (const gr of grRows) {
+    const mrId = rosterToMrId.get(gr.rosterId);
+    if (mrId == null) continue;
+    const managerId = mrToManagerId.get(mrId);
+    if (managerId == null) continue;
+    const entry = rosterMap.get(managerId) ?? { active: [], bench: [] };
+    if (gr.statusEnum === "active") entry.active.push(gr.golferId);
+    else entry.bench.push(gr.golferId);
+    rosterMap.set(managerId, entry);
+  }
+
+  const teamDataList: TeamData[] = managerRows.map((m) => {
+    const rosterData = rosterMap.get(m.managerId) ?? { active: [], bench: [] };
+    return {
       pk: m.managerId,
       teamId: m.managerId,
-      teamName: m.userName,
+      teamName: m.teamName ?? m.userName,
       managerName: m.userName,
       managerId: m.userId,
       roster: rosterData.active,
       reserve: rosterData.bench,
       mulligansUsed: 0,
       seasonEarnings: 0,
-      seasonPoints: seasonPts,
-    });
-  }
+      seasonPoints: pointsMap.get(m.managerId) ?? 0,
+    };
+  });
 
   const scoring = scores ? buildScoringSettings(scores) : {
     albatross: 8, eagle: 5, birdie: 3, par: 1, bogey: -1, doubleBogey: -2, triplePlus: -3,
@@ -169,12 +234,8 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
 
 export async function getAllLeagues(): Promise<LeagueData[]> {
   const leagueRows = await db.select().from(leagues).orderBy(leagues.id);
-  const results: LeagueData[] = [];
-  for (const league of leagueRows) {
-    const data = await getLeague(league.id);
-    if (data) results.push(data);
-  }
-  return results;
+  const results = await Promise.all(leagueRows.map((l) => getLeague(l.id)));
+  return results.filter((d): d is LeagueData => d !== null);
 }
 
 // --- Team queries ---
@@ -431,7 +492,8 @@ export async function getChatMessages(leagueId: number) {
       managerId: messages.managerId,
       content: messages.content,
       createdAt: messages.createdAt,
-      managerName: users.name,
+      userName: users.name,
+      teamName: managers.teamName,
     })
     .from(messages)
     .innerJoin(managers, eq(messages.managerId, managers.id))
@@ -442,7 +504,7 @@ export async function getChatMessages(leagueId: number) {
   return rows.map((m) => ({
     id: m.id,
     teamId: m.managerId,
-    teamName: m.managerName,
+    teamName: m.teamName ?? m.userName,
     message: m.content,
     createdAt: m.createdAt,
   }));
@@ -453,8 +515,8 @@ export async function addChatMessage(leagueId: number, managerId: number, _teamN
     .values({ leagueId, managerId, content: message })
     .returning();
 
-  // Fetch the manager's user name
-  const [manager] = await db.select({ userName: users.name })
+  // Fetch the manager's team name
+  const [manager] = await db.select({ userName: users.name, teamName: managers.teamName })
     .from(managers)
     .innerJoin(users, eq(managers.userId, users.id))
     .where(eq(managers.id, managerId));
@@ -462,7 +524,7 @@ export async function addChatMessage(leagueId: number, managerId: number, _teamN
   return {
     id: msg.id,
     teamId: managerId,
-    teamName: manager?.userName ?? "Unknown",
+    teamName: manager?.teamName ?? manager?.userName ?? "Unknown",
     message: msg.content,
     createdAt: msg.createdAt,
   };
@@ -502,7 +564,7 @@ export async function isPlayerOwned(leagueId: number, golferId: number): Promise
 
 export async function getOwnershipMap(leagueId: number): Promise<Map<number, { teamId: number; teamName: string }>> {
   const managerRows = await db
-    .select({ managerId: managers.id, userName: users.name })
+    .select({ managerId: managers.id, userName: users.name, teamName: managers.teamName })
     .from(managers)
     .innerJoin(users, eq(managers.userId, users.id))
     .where(eq(managers.leagueId, leagueId));
@@ -528,7 +590,7 @@ export async function getOwnershipMap(leagueId: number): Promise<Map<number, { t
   // Build reverse lookup: roster.id → managerRoster.managerId
   const rosterToMr = new Map(rosterRows.map((r) => [r.id, r.rosterableId]));
   const mrToManager = new Map(mrRows.map((r) => [r.id, r.managerId]));
-  const managerMap = new Map(managerRows.map((m) => [m.managerId, m.userName]));
+  const managerMap = new Map(managerRows.map((m) => [m.managerId, m.teamName ?? m.userName]));
 
   const map = new Map<number, { teamId: number; teamName: string }>();
   for (const gr of grRows) {
@@ -547,19 +609,21 @@ export async function getOwnershipMap(leagueId: number): Promise<Map<number, { t
 export async function getTeamByManagerAndLeague(userId: number, leagueId: number): Promise<TeamData | null> {
   // userId here is the users.id, find the manager row
   const [manager] = await db
-    .select({ managerId: managers.id, userName: users.name, userId: users.id })
+    .select({ managerId: managers.id, userName: users.name, userId: users.id, teamName: managers.teamName })
     .from(managers)
     .innerJoin(users, eq(managers.userId, users.id))
     .where(and(eq(managers.userId, userId), eq(managers.leagueId, leagueId)));
   if (!manager) return null;
 
-  const rosterData = await getManagerRosterGolfers(manager.managerId);
-  const seasonPts = await getSeasonPoints(manager.managerId);
+  const [rosterData, seasonPts] = await Promise.all([
+    getManagerRosterGolfers(manager.managerId),
+    getSeasonPoints(manager.managerId),
+  ]);
 
   return {
     pk: manager.managerId,
     teamId: manager.managerId,
-    teamName: manager.userName,
+    teamName: manager.teamName ?? manager.userName,
     managerName: manager.userName,
     managerId: manager.userId,
     roster: rosterData.active,

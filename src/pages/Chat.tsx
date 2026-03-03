@@ -61,20 +61,8 @@ export function Chat({ leagueId, teamId: _teamId, colors: C }: ChatProps) {
 
   if (loading) {
     return (
-      <div style={{ padding: "12px 16px 100px" }}>
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            style={{
-              background: C.card,
-              borderRadius: 10,
-              height: 48,
-              marginBottom: 6,
-              border: `1px solid ${C.border}`,
-              animation: "pulse 2s infinite",
-            }}
-          />
-        ))}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 0" }}>
+        <div style={{ width: 32, height: 32, border: `3px solid ${C.border}`, borderTopColor: C.green, borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
       </div>
     );
   }

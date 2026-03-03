@@ -96,6 +96,7 @@ export const managers = pgTable("managers", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   leagueId: integer("league_id").notNull().references(() => leagues.id),
+  teamName: varchar("team_name", { length: 100 }),
   isCommissioner: boolean("is_commissioner").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [

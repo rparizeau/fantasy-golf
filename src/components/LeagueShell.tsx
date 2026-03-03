@@ -45,8 +45,15 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
 
   if (myTeamId === null) {
     return (
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <p style={{ color: C.txt2, fontSize: 15 }}>Loading...</p>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", gap: 12 }}>
+        <div style={{
+          width: 32, height: 32,
+          border: `3px solid ${C.border}`,
+          borderTopColor: C.green,
+          borderRadius: "50%",
+          animation: "spin 0.7s linear infinite",
+        }} />
+        <p style={{ color: C.txt2, fontSize: 13, margin: 0 }}>Loading league...</p>
       </div>
     );
   }

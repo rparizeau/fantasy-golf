@@ -55,6 +55,14 @@ async function seed() {
   );
   console.log(`  ✓ golfers: ${players.length}`);
 
+  // ─── Load tournament data first (needed for course locations) ─
+  const tournaments = loadJSON<{
+    id: number; name: string; course: string; location: string;
+    purse: number; par: number; isMajor: boolean; current?: boolean;
+    color?: string; dates: { start: string; end: string };
+  }[]>(join(DATA_DIR, "tournaments.json"));
+  const locationByTid = new Map(tournaments.map((t) => [t.id, t.location]));
+
   // ─── Courses ──────────────────────────────────────────────
   const coursesRaw = loadJSON<Record<string, { course: string; holes: number[] }>>(
     join(DATA_DIR, "courses.json")
@@ -65,16 +73,10 @@ async function seed() {
       id: Number(tid),
       name: data.course,
       holes: data.holes,
+      address: locationByTid.get(Number(tid)) ?? null,
     });
   }
   console.log(`  ✓ courses: ${courseEntries.length}`);
-
-  // ─── Tournaments ──────────────────────────────────────────
-  const tournaments = loadJSON<{
-    id: number; name: string; course: string; location: string;
-    purse: number; par: number; isMajor: boolean; current?: boolean;
-    color?: string; dates: { start: string; end: string };
-  }[]>(join(DATA_DIR, "tournaments.json"));
 
   for (const t of tournaments) {
     await db.insert(schema.tournaments).values({

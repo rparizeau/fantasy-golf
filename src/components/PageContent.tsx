@@ -50,7 +50,7 @@ export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, 
     case "league":
       return (
         <div style={{ flex: 1 }}>
-          <LeagueStandings leagueId={leagueId} colors={C} />
+          <LeagueStandings leagueId={leagueId} myTeamId={myTeamId} colors={C} />
         </div>
       );
     case "chat":
