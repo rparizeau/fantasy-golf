@@ -542,15 +542,58 @@ export function SimPanel() {
     }
   };
 
-  // Sort: players with rounds first (by position), then unscored players (by world rank)
+  // Compute cumulative to-par for a player (used for sorting + TOT column)
+  const calcToPar = (p: LeaderboardPlayer) => {
+    const pars = holePars ?? Array(18).fill(4);
+    let total = 0;
+    let hasRound = false;
+    for (let i = 0; i < 4; i++) {
+      const hs = p.holeScores?.[i];
+      if (hs && hs.some((s) => s != null)) {
+        hasRound = true;
+        hs.forEach((s, h) => { if (s != null) total += s - (pars[h] ?? 4); });
+      } else if (p.rounds[i] != null) {
+        hasRound = true;
+        total += p.rounds[i] - (sim?.par ?? 72);
+      }
+    }
+    return { toPar: total, hasScore: hasRound };
+  };
+
+  // Sort: players with scores first (by to-par), then unscored by world rank
   const sortedLeaderboard = [...leaderboard].sort((a, b) => {
-    const aHasScore = a.rounds.length > 0;
-    const bHasScore = b.rounds.length > 0;
-    if (aHasScore && !bHasScore) return -1;
-    if (!aHasScore && bHasScore) return 1;
-    if (aHasScore && bHasScore) return a.position - b.position || a.ranking - b.ranking;
+    const aCalc = calcToPar(a);
+    const bCalc = calcToPar(b);
+    if (aCalc.hasScore && !bCalc.hasScore) return -1;
+    if (!aCalc.hasScore && bCalc.hasScore) return 1;
+    if (aCalc.hasScore && bCalc.hasScore) return aCalc.toPar - bCalc.toPar || a.ranking - b.ranking;
     return a.ranking - b.ranking;
   });
+
+  // Compute positions from sorted order (with ties)
+  const positionMap = new Map<number, { pos: number; tied: boolean }>();
+  let pos = 1;
+  for (let i = 0; i < sortedLeaderboard.length; i++) {
+    const p = sortedLeaderboard[i];
+    const { toPar, hasScore } = calcToPar(p);
+    if (!hasScore) { positionMap.set(p.playerId, { pos: 0, tied: false }); continue; }
+    if (i > 0) {
+      const prev = sortedLeaderboard[i - 1];
+      const prevCalc = calcToPar(prev);
+      if (prevCalc.hasScore && toPar === prevCalc.toPar) {
+        // Same score as previous — same position (tied)
+      } else {
+        pos = i + 1;
+      }
+    }
+    positionMap.set(p.playerId, { pos, tied: false });
+  }
+  // Mark ties
+  for (const [, val] of positionMap) {
+    if (val.pos === 0) continue;
+    const count = [...positionMap.values()].filter((v) => v.pos === val.pos).length;
+    if (count > 1) val.tied = true;
+  }
 
   const filteredPlayers = searchQuery
     ? sortedLeaderboard.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -699,11 +742,11 @@ export function SimPanel() {
               </thead>
               <tbody>
                 {displayedPlayers.map((p) => {
-                  const hasScore = p.rounds.length > 0;
-                  const posLabel = !hasScore ? "-"
+                  const posData = positionMap.get(p.playerId);
+                  const posLabel = !posData || posData.pos === 0 ? "-"
                     : p.status === "cut" ? "MC"
-                    : sortedLeaderboard.filter((o) => o.position === p.position && o.status === "active" && o.rounds.length > 0).length > 1 ? `T${p.position}`
-                    : `${p.position}`;
+                    : posData.tied ? `T${posData.pos}`
+                    : `${posData.pos}`;
                   return (
                   <tr key={p.playerId} style={p.status === "cut" ? { opacity: 0.5 } : {}}>
                     <td style={{ ...styles.td, textAlign: "left" }}>{posLabel}</td>
@@ -763,22 +806,36 @@ export function SimPanel() {
                     {[0, 1, 2, 3].map((i) => {
                       const score = p.rounds[i];
                       if (score == null) return <td key={i} style={styles.td}>-</td>;
-                      const rtp = score - sim.par;
+                      const hs = p.holeScores?.[i];
+                      const holesPlayed = hs ? hs.filter((s) => s != null).length : 18;
+                      const isComplete = holesPlayed === 18;
+                      if (isComplete) {
+                        return (
+                          <td key={i} style={{ ...styles.td, fontWeight: 600 }}>{score}</td>
+                        );
+                      }
+                      const rtp = score - (holePars ?? Array(18).fill(4)).slice(0, holesPlayed).reduce((a, b) => a + b, 0);
                       const rtpStr = rtp === 0 ? "E" : rtp > 0 ? `+${rtp}` : `${rtp}`;
                       return (
-                        <td key={i} style={{ ...styles.td, color: rtp > 0 ? "#D94438" : "#1A1D21", fontWeight: 600 }}>
-                          {rtpStr}<span style={{ color: "#B0B5BC", fontSize: 10, fontWeight: 400, marginLeft: 2 }}>/{score}</span>
+                        <td key={i} style={{ ...styles.td, color: rtp < 0 ? "#2D8B52" : rtp > 0 ? "#D94438" : "#1A1D21", fontWeight: 600 }}>
+                          {rtpStr}
                         </td>
                       );
                     })}
-                    <td style={{
-                      ...styles.td,
-                      textAlign: "right",
-                      color: p.toPar > 0 ? "#D94438" : "#1A1D21",
-                      fontWeight: 600,
-                    }}>
-                      {p.toParDisplay}
-                    </td>
+                    {(() => {
+                      const { toPar: cumToPar, hasScore } = calcToPar(p);
+                      const display = !hasScore ? "-" : cumToPar === 0 ? "E" : cumToPar > 0 ? `+${cumToPar}` : `${cumToPar}`;
+                      return (
+                        <td style={{
+                          ...styles.td,
+                          textAlign: "right",
+                          color: cumToPar < 0 ? "#2D8B52" : cumToPar > 0 ? "#D94438" : "#1A1D21",
+                          fontWeight: 600,
+                        }}>
+                          {display}
+                        </td>
+                      );
+                    })()}
                   </tr>
                   );
                 })}
