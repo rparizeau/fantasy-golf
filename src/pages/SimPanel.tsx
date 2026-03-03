@@ -24,6 +24,12 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
 // --- Player Edit Modal ---
 
 interface ModalProps {
@@ -38,13 +44,24 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
   const roundCount = player.rounds.length;
   const hasHoleData = player.holeScores && player.holeScores.length > 0;
 
-  // Initialize hole scores state: deep copy from player data (nulls = unplayed holes)
+  // Determine which round to open to
+  const initialRound = (() => {
+    for (let i = 0; i < 4; i++) {
+      const hs = player.holeScores?.[i];
+      if (!hs || hs.length === 0 || hs.every((s) => s == null)) return i;
+    }
+    return Math.max(0, roundCount - 1);
+  })();
+
+  // Initialize hole scores state: deep copy from player data, auto-init the active round
   const [holeData, setHoleData] = useState<((number | null)[] | null)[]>(() => {
     const data: ((number | null)[] | null)[] = [];
     for (let i = 0; i < 4; i++) {
       const hs = player.holeScores?.[i];
       if (hs && hs.length > 0) {
         data.push([...hs]);
+      } else if (i === initialRound) {
+        data.push(new Array(18).fill(null));
       } else {
         data.push(null);
       }
@@ -57,15 +74,7 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
     return [player.rounds[0] ?? null, player.rounds[1] ?? null, player.rounds[2] ?? null, player.rounds[3] ?? null];
   });
 
-  const [activeRound, setActiveRound] = useState(() => {
-    // Open to the first round that has no scores (the "active" round to edit).
-    // If all played rounds have data, show the last one. If none exist, show R1 (index 0).
-    for (let i = 0; i < 4; i++) {
-      const hs = player.holeScores?.[i];
-      if (!hs || hs.length === 0 || hs.every((s) => s == null)) return i;
-    }
-    return Math.max(0, roundCount - 1);
-  });
+  const [activeRound, setActiveRound] = useState(initialRound);
   const [status, setStatus] = useState(player.status === "active" ? "Active" : player.status === "wd" ? "WD" : "Cut");
 
   const pars = holePars ?? Array(18).fill(4);
@@ -98,20 +107,6 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
   const hasAnyScore = computedRounds.some((r) => r != null);
   const toPar = hasAnyScore ? overallTotal - overallParForScored : 0;
   const toParDisplay = !hasAnyScore ? "-" : toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : `${toPar}`;
-
-  // Fantasy points from hole scores
-  const POINT_MAP: Record<number, number> = { [-3]: 800, [-2]: 500, [-1]: 300, 0: 100, 1: -100, 2: -200 };
-  let totalPoints = 0;
-  for (const round of holeData) {
-    if (!round) continue;
-    for (let h = 0; h < round.length; h++) {
-      const s = round[h];
-      if (s == null) continue;
-      const diff = s - (pars[h] ?? 4);
-      totalPoints += POINT_MAP[diff] ?? (diff <= -3 ? 800 : -300);
-    }
-  }
-  const pointsDisplay = hasAnyScore ? totalPoints.toLocaleString() : "-";
 
   // Active round hole data
   const activeHoles = holeData[activeRound];
@@ -186,30 +181,32 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
   return (
     <div style={modal.overlay} onClick={onClose}>
       <div style={{ ...modal.dialog, width: 620 }} onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div style={modal.header}>
-          <div style={{ flex: 1 }}>
+        {/* Title bar */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #E2E5EA" }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.5 }}>Player Scores</div>
+          <button style={modal.closeBtn} onClick={onClose}>&times;</button>
+        </div>
+
+        {/* Player header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: "1px solid #E2E5EA" }}>
+          <div>
             <div style={modal.playerName}>{player.name}</div>
-            <div style={modal.headerMeta}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={modal.metaLabel}>Status</span>
-                <select value={status} onChange={(e) => setStatus(e.target.value)} style={modal.select}>
-                  <option value="Active">Active</option>
-                  <option value="Cut">Cut</option>
-                  <option value="WD">WD</option>
-                </select>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={modal.metaLabel}>To Par</span>
-                <span style={{ ...modal.metaValue, color: toPar < 0 ? "#2D8B52" : toPar > 0 ? "#D94438" : "#1A1D21" }}>{toParDisplay}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={modal.metaLabel}>Pts</span>
-                <span style={{ ...modal.metaValue, color: totalPoints > 0 ? "#2D8B52" : totalPoints < 0 ? "#D94438" : "#1A1D21" }}>{pointsDisplay}</span>
-              </div>
+            <div style={{ fontSize: 12, color: "#8E95A0", marginTop: 2 }}>{ordinal(player.ranking)} &middot; {player.country}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={modal.metaLabel}>Status</span>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} style={modal.select}>
+                <option value="Active">Active</option>
+                <option value="Cut">Cut</option>
+                <option value="WD">WD</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={modal.metaLabel}>Total</span>
+              <span style={{ ...modal.metaValue, fontSize: 20, color: toPar < 0 ? "#2D8B52" : toPar > 0 ? "#D94438" : "#1A1D21" }}>{toParDisplay}</span>
             </div>
           </div>
-          <button style={modal.closeBtn} onClick={onClose}>&times;</button>
         </div>
 
         {/* Round tabs */}
@@ -346,11 +343,11 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
                   <div style={{ fontWeight: 600, color: "#1A1D21" }}>{back9}</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>Total</div>
+                  <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>Score</div>
                   <div style={{ fontWeight: 600, color: "#1A1D21" }}>{roundTotal}</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>To Par</div>
+                  <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>Total</div>
                   <div style={{
                     fontWeight: 600,
                     color: roundToPar != null && roundToPar < 0 ? "#2D8B52" : roundToPar != null && roundToPar > 0 ? "#D94438" : "#1A1D21",
@@ -708,11 +705,11 @@ export function SimPanel() {
                   <th style={{ ...styles.th, textAlign: "left" }}>Pos</th>
                   <th style={{ ...styles.th, textAlign: "left" }}>Player</th>
                   <th style={styles.th}>Status</th>
-                  <th style={styles.th}>EGL</th>
-                  <th style={styles.th}>BRD</th>
-                  <th style={styles.th}>PAR</th>
+                  <th style={styles.th}>DBL</th>
                   <th style={styles.th}>BOG</th>
-                  <th style={styles.th}>2B</th>
+                  <th style={styles.th}>PAR</th>
+                  <th style={styles.th}>BRD</th>
+                  <th style={styles.th}>EGL</th>
                   <th style={styles.th}>Thru</th>
                   {[1, 2, 3, 4].map((r) => {
                     const isOn = completedRound >= r;
@@ -776,11 +773,11 @@ export function SimPanel() {
                       }
                       return (
                         <>
-                          <td style={styles.td}>{counts.egl || "-"}</td>
-                          <td style={styles.td}>{counts.brd || "-"}</td>
-                          <td style={styles.td}>{counts.par || "-"}</td>
-                          <td style={styles.td}>{counts.bog || "-"}</td>
                           <td style={styles.td}>{counts.dbog || "-"}</td>
+                          <td style={styles.td}>{counts.bog || "-"}</td>
+                          <td style={styles.td}>{counts.par || "-"}</td>
+                          <td style={styles.td}>{counts.brd || "-"}</td>
+                          <td style={styles.td}>{counts.egl || "-"}</td>
                         </>
                       );
                     })()}
