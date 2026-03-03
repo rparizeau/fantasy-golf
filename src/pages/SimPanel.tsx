@@ -439,7 +439,6 @@ export function SimPanel() {
   // Which rounds are "on" based on current phase
   const PHASE_ROUND: Record<string, number> = { idle: 0, round1: 1, round2: 2, cut: 2, round3: 3, round4: 4, final: 4 };
   const completedRound = sim ? PHASE_ROUND[sim.phase] ?? 0 : 0;
-  const isFinal = sim?.phase === "final";
 
   /** Advance sim forward until we reach the target round. */
   const handleAdvanceToRound = async (targetRound: number) => {
@@ -490,20 +489,6 @@ export function SimPanel() {
     }
   };
 
-  const handleToggleScore = async () => {
-    if (isFinal) {
-      await handleRewindToRound(5); // rewind from final → round4
-    } else if (completedRound >= 4) {
-      setLoading(true);
-      try {
-        await advanceSim(); // round4 → final
-        await refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Score failed");
-      }
-      setLoading(false);
-    }
-  };
 
   const handleReset = async () => {
     setLoading(true);
