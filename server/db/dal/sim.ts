@@ -160,7 +160,7 @@ export async function saveSimState(state: SimState): Promise<void> {
         ${totals}::int[],
         ${toPars}::int[],
         ${positions}::int[],
-        ${statuses}::varchar[]
+        ${statuses}::sim_player_status[]
       )
       ON CONFLICT (tournament_id, golfer_id) DO UPDATE SET
         rounds = EXCLUDED.rounds,
