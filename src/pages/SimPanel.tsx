@@ -57,7 +57,15 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
     return [player.rounds[0] ?? null, player.rounds[1] ?? null, player.rounds[2] ?? null, player.rounds[3] ?? null];
   });
 
-  const [activeRound, setActiveRound] = useState(() => Math.max(0, roundCount - 1));
+  const [activeRound, setActiveRound] = useState(() => {
+    // Open to the first round that has no scores (the "active" round to edit).
+    // If all played rounds have data, show the last one. If none exist, show R1 (index 0).
+    for (let i = 0; i < 4; i++) {
+      const hs = player.holeScores?.[i];
+      if (!hs || hs.length === 0 || hs.every((s) => s == null)) return i;
+    }
+    return Math.max(0, roundCount - 1);
+  });
   const [status, setStatus] = useState(player.status === "active" ? "Active" : player.status === "wd" ? "WD" : "Cut");
 
   const pars = holePars ?? Array(18).fill(4);
@@ -90,6 +98,20 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
   const hasAnyScore = computedRounds.some((r) => r != null);
   const toPar = hasAnyScore ? overallTotal - overallParForScored : 0;
   const toParDisplay = !hasAnyScore ? "-" : toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : `${toPar}`;
+
+  // Fantasy points from hole scores
+  const POINT_MAP: Record<number, number> = { [-3]: 800, [-2]: 500, [-1]: 300, 0: 100, 1: -100, 2: -200 };
+  let totalPoints = 0;
+  for (const round of holeData) {
+    if (!round) continue;
+    for (let h = 0; h < round.length; h++) {
+      const s = round[h];
+      if (s == null) continue;
+      const diff = s - (pars[h] ?? 4);
+      totalPoints += POINT_MAP[diff] ?? (diff <= -3 ? 800 : -300);
+    }
+  }
+  const pointsDisplay = hasAnyScore ? totalPoints.toLocaleString() : "-";
 
   // Active round hole data
   const activeHoles = holeData[activeRound];
@@ -180,6 +202,10 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={modal.metaLabel}>To Par</span>
                 <span style={{ ...modal.metaValue, color: toPar < 0 ? "#2D8B52" : toPar > 0 ? "#D94438" : "#1A1D21" }}>{toParDisplay}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={modal.metaLabel}>Pts</span>
+                <span style={{ ...modal.metaValue, color: totalPoints > 0 ? "#2D8B52" : totalPoints < 0 ? "#D94438" : "#1A1D21" }}>{pointsDisplay}</span>
               </div>
             </div>
           </div>
@@ -611,6 +637,12 @@ export function SimPanel() {
               Reset
             </button>
         </div>
+            <div style={{ position: "relative" }}>
+            {loading && (
+              <div style={styles.tableOverlay}>
+                <div style={styles.spinner} />
+              </div>
+            )}
             <table style={styles.table}>
               <colgroup>
                 <col style={{ width: 40 }} />
@@ -773,6 +805,7 @@ export function SimPanel() {
                 </button>
               </div>
             )}
+            </div>
       </div>
 
       {/* Player Edit Modal */}
@@ -1122,6 +1155,25 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: "#8E95A0",
     fontWeight: 500,
+  },
+  tableOverlay: {
+    position: "absolute",
+    inset: 0,
+    zIndex: 2,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(255,255,255,0.6)",
+    backdropFilter: "blur(2px)",
+    borderRadius: 8,
+  },
+  spinner: {
+    width: 32,
+    height: 32,
+    border: "3px solid #E2E5EA",
+    borderTopColor: "#2D8B52",
+    borderRadius: "50%",
+    animation: "spin 0.7s linear infinite",
   },
   table: {
     width: "100%",

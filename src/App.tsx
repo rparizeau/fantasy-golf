@@ -49,7 +49,7 @@ export default function App() {
         flexDirection: leagueId ? "column" : undefined,
       }}
     >
-      <style>{`*{box-sizing:border-box}html,body{margin:0;padding:0;height:100%;overscroll-behavior:none}::-webkit-scrollbar{display:none}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+      <style>{`*{box-sizing:border-box}html,body{margin:0;padding:0;height:100%;overscroll-behavior:none}::-webkit-scrollbar{display:none}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       {leagueId ? (
         <LeagueShell
