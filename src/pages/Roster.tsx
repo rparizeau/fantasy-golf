@@ -14,63 +14,120 @@ interface RosterProps {
   isMajor: boolean;
 }
 
+interface CachedWeek {
+  data: RosterData;
+  rank: { myRank: number; myPoints: number; totalTeams: number; rivalAbove: { name: string; points: number; rank: number } | null; rivalBelow: { name: string; points: number; rank: number } | null } | null;
+}
+
 export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek: _onChangeWeek, isMajor: _isMajor }: RosterProps) {
   const [data, setData] = useState<RosterData | null>(null);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [reserve, setReserve] = useState<RosterPlayer[]>([]);
   const [locked, setLocked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modalPlayerId, setModalPlayerId] = useState<number | null>(null);
   const [moving, setMoving] = useState<number | null>(null);
   const [myRank, setMyRank] = useState(0);
-  const [, setTotalTeams] = useState(0);
+  const [totalTeams, setTotalTeams] = useState(0);
   const [myPoints, setMyPoints] = useState(0);
   const [rivalAbove, setRivalAbove] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [rivalBelow, setRivalBelow] = useState<{ name: string; points: number; rank: number } | null>(null);
+  const cacheRef = useRef(new Map<number, CachedWeek>());
+  const initialLoadRef = useRef(true);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const applyData = useCallback((d: RosterData, rankData: CachedWeek["rank"]) => {
+    setData(d);
+    setRoster(d.roster);
+    setReserve(d.reserve);
+    setLocked(d.locked);
+    setError(null);
+    const weekPts = d.roster.filter((p) => p.isActive).reduce((sum, p) => sum + p.points, 0);
+    setMyPoints(weekPts);
+    if (rankData) {
+      setMyRank(rankData.myRank);
+      setTotalTeams(rankData.totalTeams);
+      setRivalAbove(rankData.rivalAbove);
+      setRivalBelow(rankData.rivalBelow);
+    } else {
+      setMyRank(0);
+      setTotalTeams(0);
+      setRivalAbove(null);
+      setRivalBelow(null);
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
-    try {
-      const tid = tournaments[viewingWeek]?.id;
-      const currentWeekIdx = tournaments.findIndex((t) => t.id === currentTournamentId);
-      const isCurrentWeek = viewingWeek === currentWeekIdx;
+    const tid = tournaments[viewingWeek]?.id;
+    if (tid == null) return;
+    const currentWeekIdx = tournaments.findIndex((t) => t.id === currentTournamentId);
+    const isCurrentWeek = viewingWeek === currentWeekIdx;
+    const cached = cacheRef.current.get(tid);
 
-      const [d, lb] = await Promise.all([
-        getRoster(leagueId, teamId, tid),
-        isCurrentWeek ? getFantasyLeaderboard(leagueId) : null,
-      ]);
-      setData(d);
-      setRoster(d.roster);
-      setReserve(d.reserve);
-      setLocked(d.locked);
-      setError(null);
+    // Cancel any in-flight request
+    abortRef.current?.abort();
 
-      // Compute points from roster data (tournament-specific)
-      const weekPts = d.roster.filter((p) => p.isActive).reduce((sum, p) => sum + p.points, 0);
-      setMyPoints(weekPts);
+    // Cache hit for past/future week — use cached data, skip fetch
+    if (cached && !isCurrentWeek) {
+      applyData(cached.data, cached.rank);
+      setLoading(false);
+      setFetching(false);
+      return;
+    }
 
-      if (lb) {
-        // Current week: use leaderboard for rank + rivals
-        const sorted = lb.teams;
-        const myIdx = sorted.findIndex(t => t.teamId === teamId);
-        setTotalTeams(sorted.length);
-        if (myIdx >= 0) {
-          setMyRank(myIdx + 1);
-          setRivalAbove(myIdx > 0 ? { name: sorted[myIdx - 1].teamName, points: sorted[myIdx - 1].totalPoints, rank: myIdx } : null);
-          setRivalBelow(myIdx < sorted.length - 1 ? { name: sorted[myIdx + 1].teamName, points: sorted[myIdx + 1].totalPoints, rank: myIdx + 2 } : null);
-        }
-      } else {
-        // Past/future week: no ranking context available
-        setMyRank(0);
-        setRivalAbove(null);
-        setRivalBelow(null);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load");
-    } finally {
+    // Cache hit for current week — show cached data immediately, fetch in background
+    if (cached && isCurrentWeek) {
+      applyData(cached.data, cached.rank);
       setLoading(false);
     }
-  }, [leagueId, teamId, viewingWeek, tournaments, currentTournamentId]);
+
+    // No cache — show fetching overlay (skip on initial load since `loading` handles that)
+    if (!cached) {
+      if (!initialLoadRef.current) setFetching(true);
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const [d, lb] = await Promise.all([
+        getRoster(leagueId, teamId, tid, { signal: controller.signal }),
+        getFantasyLeaderboard(leagueId, { signal: controller.signal }),
+      ]);
+
+      // If aborted while awaiting, don't apply stale data
+      if (controller.signal.aborted) return;
+
+      let rankData: CachedWeek["rank"] = null;
+      if (lb) {
+        const sorted = lb.teams;
+        const myIdx = sorted.findIndex(t => t.teamId === teamId);
+        if (myIdx >= 0) {
+          rankData = {
+            myRank: myIdx + 1,
+            myPoints: d.roster.filter((p) => p.isActive).reduce((sum, p) => sum + p.points, 0),
+            totalTeams: sorted.length,
+            rivalAbove: myIdx > 0 ? { name: sorted[myIdx - 1].teamName, points: sorted[myIdx - 1].totalPoints, rank: myIdx } : null,
+            rivalBelow: myIdx < sorted.length - 1 ? { name: sorted[myIdx + 1].teamName, points: sorted[myIdx + 1].totalPoints, rank: myIdx + 2 } : null,
+          };
+        }
+      }
+
+      cacheRef.current.set(tid, { data: d, rank: rankData });
+      applyData(d, rankData);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setError(e instanceof Error ? e.message : "Failed to load");
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+        setFetching(false);
+        initialLoadRef.current = false;
+      }
+    }
+  }, [leagueId, teamId, viewingWeek, tournaments, currentTournamentId, applyData]);
 
   useEffect(() => {
     refresh();
@@ -85,7 +142,9 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const autoSave = (newRoster: RosterPlayer[]) => {
     const activeIds = newRoster.filter((p) => p.isActive).map((p) => p.playerId);
     if (activeIds.length !== activeSize) return;
-    setLineup(leagueId, teamId, activeIds).catch((e) => {
+    const tid = tournaments[viewingWeek]?.id;
+    if (tid != null) cacheRef.current.delete(tid);
+    setLineup(leagueId, teamId, activeIds, tid).catch((e) => {
       setError(e instanceof Error ? e.message : "Failed to save lineup");
     });
   };
@@ -198,7 +257,8 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const benchPlayers = roster.filter((p) => !p.isActive).sort((a, b) => a.ranking - b.ranking);
   const sortedReserve = [...reserve].sort((a, b) => a.ranking - b.ranking);
   const emptyActive = Math.max(0, activeSize - activePlayers.length);
-  const emptyBench = Math.max(0, benchSize - benchPlayers.length);
+  const movingIsActive = moving !== null && roster.find((p) => p.playerId === moving)?.isActive;
+  const emptyBench = Math.max(0, benchSize - benchPlayers.length) || (movingIsActive ? 1 : 0);
   const emptyReserve = Math.max(0, reserveSize - reserve.length);
 
   if (loading) {
@@ -228,11 +288,27 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
 
   const currentWeekIndex = tournaments.findIndex((t) => t.id === currentTournamentId);
   const isPastWeek = viewingWeek < currentWeekIndex;
+  const isFutureWeek = viewingWeek > currentWeekIndex;
   const canMove = !locked && !isPastWeek;
   const par = tournaments[viewingWeek]?.par ?? 72;
+  const isLastPlace = myRank > 0 && myRank === totalTeams;
 
   return (
-    <div style={{ paddingBottom: 100 }}>
+    <div style={{ paddingBottom: 100, position: "relative" }}>
+      {fetching && !loading && (
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 10,
+          background: `${C.bg}88`,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "center",
+          paddingTop: 80,
+        }}>
+          <div style={{ width: 24, height: 24, border: `3px solid ${C.border}`, borderTopColor: C.green, borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+        </div>
+      )}
       {error && (
         <div style={{ padding: "12px 16px 0" }}>
           <div style={{ background: C.redDim, color: C.red, padding: "10px 14px", borderRadius: 10, fontSize: 13 }}>
@@ -252,7 +328,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
               border: `1px solid ${C.border}`,
               padding: "14px 16px",
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: myRank > 0 ? 10 : 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                   {myRank > 0 && <span style={{ fontSize: 14, fontWeight: 500, color: C.txt3 }}>#{myRank}</span>}
                   <p style={{ fontSize: 22, fontWeight: 700, color: C.txt, margin: 0 }}>{data.teamName}</p>
@@ -262,45 +338,64 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                   <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{myPoints} pts</p>
                 </div>
               </div>
-              {myRank > 0 && (
-                <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-                  {myRank === 1 && rivalBelow ? (
+              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                {isFutureWeek ? (
+                  <>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                      <span style={{ color: C.green, fontWeight: 600 }}>Leading</span>
-                      <span style={{ color: C.green }}>+{myPoints - rivalBelow.points} pts</span>
+                      <span style={{ color: C.txt3 }}>No leaderboard yet</span>
                     </div>
-                  ) : rivalAbove && (
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                      <span style={{ color: C.txt2 }}><span style={{ color: C.txt3 }}>#{rivalAbove.rank}</span> {rivalAbove.name}</span>
-                      <span style={{ color: C.txt3 }}>+{rivalAbove.points - myPoints} pts</span>
-                    </div>
-                  )}
-                  {myRank !== 1 && rivalBelow && (
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                      <span style={{ color: C.txt2 }}><span style={{ color: C.txt3 }}>#{rivalBelow.rank}</span> {rivalBelow.name}</span>
-                      <span style={{ color: C.txt3 }}>-{myPoints - rivalBelow.points} pts</span>
-                    </div>
-                  )}
-                </div>
-              )}
+                    <div style={{ fontSize: 13, height: 18 }} />
+                  </>
+                ) : myRank > 0 ? (
+                  <>
+                    {/* Row 1: status or rival above */}
+                    {myRank === 1 ? (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                        <span style={{ color: C.green, fontWeight: 600 }}>Leading</span>
+                        {rivalBelow && <span style={{ color: C.green }}>+{myPoints - rivalBelow.points} pts</span>}
+                      </div>
+                    ) : isLastPlace ? (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                        <span style={{ color: C.txt3, fontWeight: 600 }}>Last place</span>
+                      </div>
+                    ) : rivalAbove ? (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                        <span style={{ color: C.txt2 }}><span style={{ color: C.txt3 }}>#{rivalAbove.rank}</span> {rivalAbove.name}</span>
+                        <span style={{ color: C.txt3 }}>+{rivalAbove.points - myPoints} pts</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 13, height: 18 }} />
+                    )}
+                    {/* Row 2: rival below or spacer */}
+                    {rivalBelow ? (
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                        <span style={{ color: C.txt2 }}><span style={{ color: C.txt3 }}>#{rivalBelow.rank}</span> {rivalBelow.name}</span>
+                        <span style={{ color: C.txt3 }}>{myRank === 1 ? "" : `-${myPoints - rivalBelow.points} pts`}</span>
+                      </div>
+                    ) : rivalAbove ? (
+                      <div style={{ fontSize: 13, height: 18 }} />
+                    ) : (
+                      <div style={{ fontSize: 13, height: 18 }} />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 13, height: 18 }} />
+                    <div style={{ fontSize: 13, height: 18 }} />
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}
-        {sectionHeader(
-          `Active Lineup (${activePlayers.length}/${activeSize})`,
-          emptyActive > 0 && !locked ? (
-            <span style={{ marginLeft: "auto", fontSize: 11, color: C.red, fontWeight: 600 }}>
-              {emptyActive} empty {emptyActive === 1 ? "spot" : "spots"}
-            </span>
-          ) : undefined
-        )}
+        {sectionHeader(`Active Lineup (${activePlayers.length}/${activeSize})`)}
         <div style={{ padding: "0 16px 6px" }}>
 
           {activePlayers.map((p) => (
             <PlayerCard key={p.playerId} player={p} par={par} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
           ))}
           {Array.from({ length: emptyActive }).map((_, i) => (
-            <EmptySlot key={`ea-${i}`} label="Active" colors={C} highlight={moving !== null} warn={canMove && moving === null} onClick={() => handleEmptySlotDrop("active")} />
+            <EmptySlot key={`ea-${i}`} label="Active" colors={C} highlight={moving !== null} warn={!isFutureWeek && !isPastWeek && canMove && moving === null} onClick={() => handleEmptySlotDrop("active")} />
           ))}
         </div>
       </div>

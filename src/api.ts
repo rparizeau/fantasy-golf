@@ -198,14 +198,11 @@ export interface FantasyLeaderboard {
   teams: FantasyTeamSummary[];
 }
 
-export function getFantasyLeaderboard(leagueId: number) {
-  return fetchJSON<FantasyLeaderboard>(`/league/${leagueId}/leaderboard`);
+export function getFantasyLeaderboard(leagueId: number, options?: { signal?: AbortSignal }) {
+  return fetchJSON<FantasyLeaderboard>(`/league/${leagueId}/leaderboard`, options);
 }
 
-export interface ScoringSettings {
-  albatross: number; eagle: number; birdie: number; par: number;
-  bogey: number; doubleBogey: number; triplePlus: number;
-}
+export type ScoringSettings = Record<string, number>;
 
 export interface LeagueInfo {
   id: number;
@@ -248,15 +245,15 @@ export interface RosterData {
   reserve: RosterPlayer[];
 }
 
-export function getRoster(leagueId: number, teamId: number, tournamentId?: number) {
+export function getRoster(leagueId: number, teamId: number, tournamentId?: number, options?: { signal?: AbortSignal }) {
   const qs = tournamentId != null ? `?tournamentId=${tournamentId}` : "";
-  return fetchJSON<RosterData>(`/league/${leagueId}/team/${teamId}/roster${qs}`);
+  return fetchJSON<RosterData>(`/league/${leagueId}/team/${teamId}/roster${qs}`, options);
 }
 
-export function setLineup(leagueId: number, teamId: number, activePlayerIds: number[]) {
+export function setLineup(leagueId: number, teamId: number, activePlayerIds: number[], tournamentId?: number) {
   return fetchJSON<{ ok: boolean }>(`/league/${leagueId}/team/${teamId}/lineup`, {
     method: "POST",
-    body: JSON.stringify({ activePlayerIds }),
+    body: JSON.stringify({ activePlayerIds, tournamentId }),
   });
 }
 

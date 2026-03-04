@@ -1,12 +1,12 @@
 import { db } from "../index.js";
 import {
-  leagues, managers, users, leagueSettings, leagueScores,
+  leagues, managers, users, leagueSettings, leagueScoring, scoringEvents,
   managerRosters, rosters, golferRoster, tournamentRosters,
   managerPoints, waivers, activities, messages, golfers,
   leagueTournament, simTournaments,
 } from "../schema/index.js";
 import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
-import type { ScoringSettings } from "../../sim/engine.js";
+import { DEFAULT_SCORING, type ScoringSettings } from "../../sim/engine.js";
 import { getSeasonPoints } from "./points.js";
 
 // --- Types matching existing API shapes ---
@@ -76,48 +76,53 @@ async function getOrCreateManagerRoster(managerId: number): Promise<{ managerRos
 }
 
 /** Get golfers on a manager's roster (through polymorphic chain). */
-async function getManagerRosterGolfers(managerId: number): Promise<{ active: number[]; bench: number[] }> {
+async function getManagerRosterGolfers(managerId: number): Promise<{ roster: number[]; reserve: number[] }> {
   const [mr] = await db.select().from(managerRosters)
     .where(eq(managerRosters.managerId, managerId));
-  if (!mr) return { active: [], bench: [] };
+  if (!mr) return { roster: [], reserve: [] };
 
   const [rosterRow] = await db.select().from(rosters)
     .where(and(
       eq(rosters.rosterableId, mr.id),
       eq(rosters.rosterableType, "manager_roster"),
     ));
-  if (!rosterRow) return { active: [], bench: [] };
+  if (!rosterRow) return { roster: [], reserve: [] };
 
   const grRows = await db.select().from(golferRoster)
     .where(eq(golferRoster.rosterId, rosterRow.id));
 
   return {
-    active: grRows.filter((r) => r.statusEnum === "active").map((r) => r.golferId),
-    bench: grRows.filter((r) => r.statusEnum === "bench").map((r) => r.golferId),
+    roster: grRows.filter((r) => r.statusEnum === "rostered").map((r) => r.golferId),
+    reserve: grRows.filter((r) => r.statusEnum === "reserved").map((r) => r.golferId),
   };
 }
 
-/** Build scoring settings from league_scores row. Values in DB are pennies (÷100 for display). */
-function buildScoringSettings(scores: typeof leagueScores.$inferSelect): ScoringSettings {
-  return {
-    albatross: scores.albatrossVal / 100,
-    eagle: scores.eagleVal / 100,
-    birdie: scores.birdieVal / 100,
-    par: scores.parVal / 100,
-    bogey: scores.bogeyVal / 100,
-    doubleBogey: scores.doubleVal / 100,
-    triplePlus: scores.tripleVal / 100,
-  };
+/** Build scoring settings from league_scoring rows. Values in DB are pennies (÷100 for display). */
+function buildScoringFromRows(rows: { key: string; pointsVal: number; isActive: boolean }[]): ScoringSettings {
+  const settings: ScoringSettings = {};
+  for (const row of rows) {
+    if (row.isActive) {
+      settings[row.key] = row.pointsVal / 100;
+    }
+  }
+  return settings;
 }
 
 // --- League queries ---
 
 export async function getLeague(leagueId: number): Promise<LeagueData | null> {
-  // Batch: fetch league, settings, scores, and managers in parallel
-  const [leagueRows, settingsRows, scoresRows, managerRows] = await Promise.all([
+  // Batch: fetch league, settings, scoring, and managers in parallel
+  const [leagueRows, settingsRows, scoringRows, managerRows] = await Promise.all([
     db.select().from(leagues).where(eq(leagues.id, leagueId)),
     db.select().from(leagueSettings).where(eq(leagueSettings.leagueId, leagueId)),
-    db.select().from(leagueScores).where(eq(leagueScores.leagueId, leagueId)),
+    db.select({
+      key: scoringEvents.key,
+      pointsVal: leagueScoring.pointsVal,
+      isActive: leagueScoring.isActive,
+    })
+    .from(leagueScoring)
+    .innerJoin(scoringEvents, eq(leagueScoring.scoringEventId, scoringEvents.id))
+    .where(eq(leagueScoring.leagueId, leagueId)),
     db.select({
       managerId: managers.id,
       userId: managers.userId,
@@ -134,7 +139,6 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
   const league = leagueRows[0];
   if (!league) return null;
   const settings = settingsRows[0];
-  const scores = scoresRows[0];
 
   const managerIds = managerRows.map((m) => m.managerId);
 
@@ -182,48 +186,46 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
     ? await db.select().from(golferRoster).where(inArray(golferRoster.rosterId, rosterIds))
     : [];
 
-  // Build lookup: managerId → { active, bench }
+  // Build lookup: managerId → { roster (active+bench), reserve }
   const mrToManagerId = new Map(mrRows.map((r) => [r.id, r.managerId]));
   const rosterToMrId = new Map(rosterRows.map((r) => [r.id, r.rosterableId]));
-  const rosterMap = new Map<number, { active: number[]; bench: number[] }>();
+  const rosterMap = new Map<number, { roster: number[]; reserve: number[] }>();
   for (const gr of grRows) {
     const mrId = rosterToMrId.get(gr.rosterId);
     if (mrId == null) continue;
     const managerId = mrToManagerId.get(mrId);
     if (managerId == null) continue;
-    const entry = rosterMap.get(managerId) ?? { active: [], bench: [] };
-    if (gr.statusEnum === "active") entry.active.push(gr.golferId);
-    else entry.bench.push(gr.golferId);
+    const entry = rosterMap.get(managerId) ?? { roster: [], reserve: [] };
+    if (gr.statusEnum === "reserved") entry.reserve.push(gr.golferId);
+    else entry.roster.push(gr.golferId);
     rosterMap.set(managerId, entry);
   }
 
   const teamDataList: TeamData[] = managerRows.map((m) => {
-    const rosterData = rosterMap.get(m.managerId) ?? { active: [], bench: [] };
+    const rosterData = rosterMap.get(m.managerId) ?? { roster: [], reserve: [] };
     return {
       pk: m.managerId,
       teamId: m.managerId,
       teamName: m.teamName ?? m.userName,
       managerName: m.userName,
       managerId: m.userId,
-      roster: rosterData.active,
-      reserve: rosterData.bench,
+      roster: rosterData.roster,
+      reserve: rosterData.reserve,
       mulligansUsed: 0,
       seasonEarnings: 0,
       seasonPoints: pointsMap.get(m.managerId) ?? 0,
     };
   });
 
-  const scoring = scores ? buildScoringSettings(scores) : {
-    albatross: 8, eagle: 5, birdie: 3, par: 1, bogey: -1, doubleBogey: -2, triplePlus: -3,
-  };
+  const scoring = scoringRows.length > 0 ? buildScoringFromRows(scoringRows) : DEFAULT_SCORING;
 
   return {
     id: league.id,
     name: league.name,
     settings: {
       rosterSize: settings?.rosterCount ?? 8,
-      activeSize: settings?.lineupCount ?? 5,
-      reserveSize: settings?.reserveCount ?? 3,
+      activeSize: settings?.lineupCount ?? 4,
+      reserveSize: settings?.reserveCount ?? 4,
       mulligansPerSeason: 0,
       scoringSettings: scoring,
       showMoney: false,
@@ -389,7 +391,7 @@ export async function setLineup(teamPk: number, tournamentId: number, golferIds:
     // Insert new ones
     if (golferIds.length > 0) {
       await tx.insert(golferRoster).values(
-        golferIds.map((gid) => ({ golferId: gid, rosterId, statusEnum: "active" as const }))
+        golferIds.map((gid) => ({ golferId: gid, rosterId, statusEnum: "rostered" as const, isActive: true }))
       );
     }
   });
@@ -397,9 +399,9 @@ export async function setLineup(teamPk: number, tournamentId: number, golferIds:
 
 // --- Roster mutations ---
 
-export async function addToRoster(teamPk: number, golferId: number, slot: "active" | "bench" = "active"): Promise<void> {
+export async function addToRoster(teamPk: number, golferId: number, status: "rostered" | "reserved" = "rostered"): Promise<void> {
   const { rosterId } = await getOrCreateManagerRoster(teamPk);
-  await db.insert(golferRoster).values({ golferId, rosterId, statusEnum: slot });
+  await db.insert(golferRoster).values({ golferId, rosterId, statusEnum: status });
 }
 
 export async function removeFromRoster(teamPk: number, golferId: number): Promise<void> {
@@ -425,13 +427,14 @@ export async function swapRosterPlayer(teamPk: number, dropGolferId: number, add
   await db.transaction(async (tx) => {
     const [dropped] = await tx.select().from(golferRoster)
       .where(and(eq(golferRoster.rosterId, rosterRow.id), eq(golferRoster.golferId, dropGolferId)));
-    const slot = dropped?.statusEnum ?? "active";
+    const slot = dropped?.statusEnum ?? "rostered";
+    const wasActive = dropped?.isActive ?? false;
 
     await tx.delete(golferRoster).where(and(
       eq(golferRoster.rosterId, rosterRow.id),
       eq(golferRoster.golferId, dropGolferId),
     ));
-    await tx.insert(golferRoster).values({ golferId: addGolferId, rosterId: rosterRow.id, statusEnum: slot });
+    await tx.insert(golferRoster).values({ golferId: addGolferId, rosterId: rosterRow.id, statusEnum: slot, isActive: wasActive });
   });
 }
 
@@ -443,7 +446,7 @@ export async function getRosterCount(teamPk: number): Promise<number> {
   if (!rosterRow) return 0;
 
   const rows = await db.select().from(golferRoster)
-    .where(and(eq(golferRoster.rosterId, rosterRow.id), eq(golferRoster.statusEnum, "active")));
+    .where(and(eq(golferRoster.rosterId, rosterRow.id), eq(golferRoster.statusEnum, "rostered")));
   return rows.length;
 }
 
@@ -626,8 +629,8 @@ export async function getTeamByManagerAndLeague(userId: number, leagueId: number
     teamName: manager.teamName ?? manager.userName,
     managerName: manager.userName,
     managerId: manager.userId,
-    roster: rosterData.active,
-    reserve: rosterData.bench,
+    roster: rosterData.roster,
+    reserve: rosterData.reserve,
     mulligansUsed: 0,
     seasonEarnings: 0,
     seasonPoints: seasonPts,

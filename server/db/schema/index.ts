@@ -11,7 +11,7 @@ export const rosterableTypeEnum = pgEnum("rosterable_type", [
 ]);
 
 export const rosterStatusEnum = pgEnum("roster_status", [
-  "active", "bench",
+  "rostered", "reserved",
 ]);
 
 export const draftStatusEnum = pgEnum("draft_status", [
@@ -36,6 +36,10 @@ export const simPlayerStatusEnum = pgEnum("sim_player_status", [
 
 export const pointSourceEnum = pgEnum("point_source", [
   "computed", "manual",
+]);
+
+export const scoringCategoryEnum = pgEnum("scoring_category", [
+  "hole_outcome", "bonus",
 ]);
 
 // ─── Tier 1: Standalone reference data ───────────────────────
@@ -66,6 +70,16 @@ export const golfers = pgTable("golfers", {
   origin: varchar("origin", { length: 10 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const scoringEvents = pgTable("scoring_events", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 30 }).notNull().unique(),
+  label: varchar("label", { length: 50 }).notNull(),
+  category: scoringCategoryEnum("category").notNull(),
+  defaultPoints: integer("default_points").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Tier 2: FK to Tier 1 ───────────────────────────────────
@@ -109,25 +123,21 @@ export const leagueSettings = pgTable("league_settings", {
   weekCount: integer("week_count").notNull().default(19),
   managerCount: integer("manager_count").notNull().default(10),
   rosterCount: integer("roster_count").notNull().default(8),
-  lineupCount: integer("lineup_count").notNull().default(5),
-  reserveCount: integer("reserve_count").notNull().default(3),
+  lineupCount: integer("lineup_count").notNull().default(4),
+  reserveCount: integer("reserve_count").notNull().default(4),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const leagueScores = pgTable("league_scores", {
+export const leagueScoring = pgTable("league_scoring", {
   id: serial("id").primaryKey(),
-  leagueId: integer("league_id").notNull().references(() => leagues.id).unique(),
-  albatrossVal: integer("albatross_val").notNull().default(800),
-  eagleVal: integer("eagle_val").notNull().default(500),
-  birdieVal: integer("birdie_val").notNull().default(300),
-  parVal: integer("par_val").notNull().default(100),
-  bogeyVal: integer("bogey_val").notNull().default(-100),
-  doubleVal: integer("double_val").notNull().default(-200),
-  tripleVal: integer("triple_val").notNull().default(-300),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+  leagueId: integer("league_id").notNull().references(() => leagues.id),
+  scoringEventId: integer("scoring_event_id").notNull().references(() => scoringEvents.id),
+  pointsVal: integer("points_val").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+}, (t) => [
+  unique("league_scoring_uq").on(t.leagueId, t.scoringEventId),
+]);
 
 export const leagueTournament = pgTable("league_tournament", {
   id: serial("id").primaryKey(),
@@ -179,7 +189,8 @@ export const golferRoster = pgTable("golfer_roster", {
   id: serial("id").primaryKey(),
   golferId: integer("golfer_id").notNull().references(() => golfers.id),
   rosterId: integer("roster_id").notNull().references(() => rosters.id),
-  statusEnum: rosterStatusEnum("status_enum").notNull().default("active"),
+  statusEnum: rosterStatusEnum("status_enum").notNull().default("rostered"),
+  isActive: boolean("is_active").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
   unique("golfer_roster_uq").on(t.golferId, t.rosterId),
@@ -303,6 +314,7 @@ export const messages = pgTable("messages", {
 export const managerPoints = pgTable("manager_points", {
   id: serial("id").primaryKey(),
   golferRosterId: integer("golfer_roster_id").notNull().references(() => golferRoster.id),
+  scoringEventId: integer("scoring_event_id").references(() => scoringEvents.id),
   roundNumber: integer("round_number").notNull(),
   holeNumber: integer("hole_number").notNull(),
   holeScore: integer("hole_score").notNull(),
@@ -342,7 +354,7 @@ export const leaguesRelations = relations(leagues, ({ one, many }) => ({
   createdBy: one(users, { fields: [leagues.createdById], references: [users.id] }),
   managers: many(managers),
   settings: one(leagueSettings),
-  scores: one(leagueScores),
+  leagueScoring: many(leagueScoring),
   leagueTournaments: many(leagueTournament),
   drafts: many(drafts),
   trades: many(trades),
@@ -368,8 +380,13 @@ export const leagueSettingsRelations = relations(leagueSettings, ({ one }) => ({
   league: one(leagues, { fields: [leagueSettings.leagueId], references: [leagues.id] }),
 }));
 
-export const leagueScoresRelations = relations(leagueScores, ({ one }) => ({
-  league: one(leagues, { fields: [leagueScores.leagueId], references: [leagues.id] }),
+export const scoringEventsRelations = relations(scoringEvents, ({ many }) => ({
+  leagueScoring: many(leagueScoring),
+}));
+
+export const leagueScoringRelations = relations(leagueScoring, ({ one }) => ({
+  league: one(leagues, { fields: [leagueScoring.leagueId], references: [leagues.id] }),
+  scoringEvent: one(scoringEvents, { fields: [leagueScoring.scoringEventId], references: [scoringEvents.id] }),
 }));
 
 export const leagueTournamentRelations = relations(leagueTournament, ({ one, many }) => ({
@@ -458,4 +475,5 @@ export const messagesRelations = relations(messages, ({ one }) => ({
 
 export const managerPointsRelations = relations(managerPoints, ({ one }) => ({
   golferRoster: one(golferRoster, { fields: [managerPoints.golferRosterId], references: [golferRoster.id] }),
+  scoringEvent: one(scoringEvents, { fields: [managerPoints.scoringEventId], references: [scoringEvents.id] }),
 }));

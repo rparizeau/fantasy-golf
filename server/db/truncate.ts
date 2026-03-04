@@ -32,10 +32,11 @@ async function truncate() {
   await db.delete(schema.managerRosters);
   await db.delete(schema.draftRosters);
   await db.delete(schema.leagueTournament);
-  await db.delete(schema.leagueScores);
+  await db.delete(schema.leagueScoring);
   await db.delete(schema.leagueSettings);
   await db.delete(schema.managers);
   await db.delete(schema.leagues);
+  await db.delete(schema.scoringEvents);
   await db.delete(schema.tournaments);
   await db.delete(schema.courses);
   await db.delete(schema.golfers);

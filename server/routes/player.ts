@@ -2,10 +2,12 @@ import { Router } from "express";
 import { loadActiveSimState, getActiveTournamentId } from "../db/dal/sim.js";
 import { loadGolfers, loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
 import { formatScore, calculatePlayerPoints, DEFAULT_SCORING } from "../sim/engine.js";
+import { getLeague } from "../db/dal/league.js";
 
 const router = Router();
 
 // GET /api/player/:id — single player detail (seed data + sim state)
+// Optional query: ?leagueId=X to use league-specific scoring
 router.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id) || id < 1) {
@@ -36,8 +38,16 @@ router.get("/:id", async (req, res) => {
     }
   }
 
+  // Use league-specific scoring if leagueId provided, otherwise defaults
+  let scoring = DEFAULT_SCORING;
+  const leagueId = Number(req.query.leagueId);
+  if (Number.isFinite(leagueId) && leagueId > 0) {
+    const league = await getLeague(leagueId);
+    if (league) scoring = league.settings.scoringSettings;
+  }
+
   const holePars = state.holePars ?? [];
-  const points = sim ? calculatePlayerPoints(sim.holeScores, holePars, DEFAULT_SCORING) : 0;
+  const points = sim ? calculatePlayerPoints(sim.holeScores, holePars, scoring) : 0;
 
   res.json({
     playerId: seed.id,

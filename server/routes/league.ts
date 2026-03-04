@@ -352,11 +352,15 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
     const roster = team.roster.map((pid) => buildStatic(pid, lineup.includes(pid)));
     const reserve = team.reserve.map((pid) => buildStatic(pid, false));
 
+    const currentIdx = tournaments.findIndex((t) => t.id === currentTournament.id);
+    const viewIdx = tournaments.findIndex((t) => t.id === viewTournamentId);
+    const isPast = viewIdx < currentIdx;
+
     res.json({
       teamId: team.teamId,
       teamName: team.teamName,
       leagueId: league.id,
-      locked: true,
+      locked: isPast,
       phase: "idle",
       settings: league.settings,
       roster,
@@ -384,13 +388,34 @@ router.post("/:id/team/:teamId/lineup", async (req: AuthenticatedRequest, res) =
     return;
   }
 
+  const { activePlayerIds, tournamentId: reqTournamentId } = req.body;
+
+  const tournaments = await loadTournaments();
+  const activeId = await getActiveTournamentId();
+  const currentTournament = tournaments.find((t) => t.id === activeId) || tournaments[0];
+
+  // Determine target tournament — default to current
+  const targetId = typeof reqTournamentId === "number" ? reqTournamentId : currentTournament.id;
+  const targetTournament = tournaments.find((t) => t.id === targetId);
+  if (!targetTournament) {
+    res.status(404).json({ error: "Tournament not found" });
+    return;
+  }
+
+  // Block edits for past tournaments and for the current tournament while sim is in progress
+  const currentIdx = tournaments.findIndex((t) => t.id === currentTournament.id);
+  const targetIdx = tournaments.findIndex((t) => t.id === targetId);
+  if (targetIdx < currentIdx) {
+    res.status(403).json({ error: "Cannot change lineup for a past tournament" });
+    return;
+  }
+
   const simState = await loadActiveSimState();
-  if (simState.phase !== "idle") {
+  if (targetId === currentTournament.id && simState.phase !== "idle") {
     res.status(403).json({ error: "Lineup is locked — tournament is in progress" });
     return;
   }
 
-  const { activePlayerIds } = req.body;
   if (!Array.isArray(activePlayerIds)) {
     res.status(400).json({ error: "activePlayerIds must be an array" });
     return;
@@ -408,10 +433,7 @@ router.post("/:id/team/:teamId/lineup", async (req: AuthenticatedRequest, res) =
     }
   }
 
-  const tournaments = await loadTournaments();
-  const activeId = await getActiveTournamentId();
-  const currentTournament = tournaments.find((t) => t.id === activeId) || tournaments[0];
-  await setLineup(team.pk, currentTournament.id, activePlayerIds);
+  await setLineup(team.pk, targetId, activePlayerIds);
 
   res.json({ ok: true });
 });

@@ -41,8 +41,10 @@ async function seed() {
   await db.delete(schema.draftRosters);
   await db.delete(schema.draftPicks);
   await db.delete(schema.leagueTournament);
+  await db.delete(schema.leagueScoring);
   await db.delete(schema.tournaments);
   await db.delete(schema.courses);
+  await db.delete(schema.scoringEvents);
   await db.delete(schema.golfers);
   console.log("  Cleared reference tables");
 
@@ -91,6 +93,20 @@ async function seed() {
     });
   }
   console.log(`  ✓ tournaments: ${tournaments.length}`);
+
+  // ─── Scoring Events ────────────────────────────────────────
+  await db.delete(schema.scoringEvents);
+  await db.insert(schema.scoringEvents).values([
+    { key: "albatross", label: "Albatross", category: "hole_outcome", defaultPoints: 1000, sortOrder: 1 },
+    { key: "eagle", label: "Eagle", category: "hole_outcome", defaultPoints: 600, sortOrder: 2 },
+    { key: "birdie", label: "Birdie", category: "hole_outcome", defaultPoints: 300, sortOrder: 3 },
+    { key: "par", label: "Par", category: "hole_outcome", defaultPoints: 100, sortOrder: 4 },
+    { key: "bogey", label: "Bogey", category: "hole_outcome", defaultPoints: 0, sortOrder: 5 },
+    { key: "double_bogey", label: "Double Bogey", category: "hole_outcome", defaultPoints: -100, sortOrder: 6 },
+    { key: "triple_bogey_plus", label: "Triple Bogey+", category: "hole_outcome", defaultPoints: -200, sortOrder: 7 },
+    { key: "hole_in_one", label: "Hole-in-One", category: "bonus", defaultPoints: 800, sortOrder: 8 },
+  ]);
+  console.log(`  ✓ scoring_events: 8`);
 
   console.log("\n✅ Reference data seeded.");
   await client.end();

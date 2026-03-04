@@ -34,30 +34,31 @@ export interface SimState {
 
 // --- Scoring Settings ---
 
-export interface ScoringSettings {
-  albatross: number;
-  eagle: number;
-  birdie: number;
-  par: number;
-  bogey: number;
-  doubleBogey: number;
-  triplePlus: number;
-}
+/** Keyed by scoring_events.key (snake_case). */
+export type ScoringSettings = Record<string, number>;
 
 export const DEFAULT_SCORING: ScoringSettings = {
-  albatross: 8, eagle: 5, birdie: 3, par: 1, bogey: -1, doubleBogey: -2, triplePlus: -3,
+  albatross: 10, eagle: 6, birdie: 3, par: 1,
+  bogey: 0, double_bogey: -1, triple_bogey_plus: -2,
+  hole_in_one: 8,
 };
 
-/** Map a single hole score to points based on diff from par. */
+/** Map a single hole score to points based on diff from par, plus hole-in-one bonus. */
 export function holeToPoints(holeScore: number, holePar: number, scoring: ScoringSettings): number {
   const diff = holeScore - holePar;
-  if (diff <= -3) return scoring.albatross;
-  if (diff === -2) return scoring.eagle;
-  if (diff === -1) return scoring.birdie;
-  if (diff === 0) return scoring.par;
-  if (diff === 1) return scoring.bogey;
-  if (diff === 2) return scoring.doubleBogey;
-  return scoring.triplePlus;
+  let base: number;
+  if (diff <= -3) base = scoring.albatross ?? 0;
+  else if (diff === -2) base = scoring.eagle ?? 0;
+  else if (diff === -1) base = scoring.birdie ?? 0;
+  else if (diff === 0) base = scoring.par ?? 0;
+  else if (diff === 1) base = scoring.bogey ?? 0;
+  else if (diff === 2) base = scoring.double_bogey ?? 0;
+  else base = scoring.triple_bogey_plus ?? 0;
+
+  // Hole-in-one bonus (score of 1 on any hole)
+  if (holeScore === 1) base += scoring.hole_in_one ?? 0;
+
+  return base;
 }
 
 /** Sum points across all rounds of hole scores. */
