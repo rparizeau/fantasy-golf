@@ -6,7 +6,6 @@ import {
   updatePlayer,
   resetSim,
   completeSim,
-  rollbackSim,
   getLeaderboard,
   getTournamentList,
   type SimStatus,
@@ -561,17 +560,6 @@ export function SimPanel() {
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Complete failed");
-    }
-    setLoading(false);
-  };
-
-  const handleRollback = async () => {
-    setLoading(true);
-    try {
-      await rollbackSim();
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Rollback failed");
     }
     setLoading(false);
   };
