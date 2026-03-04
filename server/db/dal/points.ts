@@ -239,7 +239,11 @@ export interface GolferSeasonStats {
  * Get season stats grouped by golfer for a league.
  * Returns a Map of golferId → stats (points in display units, hole-type counts).
  */
-export async function getSeasonStatsByGolfer(leagueId: number): Promise<Map<number, GolferSeasonStats>> {
+export async function getSeasonStatsByGolfer(leagueId: number, excludeTournamentId?: number): Promise<Map<number, GolferSeasonStats>> {
+  const conditions = [eq(leagueTournament.leagueId, leagueId)];
+  if (excludeTournamentId != null) {
+    conditions.push(sql`${leagueTournament.tournamentId} != ${excludeTournamentId}`);
+  }
   const rows = await db
     .select({
       golferId: golferRoster.golferId,
@@ -261,7 +265,7 @@ export async function getSeasonStatsByGolfer(leagueId: number): Promise<Map<numb
       ),
     )
     .innerJoin(leagueTournament, eq(tournamentRosters.leagueTournamentId, leagueTournament.id))
-    .where(eq(leagueTournament.leagueId, leagueId))
+    .where(and(...conditions))
     .groupBy(golferRoster.golferId);
 
   const map = new Map<number, GolferSeasonStats>();

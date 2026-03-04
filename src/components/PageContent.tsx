@@ -23,7 +23,7 @@ export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, 
     case "home":
       return (
         <div style={{ flex: 1 }}>
-          <Home leagueId={leagueId} myTeamId={myTeamId} colors={C} />
+          <Home leagueId={leagueId} myTeamId={myTeamId} colors={C} tournaments={tournaments} currentTournamentId={currentTournamentId} viewingWeek={viewingWeek} />
         </div>
       );
     case "scorecard":

@@ -21,18 +21,58 @@ router.get("/:id/players", async (req, res) => {
     return;
   }
 
-  const [allGolfers, simState, ownershipMap, statsMap] = await Promise.all([
+  const [allGolfers, simState, ownershipMap] = await Promise.all([
     loadGolfers(),
     loadActiveSimState(),
     getOwnershipMap(league.id),
-    getSeasonStatsByGolfer(league.id),
   ]);
+  // Exclude current tournament from DB stats — we'll use live sim data instead
+  const statsMap = await getSeasonStatsByGolfer(league.id, simState.tournamentId);
 
   const emptyStats = { points: 0, eagles: 0, birdies: 0, pars: 0, bogeys: 0, doubles: 0 };
 
+  // Compute live stats from current sim (includes all rounds played, even for cut players)
+  const holePars = simState.holePars ?? [];
+  const liveStats = new Map<number, { eagles: number; birdies: number; pars: number; bogeys: number; doubles: number; points: number }>();
+  if (holePars.length > 0) {
+    const scoring = league.settings.scoringSettings;
+    for (const sp of simState.players) {
+      if (!sp.holeScores) continue;
+      let eagles = 0, birdies = 0, pars = 0, bogeys = 0, doubles = 0, points = 0;
+      for (const roundScores of sp.holeScores) {
+        if (!roundScores) continue;
+        for (let h = 0; h < roundScores.length; h++) {
+          const score = roundScores[h];
+          if (score == null) continue;
+          const par = holePars[h] ?? 4;
+          const diff = score - par;
+          if (diff <= -2) eagles++;
+          else if (diff === -1) birdies++;
+          else if (diff === 0) pars++;
+          else if (diff === 1) bogeys++;
+          else doubles++;
+          // Compute points using scoring settings
+          const key = diff <= -2 ? "eagle" : diff === -1 ? "birdie" : diff === 0 ? "par" : diff === 1 ? "bogey" : "double_bogey";
+          points += scoring[key] ?? 0;
+        }
+      }
+      liveStats.set(sp.playerId, { eagles, birdies, pars, bogeys, doubles, points });
+    }
+  }
+
   const pool = allGolfers.map((p) => {
     const simPlayer = simState.players.find((sp) => sp.playerId === p.id);
-    const stats = statsMap.get(p.id) ?? emptyStats;
+    const dbStats = statsMap.get(p.id) ?? emptyStats;
+    const live = liveStats.get(p.id);
+    // Merge: DB season stats + live current tournament stats
+    const stats = live ? {
+      points: dbStats.points + live.points,
+      eagles: dbStats.eagles + live.eagles,
+      birdies: dbStats.birdies + live.birdies,
+      pars: dbStats.pars + live.pars,
+      bogeys: dbStats.bogeys + live.bogeys,
+      doubles: dbStats.doubles + live.doubles,
+    } : dbStats;
     return {
       playerId: p.id,
       name: p.name,

@@ -190,14 +190,21 @@ function LeagueCard({
             <ManagerIcon size={42} bgColor={l.teamColor ?? "#003C80"} ballColor={l.teamSecondaryColor ?? "#FFFFFF"} />
             <div style={{ minWidth: 0 }}>
               <p style={{ color: C.txt, fontSize: 18, fontWeight: 700, margin: 0 }}>{l.team}</p>
-              <p style={{ color: C.txt2, fontSize: 12, fontWeight: 500, margin: "2px 0 0" }}>
-                {ordinal(l.rank)} Place · {l.points} pts
-              </p>
+              {l.rank > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 24, height: 18, borderRadius: 5, background: C.goldDim, color: C.gold, fontSize: 11, fontWeight: 700, padding: "0 5px" }}>{l.rankTied ? "T" : ""}{l.rank}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: C.txt2 }}>{l.points} pts</span>
+                </div>
+              )}
             </div>
           </div>
           <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
             <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{l.weekPoints} pts</p>
-            {l.weekRank > 0 && <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0", fontWeight: 600 }}>{ordinal(l.weekRank)} Place</p>}
+            {l.weekRank > 0 && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginTop: 2 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 24, height: 18, borderRadius: 5, background: C.card2, color: C.txt2, fontSize: 11, fontWeight: 700, padding: "0 5px" }}>{l.weekRankTied ? "T" : ""}{l.weekRank}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

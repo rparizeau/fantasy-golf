@@ -23,7 +23,7 @@ interface RosterProps {
 
 interface CachedWeek {
   data: RosterData;
-  rank: { myRank: number; myPoints: number; totalTeams: number; rivalAbove: { name: string; points: number; rank: number } | null; rivalBelow: { name: string; points: number; rank: number } | null } | null;
+  rank: { myRank: number; myRankTied: boolean; myPoints: number; leaderPoints: number; totalTeams: number; projectedTotal: number; rivalAbove: { name: string; points: number; rank: number } | null; rivalBelow: { name: string; points: number; rank: number } | null } | null;
 }
 
 export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek: _onChangeWeek, isMajor: _isMajor }: RosterProps) {
@@ -37,10 +37,13 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const [modalPlayerId, setModalPlayerId] = useState<number | null>(null);
   const [moving, setMoving] = useState<number | null>(null);
   const [myRank, setMyRank] = useState(0);
+  const [myRankTied, setMyRankTied] = useState(false);
   const [totalTeams, setTotalTeams] = useState(0);
   const [myPoints, setMyPoints] = useState(0);
+  const [leaderPoints, setLeaderPoints] = useState(0);
   const [rivalAbove, setRivalAbove] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [rivalBelow, setRivalBelow] = useState<{ name: string; points: number; rank: number } | null>(null);
+  const [projectedTotal, setProjectedTotal] = useState(0);
   const [seasonRank, setSeasonRank] = useState(0);
   const [seasonPoints, setSeasonPoints] = useState(0);
   const cacheRef = useRef(new Map<number, CachedWeek>());
@@ -57,12 +60,18 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
     setMyPoints(weekPts);
     if (rankData) {
       setMyRank(rankData.myRank);
+      setMyRankTied(rankData.myRankTied);
       setTotalTeams(rankData.totalTeams);
+      setLeaderPoints(rankData.leaderPoints);
+      setProjectedTotal(rankData.projectedTotal);
       setRivalAbove(rankData.rivalAbove);
       setRivalBelow(rankData.rivalBelow);
     } else {
       setMyRank(0);
+      setMyRankTied(false);
       setTotalTeams(0);
+      setLeaderPoints(0);
+      setProjectedTotal(0);
       setRivalAbove(null);
       setRivalBelow(null);
     }
@@ -134,10 +143,16 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                 break;
               }
             }
+            const myTeamLb = sorted[myIdx];
+            const projTotal = myTeamLb.projectedRoundPoints.reduce((a, b) => a + b, 0);
+            const tied = sorted.filter((t) => t.totalPoints === myPts).length > 1;
             rankData = {
-              myRank: myIdx + 1,
+              myRank: sorted.findIndex((t) => t.totalPoints === myPts) + 1,
+              myRankTied: tied,
               myPoints: d.roster.filter((p) => p.isActive).reduce((sum, p) => sum + p.points, 0),
+              leaderPoints: sorted[0].totalPoints,
               totalTeams: sorted.length,
+              projectedTotal: projTotal,
               rivalAbove: above,
               rivalBelow: below,
             };
@@ -379,15 +394,44 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <ManagerIcon size={42} bgColor={data.color ?? "#003C80"} ballColor={data.secondaryColor ?? "#FFFFFF"} />
+                  {/* Icon with week rank badge offset top-left */}
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <ManagerIcon size={42} bgColor={data.color ?? "#003C80"} ballColor={data.secondaryColor ?? "#FFFFFF"} />
+                    {myRank > 0 && (
+                      <span style={{
+                        position: "absolute",
+                        top: -4,
+                        left: -6,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minWidth: 20,
+                        height: 18,
+                        borderRadius: 5,
+                        background: C.card2,
+                        color: C.txt2,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "0 4px",
+                        border: `1px solid ${C.border}`,
+                      }}>{myRankTied ? "T" : ""}{myRank}</span>
+                    )}
+                  </div>
                   <div>
                     <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{data.teamName}</p>
-                    {seasonRank > 0 && <p style={{ fontSize: 12, fontWeight: 500, color: C.txt2, margin: "2px 0 0" }}>{ordinal(seasonRank)} Place · {seasonPoints} pts</p>}
+                    {seasonRank > 0 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 24, height: 18, borderRadius: 5, background: C.goldDim, color: C.gold, fontSize: 11, fontWeight: 700, padding: "0 5px" }}>{seasonRank}</span>
+                        <span style={{ fontSize: 12, fontWeight: 500, color: C.txt2 }}>{seasonPoints} pts</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{myPoints}</p>
-                  <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0", fontWeight: 600 }}>{myRank > 0 ? `${ordinal(myRank)} Place` : "-"}</p>
+                  <p style={{ fontSize: 10, color: C.txt3, margin: "2px 0 0" }}>
+                    {projectedTotal > 0 ? `${projectedTotal}` : "-"}
+                  </p>
                 </div>
               </div>
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -404,7 +448,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                     {rivalAbove ? (
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                         <span style={{ color: C.txt2 }}>▲ {ordinal(rivalAbove.rank)} · {rivalAbove.name}</span>
-                        <span style={{ color: C.txt3 }}>+{rivalAbove.points - myPoints}</span>
+                        <span style={{ color: C.txt3 }}>-{rivalAbove.points - myPoints}</span>
                       </div>
                     ) : myRank === 1 ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
@@ -418,7 +462,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                     {rivalBelow ? (
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                         <span style={{ color: C.txt2 }}>▼ {ordinal(rivalBelow.rank)} · {rivalBelow.name}</span>
-                        <span style={{ color: C.txt3 }}>-{myPoints - rivalBelow.points}</span>
+                        <span style={{ color: C.txt3 }}>+{myPoints - rivalBelow.points}</span>
                       </div>
                     ) : myRank === totalTeams && totalTeams > 1 ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
@@ -428,7 +472,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                     ) : (
                       <div style={{ fontSize: 13, height: 18 }} />
                     )}
-
                   </>
                 ) : (
                   <>
@@ -767,18 +810,15 @@ function PlayerCard({
         {/* R1–R4 */}
         {[0, 1, 2, 3].map((i) => {
           const rPts = p.roundPoints[i];
-          const played = rPts != null;
-          const avgPts = p.roundPoints.length > 0
-            ? Math.round(p.roundPoints.reduce((a, b) => a + b, 0) / p.roundPoints.length)
-            : Math.round(18 - (p.ranking - 1) * 0.12);
-          const proj = played ? avgPts + (rPts > avgPts ? 1 : rPts < avgPts ? -1 : 0) : avgPts;
+          const proj = p.projectedRoundPoints[i];
+          const played = rPts != null && rPts !== 0;
           return (
             <div key={i} style={{ width: COL.r, textAlign: "center" }}>
               <p style={{ fontSize: 12, fontWeight: 600, color: played ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
                 {played ? rPts : "-"}
               </p>
               <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3 }}>
-                {hasRounds ? proj : "-"}
+                {played ? proj : proj ? `${proj}` : "-"}
               </p>
             </div>
           );
@@ -786,17 +826,16 @@ function PlayerCard({
 
         {/* PTS */}
         {(() => {
-          const avgRoundPts = p.roundPoints.length > 0
-            ? p.roundPoints.reduce((a, b) => a + b, 0) / p.roundPoints.length
-            : 18 - (p.ranking - 1) * 0.12;
-          const projTotal = Math.round(avgRoundPts * 4);
+          const projTotal = p.projectedRoundPoints.length > 0
+            ? p.projectedRoundPoints.reduce((a, b) => a + b, 0)
+            : 0;
           return (
             <div style={{ width: COL.p, textAlign: "right" }}>
               <p style={{ fontSize: 15, fontWeight: 700, color: hasRounds ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
                 {hasRounds ? p.points : "-"}
               </p>
               <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
-                {hasRounds ? projTotal : "-"}
+                {projTotal > 0 ? `${projTotal}` : "-"}
               </p>
             </div>
           );

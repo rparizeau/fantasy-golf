@@ -7,6 +7,13 @@ import type { AuthenticatedRequest } from "../middleware/auth.js";
 
 const router = Router();
 
+/** Compute per-round projected points for a player */
+function projectRoundPoints(roundPoints: number[]): number[] {
+  const completed = roundPoints.filter((p) => p !== 0);
+  const avg = completed.length > 0 ? Math.round(completed.reduce((a, b) => a + b, 0) / completed.length) : 0;
+  return [0, 1, 2, 3].map((i) => roundPoints[i] !== 0 ? roundPoints[i] : avg);
+}
+
 // GET /api/league/all — all leagues summary for lobby
 router.get("/all", async (_req: AuthenticatedRequest, res) => {
   const [allLeagues, simState, tournaments, activeId] = await Promise.all([
@@ -71,9 +78,13 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
     const sorted = [...league.teams].sort((a, b) => b.seasonPoints - a.seasonPoints || b.seasonEarnings - a.seasonEarnings);
     const myTeam = league.teams.find((t) => t.managerId === userId);
     const myRank = myTeam ? sorted.findIndex((t) => t.teamId === myTeam.teamId) + 1 : 0;
+    const mySeasonPts = myTeam?.seasonPoints ?? 0;
+    const rankTied = myRank > 0 && sorted.filter((t) => t.seasonPoints === mySeasonPts).length > 1;
     const myWeekData = myTeam ? teamWeekData.find((t) => t.teamId === myTeam.teamId) : undefined;
     const weekSorted = [...teamWeekData].sort((a, b) => b.weekPoints - a.weekPoints);
     const myWeekRank = myTeam ? weekSorted.findIndex((t) => t.teamId === myTeam.teamId) + 1 : 0;
+    const myWeekPts = myWeekData?.weekPoints ?? 0;
+    const weekRankTied = myWeekRank > 0 && weekSorted.filter((t) => t.weekPoints === myWeekPts).length > 1;
 
     return {
       id: league.id,
@@ -82,12 +93,14 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
       teamColor: myTeam?.colorCode ?? "#003C80",
       teamSecondaryColor: myTeam?.secondaryColorCode ?? "#FFFFFF",
       rank: myRank,
+      rankTied,
       of: league.teams.length,
       money: myTeam?.seasonEarnings || 0,
       weekMoney: myWeekData?.weekEarnings || 0,
       points: myTeam?.seasonPoints || 0,
       weekPoints: myWeekData?.weekPoints || 0,
       weekRank: myWeekRank,
+      weekRankTied,
       showMoney: league.settings.showMoney,
       members: league.teams.length,
       tournament: tournament.name,
@@ -196,6 +209,18 @@ router.get("/:id/leaderboard", async (req, res) => {
     const totalEarnings = players.reduce((sum, p) => sum + p.earnings, 0);
     const totalPoints = players.reduce((sum, p) => sum + p.points, 0);
 
+    // Per-round team points (sum of active players' round points)
+    const roundPoints = [0, 0, 0, 0];
+    for (const playerId of lineup) {
+      const simPlayer = simState.players.find((p) => p.playerId === playerId);
+      if (simPlayer) {
+        const rPts = calculateRoundPoints(simPlayer.holeScores, holePars, scoring);
+        rPts.forEach((pts, i) => { roundPoints[i] += pts; });
+      }
+    }
+
+    const projectedRoundPoints = projectRoundPoints(roundPoints);
+
     return {
       teamId: team.teamId,
       teamName: team.teamName,
@@ -204,6 +229,8 @@ router.get("/:id/leaderboard", async (req, res) => {
       secondaryColor: team.secondaryColorCode,
       totalEarnings,
       totalPoints,
+      roundPoints,
+      projectedRoundPoints,
       players,
     };
   });
@@ -305,6 +332,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
         status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
         rounds: simPlayer?.rounds ?? [],
         roundPoints: rPts,
+        projectedRoundPoints: projectRoundPoints(rPts),
         earnings: isActive ? earnings : 0,
         points: pts,
       };
@@ -327,6 +355,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
         status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
         rounds: simPlayer?.rounds ?? [],
         roundPoints: rPts,
+        projectedRoundPoints: projectRoundPoints(rPts),
         earnings: 0,
         points: pts,
       };
@@ -380,6 +409,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
           status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
           rounds: simPlayer?.rounds ?? [],
           roundPoints: rPts,
+          projectedRoundPoints: projectRoundPoints(rPts),
           earnings: isActive ? earnings : 0,
           points: pts,
         };
@@ -419,6 +449,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
           status: "active" as const,
           rounds: [] as number[],
           roundPoints: [] as number[],
+          projectedRoundPoints: [] as number[],
           earnings: 0,
           points: 0,
         };

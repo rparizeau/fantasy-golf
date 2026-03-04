@@ -153,11 +153,13 @@ export interface LeagueSummary {
   teamColor?: string;
   teamSecondaryColor?: string;
   rank: number;
+  rankTied: boolean;
   of: number;
   money: number;
   weekMoney: number;
   points: number;
   weekPoints: number;
+  weekRankTied: boolean;
   showMoney: boolean;
   members: number;
   tournament: string;
@@ -189,6 +191,8 @@ export interface FantasyTeamSummary {
   secondaryColor?: string;
   totalEarnings: number;
   totalPoints: number;
+  roundPoints: number[];
+  projectedRoundPoints: number[];
   players: {
     playerId: number;
     name: string;
@@ -244,6 +248,7 @@ export interface RosterPlayer {
   status: "active" | "cut" | "wd";
   rounds: number[];
   roundPoints: number[];
+  projectedRoundPoints: number[];
   earnings: number;
   points: number;
 }

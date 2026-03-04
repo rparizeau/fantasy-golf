@@ -11,7 +11,12 @@ export interface StandingsEntry {
   totalPoints: number;
   completedWeeks?: number;
   totalWeeks?: number;
+  roundPoints?: number[];
+  projectedRoundPoints?: number[];
 }
+
+// Column widths matching Roster PlayerCard
+const COL = { r: 26, p: 46, gap: 2 };
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -24,6 +29,8 @@ export function StandingsList<T extends StandingsEntry>({
   colors: C,
   myTeamId,
   title,
+  showThru = true,
+  showRounds = false,
   renderExpanded,
   emptyMessage,
 }: {
@@ -31,6 +38,8 @@ export function StandingsList<T extends StandingsEntry>({
   colors: Theme;
   myTeamId?: number;
   title?: string;
+  showThru?: boolean;
+  showRounds?: boolean;
   renderExpanded?: (entry: T, colors: Theme) => React.ReactNode;
   emptyMessage?: string;
 }) {
@@ -50,12 +59,24 @@ export function StandingsList<T extends StandingsEntry>({
     <>
       {/* Column headers */}
       <div style={{ display: "flex", alignItems: "center", padding: "0 14px 6px" }}>
-        {title && <span style={{ ...colStyle, flex: 1 }}>{title}</span>}
-        {!title && <span style={{ flex: 1 }} />}
-        <span style={{ ...colStyle, textAlign: "center", minWidth: 70 }}>Thru</span>
-        <span style={{ ...colStyle, width: 44, textAlign: "right" }}>PTS</span>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          {title && <span style={colStyle}>{title}</span>}
+        </div>
+        {showThru && <span style={{ ...colStyle, textAlign: "right", minWidth: 70 }}>Thru</span>}
+        <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 1 }}>
+          {showRounds && ["R1", "R2", "R3", "R4"].map((l) => (
+            <div key={l} style={{ width: COL.r, textAlign: "center" }}><span style={colStyle}>{l}</span></div>
+          ))}
+          <div style={{ width: COL.p, textAlign: "right" }}><span style={colStyle}>PTS</span></div>
+        </div>
       </div>
+      {/* Compute positions with ties */}
       {entries.map((entry, idx) => {
+        // Find the first index with this score to determine position
+        const pos = entries.findIndex((e) => e.totalPoints === entry.totalPoints) + 1;
+        const tied = entries.filter((e) => e.totalPoints === entry.totalPoints).length > 1;
+        const posLabel = `${tied ? "T" : ""}${pos}`;
+
         const isMe = entry.teamId === myTeamId;
         const isExpanded = expandedTeam === entry.teamId;
         const hasExpanded = renderExpanded != null;
@@ -88,17 +109,17 @@ export function StandingsList<T extends StandingsEntry>({
                   width: 32,
                   height: 28,
                   borderRadius: 8,
-                  background: C.card2,
+                  background: showThru ? C.goldDim : C.card2,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   fontSize: 11,
                   fontWeight: 700,
-                  color: C.txt2,
+                  color: showThru ? C.gold : C.txt2,
                   flexShrink: 0,
                 }}
               >
-                {ordinal(idx + 1)}
+                {posLabel}
               </div>
 
               <ManagerIcon size={28} bgColor={entry.color ?? "#003C80"} ballColor={entry.secondaryColor ?? "#FFFFFF"} />
@@ -138,29 +159,43 @@ export function StandingsList<T extends StandingsEntry>({
                 <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>{entry.managerName}</p>
               </div>
 
-              {/* Thru + Points */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexShrink: 0 }}>
-                <div style={{ textAlign: "center", minWidth: 70 }}>
+              {/* Thru */}
+              {showThru && (
+                <div style={{ textAlign: "right", minWidth: 70, flexShrink: 0 }}>
                   <p style={{ color: C.txt2, fontSize: 15, fontWeight: 500, margin: 0 }}>
-                    {entry.completedWeeks ?? 0} {(entry.completedWeeks ?? 0) === 1 ? "Week" : "Weeks"}
+                    {entry.completedWeeks ?? 0} {(entry.completedWeeks ?? 0) === 1 ? "Wk" : "Wks"}
                   </p>
                   <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>
-                    {(entry.totalWeeks ?? 0) - (entry.completedWeeks ?? 0)} remaining
+                    {(entry.totalWeeks ?? 0) - (entry.completedWeeks ?? 0)} rem
                   </p>
                 </div>
-                <div style={{ width: 44, textAlign: "right" }}>
-                  <p
-                    style={{
-                      color: entry.totalPoints > 0 ? C.txt : C.txt3,
-                      fontSize: 15,
-                      fontWeight: 700,
-                      margin: 0,
-                    }}
-                  >
+              )}
+
+              {/* Data columns: R1 R2 R3 R4 | PTS */}
+              <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "flex-start" }}>
+                {showRounds && [0, 1, 2, 3].map((ri) => {
+                  const pts = entry.roundPoints?.[ri];
+                  const proj = entry.projectedRoundPoints?.[ri];
+                  const played = pts != null && pts !== 0;
+                  return (
+                    <div key={ri} style={{ width: COL.r, textAlign: "center" }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: played ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                        {played ? pts : "-"}
+                      </p>
+                      <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3 }}>
+                        {played ? proj : proj ? `${proj}` : "-"}
+                      </p>
+                    </div>
+                  );
+                })}
+
+                {/* PTS */}
+                <div style={{ width: COL.p, textAlign: "right" }}>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: entry.totalPoints > 0 ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
                     {entry.totalPoints}
                   </p>
-                  <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>
-                    {idx === 0 ? "Leader" : `+${entries[0].totalPoints - entry.totalPoints}`}
+                  <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
+                    {idx === 0 ? "" : `+${entries[0].totalPoints - entry.totalPoints}`}
                   </p>
                 </div>
               </div>
