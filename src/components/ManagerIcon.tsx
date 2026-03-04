@@ -5,7 +5,7 @@ interface ManagerIconProps {
 }
 
 export function ManagerIcon({ size = 30, bgColor, ballColor }: ManagerIconProps) {
-  const r = size * 0.3; // ball radius
+  const s = size * 0.6;
   return (
     <div
       style={{
@@ -19,15 +19,11 @@ export function ManagerIcon({ size = 30, bgColor, ballColor }: ManagerIconProps)
         flexShrink: 0,
       }}
     >
-      <svg width={r * 2} height={r * 2} viewBox="0 0 20 20" fill="none">
-        {/* Ball */}
-        <circle cx="10" cy="10" r="9" fill={ballColor} />
-        {/* Dimples */}
-        <path d="M4.5 8 Q7 6.5 9.5 8" stroke={bgColor} strokeWidth="0.8" fill="none" opacity={0.45} />
-        <path d="M6 12 Q9 10.5 12 12" stroke={bgColor} strokeWidth="0.8" fill="none" opacity={0.45} />
-        <path d="M10.5 7 Q13 5.5 15.5 7" stroke={bgColor} strokeWidth="0.8" fill="none" opacity={0.45} />
-        <path d="M3 11 Q5 9.5 7 11" stroke={bgColor} strokeWidth="0.7" fill="none" opacity={0.3} />
-        <path d="M11 13 Q13.5 11.5 16 13" stroke={bgColor} strokeWidth="0.7" fill="none" opacity={0.3} />
+      <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={ballColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     </div>
   );
