@@ -37,6 +37,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const [modalPlayerId, setModalPlayerId] = useState<number | null>(null);
   const [moving, setMoving] = useState<number | null>(null);
   const [myRank, setMyRank] = useState(0);
+  const [totalTeams, setTotalTeams] = useState(0);
   const [myPoints, setMyPoints] = useState(0);
   const [rivalAbove, setRivalAbove] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [rivalBelow, setRivalBelow] = useState<{ name: string; points: number; rank: number } | null>(null);
@@ -56,10 +57,12 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
     setMyPoints(weekPts);
     if (rankData) {
       setMyRank(rankData.myRank);
+      setTotalTeams(rankData.totalTeams);
       setRivalAbove(rankData.rivalAbove);
       setRivalBelow(rankData.rivalBelow);
     } else {
       setMyRank(0);
+      setTotalTeams(0);
       setRivalAbove(null);
       setRivalBelow(null);
     }
@@ -113,12 +116,30 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
           const sorted = lb.teams;
           const myIdx = sorted.findIndex(t => t.teamId === teamId);
           if (myIdx >= 0) {
+            type Rival = { name: string; points: number; rank: number } | null;
+            const myPts = sorted[myIdx].totalPoints;
+            // Find rival above: skip teams with same points (tied)
+            let above: Rival = null;
+            for (let i = myIdx - 1; i >= 0; i--) {
+              if (sorted[i].totalPoints !== myPts) {
+                above = { name: sorted[i].teamName, points: sorted[i].totalPoints, rank: i + 1 };
+                break;
+              }
+            }
+            // Find rival below: skip teams with same points (tied)
+            let below: Rival = null;
+            for (let i = myIdx + 1; i < sorted.length; i++) {
+              if (sorted[i].totalPoints !== myPts) {
+                below = { name: sorted[i].teamName, points: sorted[i].totalPoints, rank: i + 1 };
+                break;
+              }
+            }
             rankData = {
               myRank: myIdx + 1,
               myPoints: d.roster.filter((p) => p.isActive).reduce((sum, p) => sum + p.points, 0),
               totalTeams: sorted.length,
-              rivalAbove: myIdx > 0 ? { name: sorted[myIdx - 1].teamName, points: sorted[myIdx - 1].totalPoints, rank: myIdx } : null,
-              rivalBelow: myIdx < sorted.length - 1 ? { name: sorted[myIdx + 1].teamName, points: sorted[myIdx + 1].totalPoints, rank: myIdx + 2 } : null,
+              rivalAbove: above,
+              rivalBelow: below,
             };
           }
         }
@@ -142,7 +163,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
     refresh();
   }, [refresh]);
 
-  // Fetch season rank/points once
+  // Fetch season rank/points on mount and when week changes (data may update after completing a week)
   useEffect(() => {
     getLeagues().then((leagues) => {
       const mine = leagues.find((l) => l.id === leagueId);
@@ -151,7 +172,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         setSeasonPoints(mine.points);
       }
     }).catch(() => {});
-  }, [leagueId]);
+  }, [leagueId, viewingWeek]);
 
   const settings = data?.settings;
   const activeSize = settings?.activeSize ?? 5;
@@ -366,7 +387,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{myPoints}</p>
-                  {myRank > 0 && <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0", fontWeight: 600 }}>{ordinal(myRank)} Place</p>}
+                  <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0", fontWeight: 600 }}>{myRank > 0 ? `${ordinal(myRank)} Place` : "-"}</p>
                 </div>
               </div>
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -379,28 +400,41 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                   </>
                 ) : myRank > 0 ? (
                   <>
-                    {/* Row 1: rival above */}
+                    {/* Row 1: rival above or leader badge */}
                     {rivalAbove ? (
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                         <span style={{ color: C.txt2 }}>▲ {ordinal(rivalAbove.rank)} · {rivalAbove.name}</span>
                         <span style={{ color: C.txt3 }}>+{rivalAbove.points - myPoints}</span>
                       </div>
+                    ) : myRank === 1 ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                        <span style={{ color: C.txt2, fontSize: 10 }}>●</span>
+                        <span style={{ color: C.txt2 }}>You are the current leader!</span>
+                      </div>
                     ) : (
                       <div style={{ fontSize: 13, height: 18 }} />
                     )}
-                    {/* Row 2: rival below */}
+                    {/* Row 2: rival below or last place badge */}
                     {rivalBelow ? (
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                         <span style={{ color: C.txt2 }}>▼ {ordinal(rivalBelow.rank)} · {rivalBelow.name}</span>
                         <span style={{ color: C.txt3 }}>-{myPoints - rivalBelow.points}</span>
                       </div>
+                    ) : myRank === totalTeams && totalTeams > 1 ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                        <span style={{ color: C.txt3, fontSize: 10 }}>■</span>
+                        <span style={{ color: C.txt3 }}>You are currently last place</span>
+                      </div>
                     ) : (
                       <div style={{ fontSize: 13, height: 18 }} />
                     )}
+
                   </>
                 ) : (
                   <>
-                    <div style={{ fontSize: 13, height: 18 }} />
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                      <span style={{ color: C.txt3 }}>No leaderboard yet</span>
+                    </div>
                     <div style={{ fontSize: 13, height: 18 }} />
                   </>
                 )}

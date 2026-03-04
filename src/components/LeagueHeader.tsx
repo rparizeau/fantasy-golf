@@ -25,7 +25,7 @@ function formatPurse(n: number): string {
   return `$${n.toLocaleString()}`;
 }
 
-export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, onBack, viewedTournament: t, activePage, tournaments, currentTournamentId, viewingWeek, onChangeWeek }: LeagueHeaderProps) {
+export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, onBack, viewedTournament: t, activePage: _activePage, tournaments, currentTournamentId, viewingWeek, onChangeWeek }: LeagueHeaderProps) {
   const [leagueName, setLeagueName] = useState("");
 
   useEffect(() => {
@@ -123,7 +123,7 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
           </>
         )}
       </div>
-      {activePage === "scorecard" && tournaments.length > 0 && (
+      {tournaments.length > 0 && (
         <div style={{ borderBottom: `1px solid ${C.border}`, background: `${tournamentColor}20` }}>
           <WeekNav
             tournaments={tournaments}

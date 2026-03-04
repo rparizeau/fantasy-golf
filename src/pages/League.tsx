@@ -50,11 +50,8 @@ export function LeagueStandings({ leagueId, myTeamId, colors: C }: LeagueStandin
 
   return (
     <div style={{ padding: "12px 16px 100px" }}>
-      <p style={{ color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6, margin: "0 0 10px" }}>
-        Standings
-      </p>
-
       <StandingsList
+        title="Standings"
         entries={standings}
         colors={C}
         myTeamId={myTeamId}

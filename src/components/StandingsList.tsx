@@ -23,12 +23,14 @@ export function StandingsList<T extends StandingsEntry>({
   entries,
   colors: C,
   myTeamId,
+  title,
   renderExpanded,
   emptyMessage,
 }: {
   entries: T[];
   colors: Theme;
   myTeamId?: number;
+  title?: string;
   renderExpanded?: (entry: T, colors: Theme) => React.ReactNode;
   emptyMessage?: string;
 }) {
@@ -47,7 +49,9 @@ export function StandingsList<T extends StandingsEntry>({
   return (
     <>
       {/* Column headers */}
-      <div style={{ display: "flex", alignItems: "center", padding: "0 14px 6px", justifyContent: "flex-end", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", padding: "0 14px 6px" }}>
+        {title && <span style={{ ...colStyle, flex: 1 }}>{title}</span>}
+        {!title && <span style={{ flex: 1 }} />}
         <span style={{ ...colStyle, textAlign: "center", minWidth: 70 }}>Thru</span>
         <span style={{ ...colStyle, width: 44, textAlign: "right" }}>PTS</span>
       </div>
