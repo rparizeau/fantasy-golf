@@ -64,6 +64,10 @@ export function rewindSim() {
   return fetchJSON<{ phase: string; currentRound: number }>("/sim/rewind", { method: "POST" });
 }
 
+export function completeSim() {
+  return fetchJSON<{ completed: boolean; nextTournamentId: number | null; nextTournamentName: string | null }>("/sim/complete", { method: "POST" });
+}
+
 export function resetSim(tournamentId?: number) {
   return fetchJSON<{ phase: string; tournamentId: number; fieldSize: number }>("/sim/reset", {
     method: "POST",
@@ -133,6 +137,7 @@ export interface TournamentListItem {
   isMajor: boolean;
   current?: boolean;
   color?: string;
+  secondaryColor?: string;
 }
 
 export function getTournamentList() {
@@ -145,6 +150,8 @@ export interface LeagueSummary {
   id: number;
   name: string;
   team: string;
+  teamColor?: string;
+  teamSecondaryColor?: string;
   rank: number;
   of: number;
   money: number;
@@ -157,10 +164,14 @@ export interface LeagueSummary {
   course: string;
   loc: string;
   purse: number;
+  color?: string;
+  secondaryColor?: string;
   status: "live" | "done" | "upcoming";
   round: number;
   cut: string;
   phase: string;
+  week: number;
+  weekRank: number;
   myTeamId: number;
 }
 
@@ -174,6 +185,8 @@ export interface FantasyTeamSummary {
   teamId: number;
   teamName: string;
   managerName: string;
+  color?: string;
+  secondaryColor?: string;
   totalEarnings: number;
   totalPoints: number;
   players: {
@@ -198,8 +211,9 @@ export interface FantasyLeaderboard {
   teams: FantasyTeamSummary[];
 }
 
-export function getFantasyLeaderboard(leagueId: number, options?: { signal?: AbortSignal }) {
-  return fetchJSON<FantasyLeaderboard>(`/league/${leagueId}/leaderboard`, options);
+export function getFantasyLeaderboard(leagueId: number, tournamentId?: number, options?: { signal?: AbortSignal }) {
+  const qs = tournamentId != null ? `?tournamentId=${tournamentId}` : "";
+  return fetchJSON<FantasyLeaderboard>(`/league/${leagueId}/leaderboard${qs}`, options);
 }
 
 export type ScoringSettings = Record<string, number>;
@@ -207,7 +221,7 @@ export type ScoringSettings = Record<string, number>;
 export interface LeagueInfo {
   id: number;
   name: string;
-  members: { teamId: number; teamName: string; managerName: string }[];
+  members: { teamId: number; teamName: string; managerName: string; color?: string; secondaryColor?: string }[];
   settings: { rosterSize: number; activeSize: number; reserveSize: number; mulligansPerSeason: number; scoringSettings: ScoringSettings; showMoney: boolean };
 }
 
@@ -237,6 +251,8 @@ export interface RosterPlayer {
 export interface RosterData {
   teamId: number;
   teamName: string;
+  color?: string;
+  secondaryColor?: string;
   leagueId: number;
   locked: boolean;
   phase: string;
@@ -266,6 +282,12 @@ export interface PlayerPoolEntry {
   ranking: number;
   ownedBy: { teamId: number; teamName: string } | null;
   seasonEarnings: number;
+  seasonPoints: number;
+  eagles: number;
+  birdies: number;
+  pars: number;
+  bogeys: number;
+  doubles: number;
   recentFinishes: string[];
 }
 
@@ -292,10 +314,14 @@ export interface SeasonStanding {
   teamId: number;
   teamName: string;
   managerName: string;
+  color?: string;
+  secondaryColor?: string;
   totalEarnings: number;
   totalPoints: number;
   previousRank: number;
   currentRank: number;
+  completedWeeks: number;
+  totalWeeks: number;
   tournamentEarnings: { tournamentId: number; tournamentName: string; earnings: number }[];
 }
 

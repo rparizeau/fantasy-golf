@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { loadActiveSimState, getActiveTournamentId } from "../db/dal/sim.js";
+import { loadActiveSimState, getActiveTournamentId, loadTournamentState, type SimState } from "../db/dal/sim.js";
 import { loadTournaments, loadPayoutTable, loadGolfers } from "../db/dal/seed-data.js";
 import { getLeague, getAllLeagues, getLineup, getLineupsForTeams, setLineup } from "../db/dal/league.js";
 import { formatScore, calculatePlayerPoints, calculateRoundPoints } from "../sim/engine.js";
@@ -72,27 +72,35 @@ router.get("/all", async (_req: AuthenticatedRequest, res) => {
     const myTeam = league.teams.find((t) => t.managerId === userId);
     const myRank = myTeam ? sorted.findIndex((t) => t.teamId === myTeam.teamId) + 1 : 0;
     const myWeekData = myTeam ? teamWeekData.find((t) => t.teamId === myTeam.teamId) : undefined;
+    const weekSorted = [...teamWeekData].sort((a, b) => b.weekPoints - a.weekPoints);
+    const myWeekRank = myTeam ? weekSorted.findIndex((t) => t.teamId === myTeam.teamId) + 1 : 0;
 
     return {
       id: league.id,
       name: league.name,
       team: myTeam?.teamName || "",
+      teamColor: myTeam?.colorCode ?? "#003C80",
+      teamSecondaryColor: myTeam?.secondaryColorCode ?? "#FFFFFF",
       rank: myRank,
       of: league.teams.length,
       money: myTeam?.seasonEarnings || 0,
       weekMoney: myWeekData?.weekEarnings || 0,
       points: myTeam?.seasonPoints || 0,
       weekPoints: myWeekData?.weekPoints || 0,
+      weekRank: myWeekRank,
       showMoney: league.settings.showMoney,
       members: league.teams.length,
       tournament: tournament.name,
       course: tournament.course,
       loc: tournament.location,
       purse: tournament.purse,
+      color: tournament.color,
+      secondaryColor: tournament.secondaryColor,
       status,
       round,
       cut: cutDisplay,
       phase,
+      week: tournaments.findIndex((t) => t.id === tournament.id) + 1,
       myTeamId: myTeam?.teamId ?? null,
     };
   });
@@ -116,12 +124,14 @@ router.get("/:id", async (req, res) => {
       teamId: t.teamId,
       teamName: t.teamName,
       managerName: t.managerName,
+      color: t.colorCode,
+      secondaryColor: t.secondaryColorCode,
     })),
     settings: league.settings,
   });
 });
 
-// GET /api/league/:id/leaderboard — fantasy team leaderboard for current tournament
+// GET /api/league/:id/leaderboard — fantasy team leaderboard for a tournament
 router.get("/:id/leaderboard", async (req, res) => {
   const league = await getLeague(Number(req.params.id));
   if (!league) {
@@ -129,10 +139,15 @@ router.get("/:id/leaderboard", async (req, res) => {
     return;
   }
 
-  const [simState, tournaments] = await Promise.all([
-    loadActiveSimState(),
-    loadTournaments(),
-  ]);
+  const reqTournamentId = req.query.tournamentId ? Number(req.query.tournamentId) : undefined;
+  let simState: SimState;
+  const tournaments = await loadTournaments();
+
+  if (reqTournamentId) {
+    simState = await loadTournamentState(reqTournamentId);
+  } else {
+    simState = await loadActiveSimState();
+  }
   const payoutTable = loadPayoutTable();
   const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
 
@@ -185,6 +200,8 @@ router.get("/:id/leaderboard", async (req, res) => {
       teamId: team.teamId,
       teamName: team.teamName,
       managerName: team.managerName,
+      color: team.colorCode,
+      secondaryColor: team.secondaryColorCode,
       totalEarnings,
       totalPoints,
       players,
@@ -220,6 +237,8 @@ router.get("/:id/team/:teamId", async (req, res) => {
   res.json({
     teamId: team.teamId,
     teamName: team.teamName,
+    color: team.colorCode,
+    secondaryColor: team.secondaryColorCode,
     managerName: team.managerName,
     roster: team.roster,
     reserve: team.reserve,
@@ -316,6 +335,8 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
     res.json({
       teamId: team.teamId,
       teamName: team.teamName,
+      color: team.colorCode,
+      secondaryColor: team.secondaryColorCode,
       leagueId: league.id,
       locked,
       phase: simState.phase,
@@ -326,46 +347,103 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
   } else {
     const viewTournamentId = reqTournamentId || currentTournament.id;
     const lineup = await getLineup(team.pk, viewTournamentId);
-    const seedGolfers = await loadGolfers();
-    const seedMap = new Map(seedGolfers.map((p) => [p.id, p]));
 
-    const buildStatic = (playerId: number, isActive: boolean) => {
-      const seed = seedMap.get(playerId);
-      return {
-        playerId,
-        name: seed?.name || `Player ${playerId}`,
-        country: seed?.country || "",
-        ranking: seed?.ranking || 0,
-        isActive,
-        inField: true,
-        toPar: 0,
-        toParDisplay: "-",
-        position: 0,
-        status: "active" as const,
-        rounds: [] as number[],
-        roundPoints: [] as number[],
-        earnings: 0,
-        points: 0,
+    // Try loading sim state for this tournament (works for completed weeks)
+    const pastSimState = await loadTournamentState(viewTournamentId);
+    const hasSim = pastSimState.players.length > 0 && pastSimState.phase !== "idle";
+
+    if (hasSim) {
+      const tournament = tournaments.find((t) => t.id === viewTournamentId) || tournaments[0];
+      const payoutTable = loadPayoutTable();
+      const pastHolePars = pastSimState.holePars ?? [];
+      const pastScoring = league.settings.scoringSettings;
+
+      const buildPlayer = (playerId: number, isActive: boolean) => {
+        const simPlayer = pastSimState.players.find((p) => p.playerId === playerId);
+        let earnings = 0;
+        if (simPlayer?.status === "active" && simPlayer.rounds.length > 0) {
+          const payout = payoutTable.find((pt) => pt.position === simPlayer.position);
+          if (payout) earnings = Math.round(tournament.purse * (payout.pct / 100));
+        }
+        const pts = simPlayer ? calculatePlayerPoints(simPlayer.holeScores, pastHolePars, pastScoring) : 0;
+        const rPts = simPlayer ? calculateRoundPoints(simPlayer.holeScores, pastHolePars, pastScoring) : [];
+        return {
+          playerId,
+          name: simPlayer?.name || `Player ${playerId}`,
+          country: simPlayer?.country || "",
+          ranking: simPlayer?.ranking || 0,
+          isActive,
+          inField: !!simPlayer,
+          toPar: simPlayer?.toPar ?? 0,
+          toParDisplay: simPlayer && simPlayer.rounds.length > 0 ? formatScore(simPlayer.toPar) : "-",
+          position: simPlayer?.position ?? 0,
+          status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
+          rounds: simPlayer?.rounds ?? [],
+          roundPoints: rPts,
+          earnings: isActive ? earnings : 0,
+          points: pts,
+        };
       };
-    };
 
-    const roster = team.roster.map((pid) => buildStatic(pid, lineup.includes(pid)));
-    const reserve = team.reserve.map((pid) => buildStatic(pid, false));
+      const roster = team.roster.map((pid) => buildPlayer(pid, lineup.includes(pid)));
+      const reserve = team.reserve.map((pid) => buildPlayer(pid, false));
 
-    const currentIdx = tournaments.findIndex((t) => t.id === currentTournament.id);
-    const viewIdx = tournaments.findIndex((t) => t.id === viewTournamentId);
-    const isPast = viewIdx < currentIdx;
+      res.json({
+        teamId: team.teamId,
+        teamName: team.teamName,
+        color: team.colorCode,
+        secondaryColor: team.secondaryColorCode,
+        leagueId: league.id,
+        locked: true,
+        phase: pastSimState.phase,
+        settings: league.settings,
+        roster,
+        reserve,
+      });
+    } else {
+      const seedGolfers = await loadGolfers();
+      const seedMap = new Map(seedGolfers.map((p) => [p.id, p]));
 
-    res.json({
-      teamId: team.teamId,
-      teamName: team.teamName,
-      leagueId: league.id,
-      locked: isPast,
-      phase: "idle",
-      settings: league.settings,
-      roster,
-      reserve,
-    });
+      const buildStatic = (playerId: number, isActive: boolean) => {
+        const seed = seedMap.get(playerId);
+        return {
+          playerId,
+          name: seed?.name || `Player ${playerId}`,
+          country: seed?.country || "",
+          ranking: seed?.ranking || 0,
+          isActive,
+          inField: true,
+          toPar: 0,
+          toParDisplay: "-",
+          position: 0,
+          status: "active" as const,
+          rounds: [] as number[],
+          roundPoints: [] as number[],
+          earnings: 0,
+          points: 0,
+        };
+      };
+
+      const currentIdx = tournaments.findIndex((t) => t.id === currentTournament.id);
+      const viewIdx = tournaments.findIndex((t) => t.id === viewTournamentId);
+      const isFuture = viewIdx > currentIdx;
+
+      const roster = team.roster.map((pid) => buildStatic(pid, lineup.includes(pid)));
+      const reserve = team.reserve.map((pid) => buildStatic(pid, false));
+
+      res.json({
+        teamId: team.teamId,
+        teamName: team.teamName,
+        color: team.colorCode,
+        secondaryColor: team.secondaryColorCode,
+        leagueId: league.id,
+        locked: !isFuture,
+        phase: "idle",
+        settings: league.settings,
+        roster,
+        reserve,
+      });
+    }
   }
 });
 

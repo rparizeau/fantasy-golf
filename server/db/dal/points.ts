@@ -1,9 +1,9 @@
 import { db } from "../index.js";
 import {
   managerPoints, golferRoster, rosters, managerRosters, tournamentRosters,
-  leagueTournament, simTournaments,
+  leagueTournament, simTournaments, leagueScoring, scoringEvents,
 } from "../schema/index.js";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { holeToPoints, type ScoringSettings } from "../../sim/engine.js";
 
 /**
@@ -119,4 +119,161 @@ export async function deletePointsForRound(golferRosterId: number, roundNumber: 
  */
 export async function deleteAllPointsForGolferRoster(golferRosterId: number): Promise<void> {
   await db.delete(managerPoints).where(eq(managerPoints.golferRosterId, golferRosterId));
+}
+
+/**
+ * Write points for all active lineup golfers across all leagues for a given round.
+ * `playerHoleScores` maps playerId → 18-element hole scores array.
+ */
+export async function writePointsForRound(
+  tournamentId: number,
+  roundNumber: number,
+  playerHoleScores: Map<number, (number | null)[]>,
+  holePars: number[],
+): Promise<void> {
+  // Get all league_tournament rows for this tournament
+  const ltRows = await db.select().from(leagueTournament)
+    .where(eq(leagueTournament.tournamentId, tournamentId));
+  if (ltRows.length === 0) return;
+
+  const ltIds = ltRows.map((r) => r.id);
+
+  // Get scoring settings for each league
+  const leagueIds = [...new Set(ltRows.map((r) => r.leagueId))];
+  const scoringRows = await db.select({
+    leagueId: leagueScoring.leagueId,
+    key: scoringEvents.key,
+    value: leagueScoring.pointsVal,
+  })
+    .from(leagueScoring)
+    .innerJoin(scoringEvents, eq(leagueScoring.scoringEventId, scoringEvents.id))
+    .where(inArray(leagueScoring.leagueId, leagueIds));
+
+  const leagueScoringMap = new Map<number, ScoringSettings>();
+  for (const row of scoringRows) {
+    const settings = leagueScoringMap.get(row.leagueId) ?? {};
+    settings[row.key] = row.value / 100; // DB stores pennies, holeToPoints expects display units
+    leagueScoringMap.set(row.leagueId, settings);
+  }
+
+  // Get all tournament_rosters for these league_tournaments
+  const trRows = await db.select().from(tournamentRosters)
+    .where(inArray(tournamentRosters.leagueTournamentId, ltIds));
+  if (trRows.length === 0) return;
+
+  const trIds = trRows.map((r) => r.id);
+
+  // Get rosters → golfer_roster chain
+  const rosterRows = await db.select().from(rosters)
+    .where(and(
+      inArray(rosters.rosterableId, trIds),
+      eq(rosters.rosterableType, "tournament_roster"),
+    ));
+  if (rosterRows.length === 0) return;
+
+  const rosterIds = rosterRows.map((r) => r.id);
+  const grRows = await db.select().from(golferRoster)
+    .where(inArray(golferRoster.rosterId, rosterIds));
+
+  // Build mapping: golfer_roster.id → { golferId, leagueId }
+  const rosterToTrId = new Map(rosterRows.map((r) => [r.id, r.rosterableId]));
+  const trToLtId = new Map(trRows.map((r) => [r.id, r.leagueTournamentId]));
+  const ltToLeagueId = new Map(ltRows.map((r) => [r.id, r.leagueId]));
+
+  const allRows: {
+    golferRosterId: number;
+    roundNumber: number;
+    holeNumber: number;
+    holeScore: number;
+    holePar: number;
+    pointsVal: number;
+  }[] = [];
+
+  for (const gr of grRows) {
+    const trId = rosterToTrId.get(gr.rosterId);
+    if (trId == null) continue;
+    const ltId = trToLtId.get(trId);
+    if (ltId == null) continue;
+    const leagueId = ltToLeagueId.get(ltId);
+    if (leagueId == null) continue;
+
+    const scoring = leagueScoringMap.get(leagueId) ?? {};
+    const holeScores = playerHoleScores.get(gr.golferId);
+    if (!holeScores) continue;
+
+    for (let h = 0; h < holeScores.length; h++) {
+      const score = holeScores[h];
+      if (score == null) continue;
+      const par = holePars[h] ?? 4;
+      const pts = holeToPoints(score, par, scoring);
+      allRows.push({
+        golferRosterId: gr.id,
+        roundNumber,
+        holeNumber: h + 1,
+        holeScore: score,
+        holePar: par,
+        pointsVal: pts * 100,
+      });
+    }
+  }
+
+  // Batch insert
+  if (allRows.length > 0) {
+    // Insert in chunks of 500 to avoid hitting parameter limits
+    for (let i = 0; i < allRows.length; i += 500) {
+      await db.insert(managerPoints).values(allRows.slice(i, i + 500));
+    }
+  }
+}
+
+export interface GolferSeasonStats {
+  points: number;
+  eagles: number;
+  birdies: number;
+  pars: number;
+  bogeys: number;
+  doubles: number;
+}
+
+/**
+ * Get season stats grouped by golfer for a league.
+ * Returns a Map of golferId → stats (points in display units, hole-type counts).
+ */
+export async function getSeasonStatsByGolfer(leagueId: number): Promise<Map<number, GolferSeasonStats>> {
+  const rows = await db
+    .select({
+      golferId: golferRoster.golferId,
+      total: sql<number>`COALESCE(SUM(${managerPoints.pointsVal}), 0)`,
+      eagles: sql<number>`COUNT(*) FILTER (WHERE ${managerPoints.holeScore} <= ${managerPoints.holePar} - 2)`,
+      birdies: sql<number>`COUNT(*) FILTER (WHERE ${managerPoints.holeScore} = ${managerPoints.holePar} - 1)`,
+      pars: sql<number>`COUNT(*) FILTER (WHERE ${managerPoints.holeScore} = ${managerPoints.holePar})`,
+      bogeys: sql<number>`COUNT(*) FILTER (WHERE ${managerPoints.holeScore} = ${managerPoints.holePar} + 1)`,
+      doubles: sql<number>`COUNT(*) FILTER (WHERE ${managerPoints.holeScore} >= ${managerPoints.holePar} + 2)`,
+    })
+    .from(managerPoints)
+    .innerJoin(golferRoster, eq(managerPoints.golferRosterId, golferRoster.id))
+    .innerJoin(rosters, eq(golferRoster.rosterId, rosters.id))
+    .innerJoin(
+      tournamentRosters,
+      and(
+        eq(rosters.rosterableId, tournamentRosters.id),
+        sql`${rosters.rosterableType} = 'tournament_roster'`,
+      ),
+    )
+    .innerJoin(leagueTournament, eq(tournamentRosters.leagueTournamentId, leagueTournament.id))
+    .where(eq(leagueTournament.leagueId, leagueId))
+    .groupBy(golferRoster.golferId);
+
+  const map = new Map<number, GolferSeasonStats>();
+  for (const r of rows) {
+    map.set(r.golferId, {
+      points: r.total / 100,
+      eagles: Number(r.eagles),
+      birdies: Number(r.birdies),
+      pars: Number(r.pars),
+      bogeys: Number(r.bogeys),
+      doubles: Number(r.doubles),
+    });
+  }
+  return map;
 }

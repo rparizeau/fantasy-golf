@@ -17,6 +17,8 @@ export interface TeamData {
   teamName: string;      // user.name (manager display name)
   managerName: string;   // user.name
   managerId: number;     // user.id (the users table PK)
+  colorCode: string;
+  secondaryColorCode: string;
   roster: number[];      // golfer IDs with status='active'
   reserve: number[];     // golfer IDs with status='bench'
   mulligansUsed: number;
@@ -128,6 +130,8 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
       userId: managers.userId,
       userName: users.name,
       teamName: managers.teamName,
+      colorCode: managers.colorCode,
+      secondaryColorCode: managers.secondaryColorCode,
       isCommissioner: managers.isCommissioner,
     })
     .from(managers)
@@ -209,6 +213,8 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
       teamName: m.teamName ?? m.userName,
       managerName: m.userName,
       managerId: m.userId,
+      colorCode: m.colorCode,
+      secondaryColorCode: m.secondaryColorCode,
       roster: rosterData.roster,
       reserve: rosterData.reserve,
       mulligansUsed: 0,
@@ -612,7 +618,7 @@ export async function getOwnershipMap(leagueId: number): Promise<Map<number, { t
 export async function getTeamByManagerAndLeague(userId: number, leagueId: number): Promise<TeamData | null> {
   // userId here is the users.id, find the manager row
   const [manager] = await db
-    .select({ managerId: managers.id, userName: users.name, userId: users.id, teamName: managers.teamName })
+    .select({ managerId: managers.id, userName: users.name, userId: users.id, teamName: managers.teamName, colorCode: managers.colorCode, secondaryColorCode: managers.secondaryColorCode })
     .from(managers)
     .innerJoin(users, eq(managers.userId, users.id))
     .where(and(eq(managers.userId, userId), eq(managers.leagueId, leagueId)));
@@ -629,6 +635,8 @@ export async function getTeamByManagerAndLeague(userId: number, leagueId: number
     teamName: manager.teamName ?? manager.userName,
     managerName: manager.userName,
     managerId: manager.userId,
+    colorCode: manager.colorCode,
+    secondaryColorCode: manager.secondaryColorCode,
     roster: rosterData.roster,
     reserve: rosterData.reserve,
     mulligansUsed: 0,

@@ -5,6 +5,7 @@ import {
   rewindSim,
   updatePlayer,
   resetSim,
+  completeSim,
   getLeaderboard,
   getTournamentList,
   type SimStatus,
@@ -524,6 +525,22 @@ export function SimPanel() {
     setLoading(false);
   };
 
+  const handleComplete = async () => {
+    setLoading(true);
+    try {
+      const result = await completeSim();
+      if (result.nextTournamentName) {
+        alert(`Tournament complete! Next up: ${result.nextTournamentName}`);
+      } else {
+        alert("Season complete! No more tournaments.");
+      }
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Complete failed");
+    }
+    setLoading(false);
+  };
+
   const handlePlayerSave = async (playerId: number, updates: { rounds?: (number | null)[]; status: string; holeScores?: ((number | null)[] | null)[] }) => {
     try {
       const apiUpdates: { rounds?: (number | null)[]; status?: string; holeScores?: ((number | null)[] | null)[] } = {
@@ -673,6 +690,20 @@ export function SimPanel() {
               onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
               style={{ ...styles.input, flex: 1 }}
             />
+            {(sim?.phase === "round4" || sim?.phase === "final") && (
+              <button
+                style={{
+                  ...styles.dangerBtn,
+                  background: sim.phase === "final" ? "#2D8B52" : "#1A73E8",
+                  borderColor: sim.phase === "final" ? "#2D8B52" : "#1A73E8",
+                  color: "#fff",
+                }}
+                onClick={handleComplete}
+                disabled={loading}
+              >
+                {sim.phase === "final" ? "Activate Next" : "Complete Week"}
+              </button>
+            )}
             <button style={styles.dangerBtn} onClick={handleReset} disabled={loading}>
               Reset
             </button>

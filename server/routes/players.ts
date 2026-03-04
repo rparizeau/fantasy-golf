@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { loadGolfers } from "../db/dal/seed-data.js";
 import { loadActiveSimState } from "../db/dal/sim.js";
+import { getSeasonStatsByGolfer } from "../db/dal/points.js";
 import {
   getLeague, getOwnershipMap, isPlayerOwned,
   addWaiverClaim, getTeamByManagerAndLeague,
@@ -20,12 +21,18 @@ router.get("/:id/players", async (req, res) => {
     return;
   }
 
-  const allGolfers = await loadGolfers();
-  const simState = await loadActiveSimState();
-  const ownershipMap = await getOwnershipMap(league.id);
+  const [allGolfers, simState, ownershipMap, statsMap] = await Promise.all([
+    loadGolfers(),
+    loadActiveSimState(),
+    getOwnershipMap(league.id),
+    getSeasonStatsByGolfer(league.id),
+  ]);
+
+  const emptyStats = { points: 0, eagles: 0, birdies: 0, pars: 0, bogeys: 0, doubles: 0 };
 
   const pool = allGolfers.map((p) => {
     const simPlayer = simState.players.find((sp) => sp.playerId === p.id);
+    const stats = statsMap.get(p.id) ?? emptyStats;
     return {
       playerId: p.id,
       name: p.name,
@@ -33,6 +40,12 @@ router.get("/:id/players", async (req, res) => {
       ranking: p.ranking,
       ownedBy: ownershipMap.get(p.id) || null,
       seasonEarnings: 0,
+      seasonPoints: stats.points,
+      eagles: stats.eagles,
+      birdies: stats.birdies,
+      pars: stats.pars,
+      bogeys: stats.bogeys,
+      doubles: stats.doubles,
       recentFinishes: simPlayer ? [`T${simPlayer.position}`] : [],
     };
   });

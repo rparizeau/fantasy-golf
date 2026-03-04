@@ -9,6 +9,7 @@
     "isMajor": false,
     "current": true,
     "color": "#003C80",
+    "secondaryColor": "#FFD700",
     "dates": { "start": "2026-03-11", "end": "2026-03-14" }
   },
   {
@@ -20,6 +21,7 @@
     "par": 71,
     "isMajor": false,
     "color": "#61879D",
+    "secondaryColor": "#FFFFFF",
     "dates": { "start": "2026-03-18", "end": "2026-03-21" }
   },
   {
@@ -31,6 +33,7 @@
     "par": 70,
     "isMajor": false,
     "color": "#003C80",
+    "secondaryColor": "#CC0000",
     "dates": { "start": "2026-03-25", "end": "2026-03-28" }
   },
   {
@@ -42,6 +45,7 @@
     "par": 72,
     "isMajor": false,
     "color": "#006C87",
+    "secondaryColor": "#FFFFFF",
     "dates": { "start": "2026-04-01", "end": "2026-04-04" }
   },
   {
@@ -53,6 +57,7 @@
     "par": 72,
     "isMajor": true,
     "color": "#006B54",
+    "secondaryColor": "#FFD700",
     "dates": { "start": "2026-04-08", "end": "2026-04-11" }
   },
   {
@@ -64,6 +69,7 @@
     "par": 71,
     "isMajor": false,
     "color": "#CC0000",
+    "secondaryColor": "#FFFFFF",
     "dates": { "start": "2026-04-15", "end": "2026-04-18" }
   },
   {
@@ -75,6 +81,7 @@
     "par": 72,
     "isMajor": false,
     "color": "#4066B3",
+    "secondaryColor": "#FFD700",
     "dates": { "start": "2026-04-22", "end": "2026-04-25" }
   },
   {
@@ -86,6 +93,7 @@
     "par": 72,
     "isMajor": false,
     "color": "#CBA529",
+    "secondaryColor": "#1A1A1A",
     "dates": { "start": "2026-04-29", "end": "2026-05-02" }
   },
   {
@@ -97,6 +105,7 @@
     "par": 71,
     "isMajor": false,
     "color": "#2D1A47",
+    "secondaryColor": "#FFFFFF",
     "dates": { "start": "2026-05-06", "end": "2026-05-09" }
   },
   {
@@ -108,6 +117,7 @@
     "par": 70,
     "isMajor": true,
     "color": "#063156",
+    "secondaryColor": "#FFD700",
     "dates": { "start": "2026-05-13", "end": "2026-05-16" }
   },
   {
@@ -119,6 +129,7 @@
     "par": 72,
     "isMajor": false,
     "color": "#E4002B",
+    "secondaryColor": "#FFFFFF",
     "dates": { "start": "2026-05-20", "end": "2026-05-23" }
   },
   {
@@ -130,6 +141,7 @@
     "par": 70,
     "isMajor": false,
     "color": "#00A0DF",
+    "secondaryColor": "#FFFFFF",
     "dates": { "start": "2026-05-27", "end": "2026-05-30" }
   },
   {
@@ -141,6 +153,7 @@
     "par": 72,
     "isMajor": false,
     "color": "#1C2841",
+    "secondaryColor": "#D4AF37",
     "dates": { "start": "2026-06-03", "end": "2026-06-06" }
   },
   {
@@ -152,6 +165,7 @@
     "par": 72,
     "isMajor": false,
     "color": "#005DAA",
+    "secondaryColor": "#FF0000",
     "dates": { "start": "2026-06-10", "end": "2026-06-13" }
   },
   {
@@ -163,6 +177,7 @@
     "par": 70,
     "isMajor": true,
     "color": "#00365F",
+    "secondaryColor": "#CC0000",
     "dates": { "start": "2026-06-17", "end": "2026-06-20" }
   },
   {
@@ -174,6 +189,7 @@
     "par": 70,
     "isMajor": false,
     "color": "#E31837",
+    "secondaryColor": "#FFFFFF",
     "dates": { "start": "2026-06-24", "end": "2026-06-27" }
   },
   {
@@ -185,6 +201,7 @@
     "par": 71,
     "isMajor": false,
     "color": "#367C2B",
+    "secondaryColor": "#FFD700",
     "dates": { "start": "2026-07-01", "end": "2026-07-04" }
   },
   {
@@ -196,6 +213,7 @@
     "par": 70,
     "isMajor": false,
     "color": "#1A1A1A",
+    "secondaryColor": "#FFFFFF",
     "dates": { "start": "2026-07-08", "end": "2026-07-11" }
   },
   {
@@ -207,6 +225,7 @@
     "par": 70,
     "isMajor": true,
     "color": "#1A2744",
+    "secondaryColor": "#FFD700",
     "dates": { "start": "2026-07-15", "end": "2026-07-18" }
   }
 ]

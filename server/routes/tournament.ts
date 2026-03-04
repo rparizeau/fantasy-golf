@@ -23,6 +23,7 @@ router.get("/current", async (_req, res) => {
     par: tournament.par,
     isMajor: tournament.isMajor,
     color: tournament.color,
+    secondaryColor: tournament.secondaryColor,
     dates: tournament.dates,
     phase: simMatchesCurrent ? state.phase : "idle",
     currentRound: simMatchesCurrent ? state.currentRound : 0,
@@ -78,8 +79,11 @@ router.get("/leaderboard", async (_req, res) => {
 
 // GET /api/tournament/list — all available tournaments
 router.get("/list", async (_req, res) => {
-  const tournaments = await loadTournaments();
-  res.json(tournaments);
+  const [tournaments, activeId] = await Promise.all([
+    loadTournaments(),
+    getActiveTournamentId(),
+  ]);
+  res.json(tournaments.map((t) => ({ ...t, current: t.id === activeId })));
 });
 
 export default router;

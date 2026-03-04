@@ -59,6 +59,7 @@ export const courses = pgTable("courses", {
   name: varchar("name", { length: 150 }).notNull(),
   address: varchar("address", { length: 300 }),
   colorCode: varchar("color_code", { length: 10 }).notNull().default("#003C80"),
+  secondaryColorCode: varchar("secondary_color_code", { length: 10 }).notNull().default("#FFFFFF"),
   holes: jsonb("holes").notNull().$type<number[]>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -92,6 +93,7 @@ export const tournaments = pgTable("tournaments", {
   endDate: date("end_date").notNull(),
   purse: integer("purse").notNull(),
   colorCode: varchar("color_code", { length: 10 }).notNull().default("#003C80"),
+  secondaryColorCode: varchar("secondary_color_code", { length: 10 }).notNull().default("#FFFFFF"),
   isMajor: boolean("is_major").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -111,6 +113,8 @@ export const managers = pgTable("managers", {
   userId: integer("user_id").notNull().references(() => users.id),
   leagueId: integer("league_id").notNull().references(() => leagues.id),
   teamName: varchar("team_name", { length: 100 }),
+  colorCode: varchar("color_code", { length: 10 }).notNull().default("#003C80"),
+  secondaryColorCode: varchar("secondary_color_code", { length: 10 }).notNull().default("#FFFFFF"),
   isCommissioner: boolean("is_commissioner").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [

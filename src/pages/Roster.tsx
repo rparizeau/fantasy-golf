@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getRoster, setLineup, getFantasyLeaderboard, type RosterPlayer, type RosterData, type TournamentListItem } from "../api";
+import { getRoster, setLineup, getFantasyLeaderboard, getLeagues, type RosterPlayer, type RosterData, type TournamentListItem } from "../api";
 import { PlayerModal } from "../components/PlayerModal";
+import { ManagerIcon } from "../components/ManagerIcon";
 import type { Theme } from "../theme";
+
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
 
 interface RosterProps {
   leagueId: number;
@@ -30,10 +37,11 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const [modalPlayerId, setModalPlayerId] = useState<number | null>(null);
   const [moving, setMoving] = useState<number | null>(null);
   const [myRank, setMyRank] = useState(0);
-  const [totalTeams, setTotalTeams] = useState(0);
   const [myPoints, setMyPoints] = useState(0);
   const [rivalAbove, setRivalAbove] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [rivalBelow, setRivalBelow] = useState<{ name: string; points: number; rank: number } | null>(null);
+  const [seasonRank, setSeasonRank] = useState(0);
+  const [seasonPoints, setSeasonPoints] = useState(0);
   const cacheRef = useRef(new Map<number, CachedWeek>());
   const initialLoadRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
@@ -48,12 +56,10 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
     setMyPoints(weekPts);
     if (rankData) {
       setMyRank(rankData.myRank);
-      setTotalTeams(rankData.totalTeams);
       setRivalAbove(rankData.rivalAbove);
       setRivalBelow(rankData.rivalBelow);
     } else {
       setMyRank(0);
-      setTotalTeams(0);
       setRivalAbove(null);
       setRivalBelow(null);
     }
@@ -94,7 +100,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
     try {
       const [d, lb] = await Promise.all([
         getRoster(leagueId, teamId, tid, { signal: controller.signal }),
-        getFantasyLeaderboard(leagueId, { signal: controller.signal }),
+        getFantasyLeaderboard(leagueId, tid, { signal: controller.signal }),
       ]);
 
       // If aborted while awaiting, don't apply stale data
@@ -102,16 +108,19 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
 
       let rankData: CachedWeek["rank"] = null;
       if (lb) {
-        const sorted = lb.teams;
-        const myIdx = sorted.findIndex(t => t.teamId === teamId);
-        if (myIdx >= 0) {
-          rankData = {
-            myRank: myIdx + 1,
-            myPoints: d.roster.filter((p) => p.isActive).reduce((sum, p) => sum + p.points, 0),
-            totalTeams: sorted.length,
-            rivalAbove: myIdx > 0 ? { name: sorted[myIdx - 1].teamName, points: sorted[myIdx - 1].totalPoints, rank: myIdx } : null,
-            rivalBelow: myIdx < sorted.length - 1 ? { name: sorted[myIdx + 1].teamName, points: sorted[myIdx + 1].totalPoints, rank: myIdx + 2 } : null,
-          };
+        const hasScores = lb.teams.some(t => t.totalPoints !== 0);
+        if (hasScores) {
+          const sorted = lb.teams;
+          const myIdx = sorted.findIndex(t => t.teamId === teamId);
+          if (myIdx >= 0) {
+            rankData = {
+              myRank: myIdx + 1,
+              myPoints: d.roster.filter((p) => p.isActive).reduce((sum, p) => sum + p.points, 0),
+              totalTeams: sorted.length,
+              rivalAbove: myIdx > 0 ? { name: sorted[myIdx - 1].teamName, points: sorted[myIdx - 1].totalPoints, rank: myIdx } : null,
+              rivalBelow: myIdx < sorted.length - 1 ? { name: sorted[myIdx + 1].teamName, points: sorted[myIdx + 1].totalPoints, rank: myIdx + 2 } : null,
+            };
+          }
         }
       }
 
@@ -132,6 +141,17 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Fetch season rank/points once
+  useEffect(() => {
+    getLeagues().then((leagues) => {
+      const mine = leagues.find((l) => l.id === leagueId);
+      if (mine) {
+        setSeasonRank(mine.rank);
+        setSeasonPoints(mine.points);
+      }
+    }).catch(() => {});
+  }, [leagueId]);
 
   const settings = data?.settings;
   const activeSize = settings?.activeSize ?? 5;
@@ -291,7 +311,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const isFutureWeek = viewingWeek > currentWeekIndex;
   const canMove = !locked && !isPastWeek;
   const par = tournaments[viewingWeek]?.par ?? 72;
-  const isLastPlace = myRank > 0 && myRank === totalTeams;
 
   return (
     <div style={{ paddingBottom: 100, position: "relative" }}>
@@ -322,20 +341,32 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         {/* Summary card */}
         {data && (
           <div style={{ padding: "12px 16px 4px" }}>
+            {/* TEAM + PTS label above card */}
+            <div style={{ display: "flex", alignItems: "center", padding: "0 0 8px" }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <p style={{ ...colStyle, margin: 0, whiteSpace: "nowrap" }}>Team</p>
+              </div>
+              <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 15 }}>
+                <div style={{ width: COL.p, textAlign: "right" }}><span style={colStyle}>PTS</span></div>
+              </div>
+            </div>
             <div style={{
               background: C.card,
               borderRadius: 12,
               border: `1px solid ${C.border}`,
               padding: "14px 16px",
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                  {myRank > 0 && <span style={{ fontSize: 14, fontWeight: 500, color: C.txt3 }}>#{myRank}</span>}
-                  <p style={{ fontSize: 22, fontWeight: 700, color: C.txt, margin: 0 }}>{data.teamName}</p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <ManagerIcon size={42} bgColor={data.color ?? "#003C80"} ballColor={data.secondaryColor ?? "#FFFFFF"} />
+                  <div>
+                    <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{data.teamName}</p>
+                    {seasonRank > 0 && <p style={{ fontSize: 12, fontWeight: 500, color: C.txt2, margin: "2px 0 0" }}>{ordinal(seasonRank)} Place · {seasonPoints} pts</p>}
+                  </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <p style={{ fontSize: 11, color: C.txt3, margin: 0, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>This Week</p>
-                  <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{myPoints} pts</p>
+                  <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{myPoints}</p>
+                  {myRank > 0 && <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0", fontWeight: 600 }}>{ordinal(myRank)} Place</p>}
                 </div>
               </div>
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -348,32 +379,21 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                   </>
                 ) : myRank > 0 ? (
                   <>
-                    {/* Row 1: status or rival above */}
-                    {myRank === 1 ? (
+                    {/* Row 1: rival above */}
+                    {rivalAbove ? (
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                        <span style={{ color: C.green, fontWeight: 600 }}>Leading</span>
-                        {rivalBelow && <span style={{ color: C.green }}>+{myPoints - rivalBelow.points} pts</span>}
-                      </div>
-                    ) : isLastPlace ? (
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                        <span style={{ color: C.txt3, fontWeight: 600 }}>Last place</span>
-                      </div>
-                    ) : rivalAbove ? (
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                        <span style={{ color: C.txt2 }}><span style={{ color: C.txt3 }}>#{rivalAbove.rank}</span> {rivalAbove.name}</span>
-                        <span style={{ color: C.txt3 }}>+{rivalAbove.points - myPoints} pts</span>
+                        <span style={{ color: C.txt2 }}>▲ {ordinal(rivalAbove.rank)} · {rivalAbove.name}</span>
+                        <span style={{ color: C.txt3 }}>+{rivalAbove.points - myPoints}</span>
                       </div>
                     ) : (
                       <div style={{ fontSize: 13, height: 18 }} />
                     )}
-                    {/* Row 2: rival below or spacer */}
+                    {/* Row 2: rival below */}
                     {rivalBelow ? (
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                        <span style={{ color: C.txt2 }}><span style={{ color: C.txt3 }}>#{rivalBelow.rank}</span> {rivalBelow.name}</span>
-                        <span style={{ color: C.txt3 }}>{myRank === 1 ? "" : `-${myPoints - rivalBelow.points} pts`}</span>
+                        <span style={{ color: C.txt2 }}>▼ {ordinal(rivalBelow.rank)} · {rivalBelow.name}</span>
+                        <span style={{ color: C.txt3 }}>-{myPoints - rivalBelow.points}</span>
                       </div>
-                    ) : rivalAbove ? (
-                      <div style={{ fontSize: 13, height: 18 }} />
                     ) : (
                       <div style={{ fontSize: 13, height: 18 }} />
                     )}
@@ -388,7 +408,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
             </div>
           </div>
         )}
-        {sectionHeader(`Active Lineup (${activePlayers.length}/${activeSize})`)}
+        {sectionHeader(`Lineup (${activePlayers.length}/${activeSize})`)}
         <div style={{ padding: "0 16px 6px" }}>
 
           {activePlayers.map((p) => (

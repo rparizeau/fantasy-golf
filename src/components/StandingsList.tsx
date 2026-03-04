@@ -1,11 +1,16 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import type { Theme } from "../theme";
+import { ManagerIcon } from "./ManagerIcon";
 
 export interface StandingsEntry {
   teamId: number;
   teamName: string;
   managerName: string;
+  color?: string;
+  secondaryColor?: string;
   totalPoints: number;
+  completedWeeks?: number;
+  totalWeeks?: number;
 }
 
 function ordinal(n: number): string {
@@ -29,6 +34,8 @@ export function StandingsList<T extends StandingsEntry>({
 }) {
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
 
+  const colStyle: React.CSSProperties = { color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 };
+
   if (entries.length === 0) {
     return (
       <div style={{ textAlign: "center", padding: 24, color: C.txt3, fontSize: 13 }}>
@@ -39,6 +46,11 @@ export function StandingsList<T extends StandingsEntry>({
 
   return (
     <>
+      {/* Column headers */}
+      <div style={{ display: "flex", alignItems: "center", padding: "0 14px 6px", justifyContent: "flex-end", gap: 16 }}>
+        <span style={{ ...colStyle, textAlign: "center", minWidth: 70 }}>Thru</span>
+        <span style={{ ...colStyle, width: 44, textAlign: "right" }}>PTS</span>
+      </div>
       {entries.map((entry, idx) => {
         const isMe = entry.teamId === myTeamId;
         const isExpanded = expandedTeam === entry.teamId;
@@ -85,6 +97,8 @@ export function StandingsList<T extends StandingsEntry>({
                 {ordinal(idx + 1)}
               </div>
 
+              <ManagerIcon size={28} bgColor={entry.color ?? "#003C80"} ballColor={entry.secondaryColor ?? "#FFFFFF"} />
+
               {/* Team info */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -120,18 +134,31 @@ export function StandingsList<T extends StandingsEntry>({
                 <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>{entry.managerName}</p>
               </div>
 
-              {/* Points */}
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <p
-                  style={{
-                    color: entry.totalPoints > 0 ? C.greenBright : C.txt3,
-                    fontSize: 15,
-                    fontWeight: 700,
-                    margin: 0,
-                  }}
-                >
-                  {entry.totalPoints} pts
-                </p>
+              {/* Thru + Points */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexShrink: 0 }}>
+                <div style={{ textAlign: "center", minWidth: 70 }}>
+                  <p style={{ color: C.txt2, fontSize: 15, fontWeight: 500, margin: 0 }}>
+                    {entry.completedWeeks ?? 0} {(entry.completedWeeks ?? 0) === 1 ? "Week" : "Weeks"}
+                  </p>
+                  <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>
+                    {(entry.totalWeeks ?? 0) - (entry.completedWeeks ?? 0)} remaining
+                  </p>
+                </div>
+                <div style={{ width: 44, textAlign: "right" }}>
+                  <p
+                    style={{
+                      color: entry.totalPoints > 0 ? C.txt : C.txt3,
+                      fontSize: 15,
+                      fontWeight: 700,
+                      margin: 0,
+                    }}
+                  >
+                    {entry.totalPoints}
+                  </p>
+                  <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>
+                    {idx === 0 ? "Leader" : `+${entries[0].totalPoints - entry.totalPoints}`}
+                  </p>
+                </div>
               </div>
 
               {/* Expand chevron */}

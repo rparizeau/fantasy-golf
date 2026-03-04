@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import type { Theme } from "../theme";
 import type { TournamentListItem } from "../api";
 import { getLeagueInfo } from "../api";
-import { ThemeToggle } from "./ThemeToggle";
+import { ProfileMenu } from "./ProfileMenu";
+import { CourseIcon } from "./CourseIcon";
 import { WeekNav } from "../pages/Roster";
 
 interface LeagueHeaderProps {
@@ -69,53 +70,55 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
             </button>
             <p style={{ color: C.txt, fontSize: 14, fontWeight: 600, margin: 0 }}>{leagueName}</p>
           </div>
-          <ThemeToggle isDark={dk} colors={C} onToggle={onToggleTheme} />
+          <ProfileMenu isDark={dk} colors={C} onToggleTheme={onToggleTheme} />
         </div>
 
         {!t ? (
           <div style={{ height: 52 }} />
         ) : (
           <>
-            {/* Row 2: Tournament Name + Status */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, marginBottom: 4 }}>
-              <p style={{ color: C.txt, fontSize: 17, fontWeight: 700, margin: 0 }}>
-                {t.name}
-                {t.isMajor && <span style={{ color: C.gold, marginLeft: 6 }}>★</span>}
-              </p>
-              {(() => {
-                const currentIdx = tournaments.findIndex((t2) => t2.id === currentTournamentId);
-                const viewedIdx = tournaments.findIndex((t2) => t2.id === t.id);
-                const label = viewedIdx < currentIdx ? "Complete" : viewedIdx === currentIdx ? "Active" : "Upcoming";
-                const isActive = viewedIdx === currentIdx;
-                const color = isActive ? C.greenBright : C.txt3;
-                const bg = isActive ? C.greenDim : `${C.txt3}15`;
-                return (
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color,
-                    background: bg,
-                    padding: "3px 10px",
-                    borderRadius: 10,
-                    whiteSpace: "nowrap",
-                    marginLeft: 8,
-                  }}>
-                    {label}
-                  </span>
-                );
-              })()}
-            </div>
-
-            {/* Row 3: Course | Par */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-              <p style={{ color: C.txt2, fontSize: 13, margin: 0 }}>{t.course}</p>
-              <p style={{ color: C.txt2, fontSize: 13, margin: 0 }}>Par: {t.par}</p>
-            </div>
-
-            {/* Row 4: Location | Purse */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <p style={{ color: C.txt3, fontSize: 12, margin: 0 }}>📍 {t.location}</p>
-              <p style={{ color: C.txt3, fontSize: 12, margin: 0 }}>Purse: {formatPurse(t.purse)}</p>
+            {/* Tournament info: Icon spanning name + course + location */}
+            <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+              <CourseIcon size={52} bgColor={tournamentColor} flagColor={t.secondaryColor ?? "#FFFFFF"} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <p style={{ color: C.txt, fontSize: 17, fontWeight: 700, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {t.name}
+                    {t.isMajor && <span style={{ color: C.gold, marginLeft: 6 }}>★</span>}
+                  </p>
+                  {(() => {
+                    const currentIdx = tournaments.findIndex((t2) => t2.id === currentTournamentId);
+                    const viewedIdx = tournaments.findIndex((t2) => t2.id === t.id);
+                    const label = viewedIdx < currentIdx ? "Complete" : viewedIdx === currentIdx ? "Active" : "Upcoming";
+                    const isActive = viewedIdx === currentIdx;
+                    const color = isActive ? C.greenBright : C.txt3;
+                    const bg = isActive ? C.greenDim : `${C.txt3}15`;
+                    return (
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color,
+                        background: bg,
+                        padding: "3px 10px",
+                        borderRadius: 10,
+                        whiteSpace: "nowrap",
+                        marginLeft: 8,
+                        flexShrink: 0,
+                      }}>
+                        {label}
+                      </span>
+                    );
+                  })()}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                  <p style={{ color: C.txt2, fontSize: 13, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.course}</p>
+                  <p style={{ color: C.txt2, fontSize: 13, margin: 0, flexShrink: 0, marginLeft: 8 }}>Par: {t.par}</p>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <p style={{ color: C.txt3, fontSize: 12, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.location}</p>
+                  <p style={{ color: C.txt3, fontSize: 12, margin: 0, flexShrink: 0, marginLeft: 8 }}>{formatPurse(t.purse)}</p>
+                </div>
+              </div>
             </div>
           </>
         )}

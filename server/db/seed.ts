@@ -61,7 +61,7 @@ async function seed() {
   const tournaments = loadJSON<{
     id: number; name: string; course: string; location: string;
     purse: number; par: number; isMajor: boolean; current?: boolean;
-    color?: string; dates: { start: string; end: string };
+    color?: string; secondaryColor?: string; dates: { start: string; end: string };
   }[]>(join(DATA_DIR, "tournaments.json"));
   const locationByTid = new Map(tournaments.map((t) => [t.id, t.location]));
 
@@ -89,6 +89,7 @@ async function seed() {
       endDate: t.dates.end,
       purse: t.purse,
       colorCode: t.color ?? "#003C80",
+      secondaryColorCode: t.secondaryColor ?? "#FFFFFF",
       isMajor: t.isMajor,
     });
   }

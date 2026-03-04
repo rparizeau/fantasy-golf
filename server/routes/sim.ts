@@ -1,12 +1,13 @@
 import { Router } from "express";
 import {
   loadActiveSimState, saveSimState, createFreshState,
-  resetSimState, getActiveTournamentId,
+  resetSimState, getActiveTournamentId, setActiveTournamentId,
   type SimState,
 } from "../db/dal/sim.js";
 import { loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
 import { getAllLeagues, getLineupsForTeams, autoCopyLineups } from "../db/dal/league.js";
 import { advance, rewind, setOverride, updatePlayer, calculatePlayerPoints } from "../sim/engine.js";
+import { writePointsForRound } from "../db/dal/points.js";
 
 function buildPlayerEarnings(simState: SimState, purse: number, payoutTable: { position: number; pct: number }[]): Map<number, number> {
   const map = new Map<number, number>();
@@ -111,6 +112,23 @@ router.post("/advance", async (_req, res) => {
     }
     const advanced = advance(freshState);
     await saveSimState(advanced);
+
+    // Write points for round 1
+    if (advanced.currentRound === 1) {
+      const playerHoleScores = new Map<number, (number | null)[]>();
+      for (const p of advanced.players) {
+        if (p.holeScores && p.holeScores[0]) {
+          playerHoleScores.set(p.playerId, p.holeScores[0]);
+        }
+      }
+      const holePars = advanced.holePars ?? [];
+      if (playerHoleScores.size > 0 && holePars.length > 0) {
+        await writePointsForRound(advanced.tournamentId, 1, playerHoleScores, holePars).catch((e) => {
+          console.error("Failed to write round points:", e);
+        });
+      }
+    }
+
     res.json({ phase: advanced.phase, currentRound: advanced.currentRound });
     return;
   }
@@ -122,8 +140,26 @@ router.post("/advance", async (_req, res) => {
     }
   }
 
+  const prevRound = state.currentRound;
   const updated = advance(state);
   await saveSimState(updated);
+
+  // Write points if a new round was played
+  if (updated.currentRound > prevRound) {
+    const roundIdx = updated.currentRound - 1;
+    const playerHoleScores = new Map<number, (number | null)[]>();
+    for (const p of updated.players) {
+      if (p.holeScores && p.holeScores[roundIdx]) {
+        playerHoleScores.set(p.playerId, p.holeScores[roundIdx]);
+      }
+    }
+    const holePars = updated.holePars ?? [];
+    if (playerHoleScores.size > 0 && holePars.length > 0) {
+      await writePointsForRound(updated.tournamentId, updated.currentRound, playerHoleScores, holePars).catch((e) => {
+        console.error("Failed to write round points:", e);
+      });
+    }
+  }
 
   res.json({
     phase: updated.phase,
@@ -199,6 +235,45 @@ router.post("/player/update", async (req, res) => {
   updatePlayer(state, playerId, updates);
   await saveSimState(state);
   res.json({ ok: true });
+});
+
+// POST /api/sim/complete — finalize tournament and activate next week
+router.post("/complete", async (_req, res) => {
+  let state = await loadActiveSimState();
+
+  if (state.phase === "final") {
+    // Already final — just move to next tournament
+  } else if (state.phase !== "round4") {
+    res.status(400).json({ error: "All 4 rounds must be completed first." });
+    return;
+  } else {
+    // Advance from round4 → final
+    const updated = advance(state);
+    await saveSimState(updated);
+    state = updated;
+  }
+
+  // Find next tournament in schedule
+  const tournaments = await loadTournaments();
+  const currentIdx = tournaments.findIndex((t) => t.id === state.tournamentId);
+  const nextTournament = tournaments[currentIdx + 1];
+
+  if (!nextTournament) {
+    res.json({ completed: true, nextTournamentId: null, nextTournamentName: null });
+    return;
+  }
+
+  // Activate next tournament
+  await setActiveTournamentId(nextTournament.id);
+
+  // Create fresh state for next tournament
+  await createFreshState(nextTournament.id);
+
+  res.json({
+    completed: true,
+    nextTournamentId: nextTournament.id,
+    nextTournamentName: nextTournament.name,
+  });
 });
 
 // POST /api/sim/reset — reset to idle with fresh field

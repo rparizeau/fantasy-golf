@@ -27,6 +27,7 @@ export async function loadTournaments() {
       purse: tournaments.purse,
       isMajor: tournaments.isMajor,
       colorCode: tournaments.colorCode,
+      secondaryColorCode: tournaments.secondaryColorCode,
       startDate: tournaments.startDate,
       endDate: tournaments.endDate,
     })
@@ -44,6 +45,7 @@ export async function loadTournaments() {
     isMajor: t.isMajor,
     current: false,
     color: t.colorCode,
+    secondaryColor: t.secondaryColorCode,
     dates: { start: t.startDate, end: t.endDate },
   }));
 }

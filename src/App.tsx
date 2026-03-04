@@ -22,6 +22,7 @@ export default function App() {
   const page = pageParam || "home";
 
   const enterLeague = (id: number) => navigate(`/league/${id}/home`);
+  const enterLeaguePage = (id: number, p: string) => navigate(`/league/${id}/${p}`);
   const exitLeague = () => navigate("/");
   const changePage = (p: string) => navigate(`/league/${leagueId}/${p}`);
 
@@ -62,7 +63,7 @@ export default function App() {
           onChangePage={changePage}
         />
       ) : (
-        <Lobby isDark={isDark} colors={C} onToggleTheme={toggleTheme} onEnterLeague={enterLeague} />
+        <Lobby isDark={isDark} colors={C} onToggleTheme={toggleTheme} onEnterLeague={enterLeague} onEnterLeaguePage={enterLeaguePage} />
       )}
     </div>
   );
