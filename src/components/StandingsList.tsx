@@ -39,6 +39,9 @@ export function StandingsList<T extends StandingsEntry>({
 }) {
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
 
+  const myEntry = entries.find((e) => e.teamId === myTeamId);
+  const myPoints = myEntry?.totalPoints ?? 0;
+
   const colStyle: React.CSSProperties = { color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 };
 
   if (entries.length === 0) {
@@ -134,21 +137,6 @@ export function StandingsList<T extends StandingsEntry>({
                   >
                     {entry.teamName}
                   </p>
-                  {isMe && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 600,
-                        color: C.green,
-                        background: C.greenDim,
-                        padding: "1px 6px",
-                        borderRadius: 6,
-                        flexShrink: 0,
-                      }}
-                    >
-                      YOU
-                    </span>
-                  )}
                 </div>
                 <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>{entry.managerName}</p>
               </div>
@@ -188,8 +176,8 @@ export function StandingsList<T extends StandingsEntry>({
                   <p style={{ fontSize: 15, fontWeight: 700, color: entry.totalPoints > 0 ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
                     {entry.totalPoints}
                   </p>
-                  <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
-                    {idx === 0 ? "" : `+${entries[0].totalPoints - entry.totalPoints}`}
+                  <p style={{ fontSize: 10, color: isMe ? "transparent" : C.green, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
+                    {isMe ? "\u00A0" : `${entry.totalPoints >= myPoints ? "+" : ""}${entry.totalPoints - myPoints}`}
                   </p>
                 </div>
               </div>

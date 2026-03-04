@@ -18,14 +18,10 @@ interface LeagueHeaderProps {
   currentTournamentId: number;
   viewingWeek: number;
   onChangeWeek: (week: number) => void;
+  seasonPoints: number;
 }
 
-function formatPurse(n: number): string {
-  if (n >= 1_000_000) return `$${Math.round(n / 1_000_000)}M`;
-  return `$${n.toLocaleString()}`;
-}
-
-export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, onBack, viewedTournament: t, activePage: _activePage, tournaments, currentTournamentId, viewingWeek, onChangeWeek }: LeagueHeaderProps) {
+export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, onBack, viewedTournament: t, activePage: _activePage, tournaments, currentTournamentId, viewingWeek, onChangeWeek, seasonPoints }: LeagueHeaderProps) {
   const [leagueName, setLeagueName] = useState("");
 
   useEffect(() => {
@@ -66,7 +62,7 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
                 padding: 0,
               }}
             >
-              ‹
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
             </button>
             <p style={{ color: C.txt, fontSize: 14, fontWeight: 600, margin: 0 }}>{leagueName}</p>
           </div>
@@ -81,42 +77,19 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
             <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
               <CourseIcon size={52} bgColor={tournamentColor} flagColor={t.secondaryColor ?? "#FFFFFF"} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <div style={{ marginBottom: 4 }}>
                   <p style={{ color: C.txt, fontSize: 17, fontWeight: 700, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {t.name}
                     {t.isMajor && <span style={{ color: C.gold, marginLeft: 6 }}>★</span>}
                   </p>
-                  {(() => {
-                    const currentIdx = tournaments.findIndex((t2) => t2.id === currentTournamentId);
-                    const viewedIdx = tournaments.findIndex((t2) => t2.id === t.id);
-                    const label = viewedIdx < currentIdx ? "Complete" : viewedIdx === currentIdx ? "Active" : "Upcoming";
-                    const isActive = viewedIdx === currentIdx;
-                    const color = isActive ? C.greenBright : C.txt3;
-                    const bg = isActive ? C.greenDim : `${C.txt3}15`;
-                    return (
-                      <span style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color,
-                        background: bg,
-                        padding: "3px 10px",
-                        borderRadius: 10,
-                        whiteSpace: "nowrap",
-                        marginLeft: 8,
-                        flexShrink: 0,
-                      }}>
-                        {label}
-                      </span>
-                    );
-                  })()}
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
                   <p style={{ color: C.txt2, fontSize: 13, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.course}</p>
-                  <p style={{ color: C.txt2, fontSize: 13, margin: 0, flexShrink: 0, marginLeft: 8 }}>Par: {t.par}</p>
+                  <p style={{ color: C.txt2, fontSize: 13, margin: 0, flexShrink: 0, marginLeft: 8 }}>Pts: {seasonPoints}</p>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <p style={{ color: C.txt3, fontSize: 12, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.location}</p>
-                  <p style={{ color: C.txt3, fontSize: 12, margin: 0, flexShrink: 0, marginLeft: 8 }}>{formatPurse(t.purse)}</p>
+                  <p style={{ color: C.txt3, fontSize: 12, margin: 0, flexShrink: 0, marginLeft: 8 }}>Par {t.par}</p>
                 </div>
               </div>
             </div>

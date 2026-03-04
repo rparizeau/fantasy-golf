@@ -344,6 +344,14 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const canMove = !locked && !isPastWeek;
   const par = tournaments[viewingWeek]?.par ?? 72;
 
+  // Team round totals from active roster
+  const teamRoundPoints = [0, 1, 2, 3].map((ri) =>
+    roster.filter((p) => p.isActive).reduce((sum, p) => sum + (p.roundPoints[ri] ?? 0), 0)
+  );
+  const teamProjRoundPoints = [0, 1, 2, 3].map((ri) =>
+    roster.filter((p) => p.isActive).reduce((sum, p) => sum + (p.projectedRoundPoints?.[ri] ?? 0), 0)
+  );
+
   return (
     <div style={{ paddingBottom: 100, position: "relative" }}>
       {fetching && !loading && (
@@ -372,13 +380,16 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       <div style={{ background: `${tournaments[viewingWeek]?.color ?? "#003C80"}15` }}>
         {/* Summary card */}
         {data && (
-          <div style={{ padding: "12px 16px 4px" }}>
-            {/* TEAM + PTS label above card */}
+          <div style={{ padding: "12px 16px 0" }}>
+            {/* SQUAD header with R1-R4 + PTS columns */}
             <div style={{ display: "flex", alignItems: "center", padding: "0 0 8px" }}>
               <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                <p style={{ ...colStyle, margin: 0, whiteSpace: "nowrap" }}>Team</p>
+                <p style={{ ...colStyle, margin: 0, whiteSpace: "nowrap" }}>Squad ({activePlayers.length}/{activeSize})</p>
               </div>
               <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 15 }}>
+                {["R1", "R2", "R3", "R4"].map((l) => (
+                  <div key={l} style={{ width: COL.r, textAlign: "center" }}><span style={colStyle}>{l}</span></div>
+                ))}
                 <div style={{ width: COL.p, textAlign: "right" }}><span style={colStyle}>PTS</span></div>
               </div>
             </div>
@@ -387,6 +398,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
               borderRadius: 12,
               border: `1px solid ${C.border}`,
               padding: "14px 16px",
+              marginBottom: 6,
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -423,11 +435,28 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                     )}
                   </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{myPoints}</p>
-                  <p style={{ fontSize: 10, color: C.txt3, margin: "2px 0 0" }}>
-                    {projectedTotal > 0 ? `${projectedTotal}` : "-"}
-                  </p>
+                <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "flex-start" }}>
+                  {[0, 1, 2, 3].map((ri) => {
+                    const pts = teamRoundPoints[ri];
+                    const proj = teamProjRoundPoints[ri];
+                    const played = pts != null && pts !== 0;
+                    return (
+                      <div key={ri} style={{ width: COL.r, textAlign: "center" }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: played ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                          {played ? pts : "-"}
+                        </p>
+                        <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3 }}>
+                          {played ? proj : proj ? `${proj}` : "-"}
+                        </p>
+                      </div>
+                    );
+                  })}
+                  <div style={{ width: COL.p, textAlign: "right" }}>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: C.txt, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>{myPoints}</p>
+                    <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
+                      {projectedTotal > 0 ? `${projectedTotal}` : "-"}
+                    </p>
+                  </div>
                 </div>
               </div>
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -444,7 +473,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                     {rivalAbove ? (
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                         <span style={{ color: C.txt2 }}>▲ {ordinal(rivalAbove.rank)} · {rivalAbove.name}</span>
-                        <span style={{ color: C.txt3 }}>-{rivalAbove.points - myPoints}</span>
+                        <span style={{ color: C.txt3 }}>+{rivalAbove.points - myPoints} pts · <span style={{ color: C.txt2 }}>{rivalAbove.points}</span></span>
                       </div>
                     ) : myRank === 1 ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
@@ -458,7 +487,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                     {rivalBelow ? (
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                         <span style={{ color: C.txt2 }}>▼ {ordinal(rivalBelow.rank)} · {rivalBelow.name}</span>
-                        <span style={{ color: C.txt3 }}>+{myPoints - rivalBelow.points}</span>
+                        <span style={{ color: C.txt3 }}>-{myPoints - rivalBelow.points} pts · <span style={{ color: C.txt2 }}>{rivalBelow.points}</span></span>
                       </div>
                     ) : myRank === totalTeams && totalTeams > 1 ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
@@ -481,7 +510,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
             </div>
           </div>
         )}
-        {sectionHeader(`Lineup (${activePlayers.length}/${activeSize})`)}
         <div style={{ padding: "0 16px 6px" }}>
 
           {activePlayers.map((p) => (

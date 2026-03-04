@@ -22,6 +22,7 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
   const [currentTournamentId, setCurrentTournamentId] = useState<number>(0);
   const [viewingWeek, setViewingWeek] = useState<number>(0);
   const [myTeamId, setMyTeamId] = useState<number | null>(null);
+  const [seasonPoints, setSeasonPoints] = useState(0);
 
   useEffect(() => {
     getTournamentList().then((list) => {
@@ -38,7 +39,10 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
   useEffect(() => {
     getLeagues().then((leagues) => {
       const league = leagues.find((l) => l.id === leagueId);
-      if (league) setMyTeamId(league.myTeamId);
+      if (league) {
+        setMyTeamId(league.myTeamId);
+        setSeasonPoints(league.points);
+      }
     }).catch(() => {});
   }, [leagueId]);
 
@@ -77,6 +81,7 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
         currentTournamentId={currentTournamentId}
         viewingWeek={viewingWeek}
         onChangeWeek={setViewingWeek}
+        seasonPoints={seasonPoints}
       />
       <PageContent
         page={activePage}
