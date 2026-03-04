@@ -54,7 +54,7 @@ export function PullToRefresh({ onRefresh, colors: C, children }: {
   }, [onRefresh]);
 
   return (
-    <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+    <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {(display > 0 || refreshing) && (
         <div style={{
           display: "flex",
