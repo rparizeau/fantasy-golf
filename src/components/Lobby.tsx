@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Theme } from "../theme";
 import type { LeagueSummary } from "../api";
 import { getLeagues } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { ProfileMenu } from "./ProfileMenu";
 import { ManagerIcon } from "./ManagerIcon";
+import { PullToRefresh } from "./PullToRefresh";
 
 interface LobbyProps {
   isDark: boolean;
@@ -25,13 +26,17 @@ export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeague, onEnter
   const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    getLeagues()
-      .then(setLeagues)
-      .finally(() => setLoading(false));
+  const refresh = useCallback(async () => {
+    const data = await getLeagues();
+    setLeagues(data);
   }, []);
 
+  useEffect(() => {
+    refresh().finally(() => setLoading(false));
+  }, [refresh]);
+
   return (
+    <PullToRefresh onRefresh={refresh} colors={C}>
     <div style={{ padding: "0 16px" }}>
       {/* SECTION HEADER */}
       <div style={{ paddingBottom: 16 }}>
@@ -86,6 +91,7 @@ export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeague, onEnter
         <p style={{ color: C.txt3, fontSize: 12, margin: 0 }}>Set up a new league and invite your friends</p>
       </div>
     </div>
+    </PullToRefresh>
   );
 }
 

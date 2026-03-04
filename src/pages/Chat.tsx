@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { getChatMessages, sendChatMessage, getActivityFeed, type ChatMessage, type FeedEvent } from "../api";
+import { PullToRefresh } from "../components/PullToRefresh";
 import type { Theme } from "../theme";
 
 interface ChatProps {
@@ -68,6 +69,7 @@ export function Chat({ leagueId, teamId: _teamId, colors: C }: ChatProps) {
   }
 
   return (
+    <PullToRefresh onRefresh={refresh} colors={C}>
     <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: "0 0 100px" }}>
       {error && (
         <div style={{ margin: "8px 16px", background: C.redDim, color: C.red, padding: "8px 12px", borderRadius: 8, fontSize: 12 }}>
@@ -191,5 +193,6 @@ export function Chat({ leagueId, teamId: _teamId, colors: C }: ChatProps) {
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }
