@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getFantasyLeaderboard, type FantasyTeamSummary, type TournamentListItem } from "../api";
 import { StandingsList } from "../components/StandingsList";
-import { PullToRefresh } from "../components/PullToRefresh";
 import type { Theme } from "../theme";
 
 interface HomeProps {
@@ -60,18 +59,16 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
   const isFuture = viewingWeek > currentWeekIdx;
 
   return (
-    <PullToRefresh onRefresh={refresh} colors={C}>
-      <div style={{ padding: "12px 16px 100px" }}>
-        <StandingsList
-          title="Leaderboard"
-          entries={teams}
-          colors={C}
-          myTeamId={myTeamId}
-          showThru={false}
-          showRounds={true}
-          emptyMessage={isFuture ? "Tournament hasn't started yet." : "No leaderboard data yet. Sim a round to see results."}
-        />
-      </div>
-    </PullToRefresh>
+    <div style={{ padding: "12px 16px 100px" }}>
+      <StandingsList
+        title="Leaderboard"
+        entries={teams}
+        colors={C}
+        myTeamId={myTeamId}
+        showThru={false}
+        showRounds={true}
+        emptyMessage={isFuture ? "Tournament hasn't started yet." : "No leaderboard data yet. Sim a round to see results."}
+      />
+    </div>
   );
 }

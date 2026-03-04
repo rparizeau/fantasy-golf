@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Theme } from "../theme";
 import type { TournamentListItem } from "../api";
 import { getTournamentList, getLeagues } from "../api";
 import { LeagueHeader } from "./LeagueHeader";
 import { PageContent } from "./PageContent";
 import { BottomNav } from "./BottomNav";
+import { PullToRefresh } from "./PullToRefresh";
 
 interface LeagueShellProps {
   leagueId: number;
@@ -58,8 +59,12 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
     );
   }
 
+  const fullRefresh = useCallback(async () => {
+    window.location.reload();
+  }, []);
+
   return (
-    <>
+    <PullToRefresh onRefresh={fullRefresh} colors={C}>
       <LeagueHeader
         leagueId={leagueId}
         isDark={isDark}
@@ -84,6 +89,6 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
         onChangeWeek={setViewingWeek}
       />
       <BottomNav activePage={activePage} colors={C} onChangePage={onChangePage} />
-    </>
+    </PullToRefresh>
   );
 }

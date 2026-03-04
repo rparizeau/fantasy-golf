@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { getRoster, setLineup, getFantasyLeaderboard, getLeagues, type RosterPlayer, type RosterData, type TournamentListItem } from "../api";
 import { PlayerModal } from "../components/PlayerModal";
 import { ManagerIcon } from "../components/ManagerIcon";
-import { PullToRefresh } from "../components/PullToRefresh";
 import type { Theme } from "../theme";
 
 function ordinal(n: number): string {
@@ -170,12 +169,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       }
     }
   }, [leagueId, teamId, viewingWeek, tournaments, currentTournamentId, applyData]);
-
-  const forceRefresh = useCallback(async () => {
-    const tid = tournaments[viewingWeek]?.id;
-    if (tid != null) cacheRef.current.delete(tid);
-    await refresh();
-  }, [tournaments, viewingWeek, refresh]);
 
   useEffect(() => {
     refresh();
@@ -352,7 +345,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const par = tournaments[viewingWeek]?.par ?? 72;
 
   return (
-    <PullToRefresh onRefresh={forceRefresh} colors={C}>
     <div style={{ paddingBottom: 100, position: "relative" }}>
       {fetching && !loading && (
         <div style={{
@@ -533,7 +525,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         <PlayerModal playerId={modalPlayerId} colors={C} onClose={() => setModalPlayerId(null)} />
       )}
     </div>
-    </PullToRefresh>
   );
 }
 

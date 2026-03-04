@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getSeasonStandings, type SeasonStanding } from "../api";
 import { StandingsList } from "../components/StandingsList";
-import { PullToRefresh } from "../components/PullToRefresh";
 import type { Theme } from "../theme";
 
 interface LeagueStandingsProps {
@@ -50,16 +49,14 @@ export function LeagueStandings({ leagueId, myTeamId, colors: C }: LeagueStandin
   }
 
   return (
-    <PullToRefresh onRefresh={refresh} colors={C}>
-      <div style={{ padding: "12px 16px 100px" }}>
-        <StandingsList
-          title="Standings"
-          entries={standings}
-          colors={C}
-          myTeamId={myTeamId}
-          emptyMessage="No standings data yet. Complete a tournament to see results."
-        />
-      </div>
-    </PullToRefresh>
+    <div style={{ padding: "12px 16px 100px" }}>
+      <StandingsList
+        title="Standings"
+        entries={standings}
+        colors={C}
+        myTeamId={myTeamId}
+        emptyMessage="No standings data yet. Complete a tournament to see results."
+      />
+    </div>
   );
 }

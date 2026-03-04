@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { getPlayerPool, submitWaiverClaim, type PlayerPoolEntry } from "../api";
 import { getRoster, type RosterPlayer, type RosterData } from "../api";
 import { PlayerModal } from "../components/PlayerModal";
-import { PullToRefresh } from "../components/PullToRefresh";
 import type { Theme } from "../theme";
 
 interface GolfersProps {
@@ -105,7 +104,6 @@ export function Golfers({ leagueId, teamId, colors: C }: GolfersProps) {
   }
 
   return (
-    <PullToRefresh onRefresh={refresh} colors={C}>
     <div style={{ padding: "12px 16px 100px" }}>
       {error && (
         <div style={{ background: C.redDim, color: C.red, padding: "10px 14px", borderRadius: 10, fontSize: 13, marginBottom: 10 }}>
@@ -263,7 +261,6 @@ export function Golfers({ leagueId, teamId, colors: C }: GolfersProps) {
         />
       )}
     </div>
-    </PullToRefresh>
   );
 }
 
