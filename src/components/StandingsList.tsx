@@ -68,7 +68,7 @@ export function StandingsList<T extends StandingsEntry>({
         </div>
       </div>
       {/* Compute positions with ties */}
-      {entries.map((entry, idx) => {
+      {entries.map((entry, _idx) => {
         // Find the first index with this score to determine position
         const pos = entries.findIndex((e) => e.totalPoints === entry.totalPoints) + 1;
         const tied = entries.filter((e) => e.totalPoints === entry.totalPoints).length > 1;
