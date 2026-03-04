@@ -331,6 +331,19 @@ export const managerPoints = pgTable("manager_points", {
   index("manager_points_golfer_roster_idx").on(t.golferRosterId),
 ]);
 
+// ─── Tier 10: Tournament Results ─────────────────────────────
+
+export const tournamentResults = pgTable("tournament_results", {
+  id: serial("id").primaryKey(),
+  leagueTournamentId: integer("league_tournament_id").notNull().references(() => leagueTournament.id),
+  managerId: integer("manager_id").notNull().references(() => managers.id),
+  totalPointsVal: integer("total_points_val").notNull(),
+  position: integer("position").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  unique("tournament_results_uq").on(t.leagueTournamentId, t.managerId),
+]);
+
 // ─── Relations ───────────────────────────────────────────────
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -373,6 +386,7 @@ export const managersRelations = relations(managers, ({ one, many }) => ({
   draftRoster: one(draftRosters),
   managerRoster: one(managerRosters),
   tournamentRosters: many(tournamentRosters),
+  tournamentResults: many(tournamentResults),
   draftPicks: many(draftPicks),
   proposedTrades: many(trades, { relationName: "proposedByTrades" }),
   receivedTrades: many(trades, { relationName: "proposedToTrades" }),
@@ -397,6 +411,7 @@ export const leagueTournamentRelations = relations(leagueTournament, ({ one, man
   league: one(leagues, { fields: [leagueTournament.leagueId], references: [leagues.id] }),
   tournament: one(tournaments, { fields: [leagueTournament.tournamentId], references: [tournaments.id] }),
   tournamentRosters: many(tournamentRosters),
+  tournamentResults: many(tournamentResults),
 }));
 
 export const draftRostersRelations = relations(draftRosters, ({ one }) => ({
@@ -480,4 +495,9 @@ export const messagesRelations = relations(messages, ({ one }) => ({
 export const managerPointsRelations = relations(managerPoints, ({ one }) => ({
   golferRoster: one(golferRoster, { fields: [managerPoints.golferRosterId], references: [golferRoster.id] }),
   scoringEvent: one(scoringEvents, { fields: [managerPoints.scoringEventId], references: [scoringEvents.id] }),
+}));
+
+export const tournamentResultsRelations = relations(tournamentResults, ({ one }) => ({
+  leagueTournament: one(leagueTournament, { fields: [tournamentResults.leagueTournamentId], references: [leagueTournament.id] }),
+  manager: one(managers, { fields: [tournamentResults.managerId], references: [managers.id] }),
 }));

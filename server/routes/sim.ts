@@ -7,7 +7,7 @@ import {
 import { loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
 import { getAllLeagues, getLineupsForTeams, autoCopyLineups } from "../db/dal/league.js";
 import { advance, rewind, setOverride, updatePlayer, calculatePlayerPoints } from "../sim/engine.js";
-import { writePointsForRound } from "../db/dal/points.js";
+import { writePointsForRound, writeTournamentResults, deleteTournamentResults } from "../db/dal/points.js";
 
 function buildPlayerEarnings(simState: SimState, purse: number, payoutTable: { position: number; pct: number }[]): Map<number, number> {
   const map = new Map<number, number>();
@@ -253,6 +253,9 @@ router.post("/complete", async (_req, res) => {
     state = updated;
   }
 
+  // Write tournament results (idempotent — safe to call even if already final)
+  await writeTournamentResults(state.tournamentId);
+
   // Find next tournament in schedule
   const tournaments = await loadTournaments();
   const currentIdx = tournaments.findIndex((t) => t.id === state.tournamentId);
@@ -274,6 +277,25 @@ router.post("/complete", async (_req, res) => {
     nextTournamentId: nextTournament.id,
     nextTournamentName: nextTournament.name,
   });
+});
+
+// POST /api/sim/rollback — remove tournament_results but keep round data, revert phase to round4
+router.post("/rollback", async (_req, res) => {
+  const state = await loadActiveSimState();
+
+  if (state.phase !== "final") {
+    res.status(400).json({ error: "Can only rollback a finalized tournament." });
+    return;
+  }
+
+  // Delete tournament_results rows
+  await deleteTournamentResults(state.tournamentId);
+
+  // Revert phase from final → round4 so rounds stay intact
+  const reverted = rewind(state);
+  await saveSimState(reverted);
+
+  res.json({ phase: reverted.phase, tournamentId: reverted.tournamentId });
 });
 
 // POST /api/sim/reset — reset to idle with fresh field

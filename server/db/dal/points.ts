@@ -2,8 +2,9 @@ import { db } from "../index.js";
 import {
   managerPoints, golferRoster, rosters, managerRosters, tournamentRosters,
   leagueTournament, simTournaments, leagueScoring, scoringEvents,
+  tournamentResults,
 } from "../schema/index.js";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, desc } from "drizzle-orm";
 import { holeToPoints, type ScoringSettings } from "../../sim/engine.js";
 
 /**
@@ -48,28 +49,14 @@ export async function writeRoundPoints(
 }
 
 /**
- * Get total season points for a manager (sum of all manager_points via golfer_roster chain).
+ * Get total season points for a manager from tournament_results.
  * Returns points in display units (pennies ÷ 100).
  */
 export async function getSeasonPoints(managerId: number): Promise<number> {
   const result = await db
-    .select({ total: sql<number>`COALESCE(SUM(${managerPoints.pointsVal}), 0)` })
-    .from(managerPoints)
-    .innerJoin(golferRoster, eq(managerPoints.golferRosterId, golferRoster.id))
-    .innerJoin(rosters, eq(golferRoster.rosterId, rosters.id))
-    .innerJoin(
-      tournamentRosters,
-      and(
-        eq(rosters.rosterableId, tournamentRosters.id),
-        sql`${rosters.rosterableType} = 'tournament_roster'`,
-      ),
-    )
-    .innerJoin(leagueTournament, eq(tournamentRosters.leagueTournamentId, leagueTournament.id))
-    .innerJoin(simTournaments, eq(leagueTournament.tournamentId, simTournaments.tournamentId))
-    .where(and(
-      eq(tournamentRosters.managerId, managerId),
-      eq(simTournaments.phase, "final"),
-    ));
+    .select({ total: sql<number>`COALESCE(SUM(${tournamentResults.totalPointsVal}), 0)` })
+    .from(tournamentResults)
+    .where(eq(tournamentResults.managerId, managerId));
 
   return (result[0]?.total ?? 0) / 100;
 }
@@ -280,4 +267,97 @@ export async function getSeasonStatsByGolfer(leagueId: number, excludeTournament
     });
   }
   return map;
+}
+
+/**
+ * Write (or overwrite) tournament_results rows for all leagues tied to a tournament.
+ * Sums manager_points through the roster chain, ranks managers, and upserts results.
+ */
+export async function writeTournamentResults(tournamentId: number): Promise<void> {
+  // Get all league_tournament rows for this tournament
+  const ltRows = await db.select().from(leagueTournament)
+    .where(eq(leagueTournament.tournamentId, tournamentId));
+  if (ltRows.length === 0) return;
+
+  for (const lt of ltRows) {
+    // Get all managers who have tournament_rosters for this league_tournament
+    const trRows = await db.select().from(tournamentRosters)
+      .where(eq(tournamentRosters.leagueTournamentId, lt.id));
+    if (trRows.length === 0) continue;
+
+    // Sum points per manager through the roster chain
+    const pointRows = await db
+      .select({
+        managerId: tournamentRosters.managerId,
+        total: sql<number>`COALESCE(SUM(${managerPoints.pointsVal}), 0)`,
+      })
+      .from(managerPoints)
+      .innerJoin(golferRoster, eq(managerPoints.golferRosterId, golferRoster.id))
+      .innerJoin(rosters, eq(golferRoster.rosterId, rosters.id))
+      .innerJoin(
+        tournamentRosters,
+        and(
+          eq(rosters.rosterableId, tournamentRosters.id),
+          sql`${rosters.rosterableType} = 'tournament_roster'`,
+        ),
+      )
+      .where(eq(tournamentRosters.leagueTournamentId, lt.id))
+      .groupBy(tournamentRosters.managerId);
+
+    // Build a map of managerId → totalPointsVal (keep as pennies)
+    const managerTotals = new Map(pointRows.map((r) => [r.managerId, r.total]));
+
+    // Include managers with 0 points (had a roster but no points)
+    for (const tr of trRows) {
+      if (!managerTotals.has(tr.managerId)) {
+        managerTotals.set(tr.managerId, 0);
+      }
+    }
+
+    // Rank by points DESC (dense rank for ties)
+    const sorted = [...managerTotals.entries()].sort((a, b) => b[1] - a[1]);
+    const ranked: { managerId: number; totalPointsVal: number; position: number }[] = [];
+    let pos = 1;
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i][1] < sorted[i - 1][1]) {
+        pos = i + 1;
+      }
+      ranked.push({
+        managerId: sorted[i][0],
+        totalPointsVal: sorted[i][1],
+        position: pos,
+      });
+    }
+
+    // Upsert into tournament_results
+    for (const r of ranked) {
+      await db.insert(tournamentResults)
+        .values({
+          leagueTournamentId: lt.id,
+          managerId: r.managerId,
+          totalPointsVal: r.totalPointsVal,
+          position: r.position,
+        })
+        .onConflictDoUpdate({
+          target: [tournamentResults.leagueTournamentId, tournamentResults.managerId],
+          set: {
+            totalPointsVal: r.totalPointsVal,
+            position: r.position,
+          },
+        });
+    }
+  }
+}
+
+/**
+ * Delete tournament_results rows for a given tournament (all leagues).
+ */
+export async function deleteTournamentResults(tournamentId: number): Promise<void> {
+  const ltRows = await db.select({ id: leagueTournament.id }).from(leagueTournament)
+    .where(eq(leagueTournament.tournamentId, tournamentId));
+  if (ltRows.length === 0) return;
+
+  await db.delete(tournamentResults).where(
+    inArray(tournamentResults.leagueTournamentId, ltRows.map((r) => r.id)),
+  );
 }

@@ -2,8 +2,8 @@ import { db } from "../index.js";
 import {
   leagues, managers, users, leagueSettings, leagueScoring, scoringEvents,
   managerRosters, rosters, golferRoster, tournamentRosters,
-  managerPoints, waivers, activities, messages, golfers,
-  leagueTournament, simTournaments,
+  tournamentResults, waivers, activities, messages, golfers,
+  leagueTournament,
 } from "../schema/index.js";
 import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 import { DEFAULT_SCORING, type ScoringSettings } from "../../sim/engine.js";
@@ -146,30 +146,19 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
 
   const managerIds = managerRows.map((m) => m.managerId);
 
-  // Batch: fetch all rosters + points for all managers in 3 queries
+  // Batch: fetch all rosters + points for all managers
   const [mrRows, pointsResult] = await Promise.all([
     managerIds.length > 0
       ? db.select().from(managerRosters).where(inArray(managerRosters.managerId, managerIds))
       : Promise.resolve([]),
     managerIds.length > 0
       ? db.select({
-          managerId: sql<number>`${tournamentRosters.managerId}`,
-          total: sql<number>`COALESCE(SUM(${managerPoints.pointsVal}), 0)`,
+          managerId: tournamentResults.managerId,
+          total: sql<number>`COALESCE(SUM(${tournamentResults.totalPointsVal}), 0)`,
         })
-        .from(managerPoints)
-        .innerJoin(golferRoster, eq(managerPoints.golferRosterId, golferRoster.id))
-        .innerJoin(rosters, eq(golferRoster.rosterId, rosters.id))
-        .innerJoin(tournamentRosters, and(
-          eq(rosters.rosterableId, tournamentRosters.id),
-          sql`${rosters.rosterableType} = 'tournament_roster'`,
-        ))
-        .innerJoin(leagueTournament, eq(tournamentRosters.leagueTournamentId, leagueTournament.id))
-        .innerJoin(simTournaments, eq(leagueTournament.tournamentId, simTournaments.tournamentId))
-        .where(and(
-          inArray(tournamentRosters.managerId, managerIds),
-          eq(simTournaments.phase, "final"),
-        ))
-        .groupBy(tournamentRosters.managerId)
+        .from(tournamentResults)
+        .where(inArray(tournamentResults.managerId, managerIds))
+        .groupBy(tournamentResults.managerId)
       : Promise.resolve([]),
   ]);
 

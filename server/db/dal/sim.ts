@@ -1,6 +1,6 @@
 import { db, client } from "../index.js";
-import { simActive, simTournaments, simPlayers, tournaments as tournamentsTable } from "../schema/index.js";
-import { eq } from "drizzle-orm";
+import { simActive, simTournaments, simPlayers, tournaments as tournamentsTable, tournamentResults, leagueTournament } from "../schema/index.js";
+import { eq, inArray } from "drizzle-orm";
 import { loadGolfers, loadTournaments, loadCourse } from "./seed-data.js";
 
 // --- Types (same as engine.ts) ---
@@ -276,8 +276,16 @@ export async function resetSimState(tournamentId?: number): Promise<SimState> {
     return createFreshState(targetId);
   }
 
-  // Same tournament — force reset: delete existing sim data, create fresh
+  // Same tournament — force reset: delete existing sim data + results, create fresh
   await db.transaction(async (tx) => {
+    // Delete tournament_results for all league_tournament entries tied to this tournament
+    const ltRows = await tx.select({ id: leagueTournament.id }).from(leagueTournament)
+      .where(eq(leagueTournament.tournamentId, targetId));
+    if (ltRows.length > 0) {
+      await tx.delete(tournamentResults).where(
+        inArray(tournamentResults.leagueTournamentId, ltRows.map((r) => r.id)),
+      );
+    }
     await tx.delete(simPlayers).where(eq(simPlayers.tournamentId, targetId));
     await tx.delete(simTournaments).where(eq(simTournaments.tournamentId, targetId));
   });

@@ -82,6 +82,10 @@ export function completeSim() {
   return fetchJSON<{ completed: boolean; nextTournamentId: number | null; nextTournamentName: string | null }>("/sim/complete", { method: "POST" });
 }
 
+export function rollbackSim() {
+  return fetchJSON<{ phase: string; tournamentId: number }>("/sim/rollback", { method: "POST" });
+}
+
 export function resetSim(tournamentId?: number) {
   return fetchJSON<{ phase: string; tournamentId: number; fieldSize: number }>("/sim/reset", {
     method: "POST",

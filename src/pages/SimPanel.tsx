@@ -6,6 +6,7 @@ import {
   updatePlayer,
   resetSim,
   completeSim,
+  rollbackSim,
   getLeaderboard,
   getTournamentList,
   type SimStatus,
@@ -24,6 +25,7 @@ const PHASE_LABELS: Record<string, string> = {
   final: "Tournament Final",
 };
 
+const COL = { r: 26, p: 46, gap: 2 };
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -31,7 +33,7 @@ function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-// --- Player Edit Modal ---
+// --- Player Edit Modal (Bottom Sheet) ---
 
 interface ModalProps {
   player: LeaderboardPlayer;
@@ -45,7 +47,6 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
   const roundCount = player.rounds.length;
   const hasHoleData = player.holeScores && player.holeScores.length > 0;
 
-  // Determine which round to open to
   const initialRound = (() => {
     for (let i = 0; i < 4; i++) {
       const hs = player.holeScores?.[i];
@@ -54,7 +55,6 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
     return Math.max(0, roundCount - 1);
   })();
 
-  // Initialize hole scores state: deep copy from player data, auto-init the active round
   const [holeData, setHoleData] = useState<((number | null)[] | null)[]>(() => {
     const data: ((number | null)[] | null)[] = [];
     for (let i = 0; i < 4; i++) {
@@ -70,7 +70,6 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
     return data;
   });
 
-  // Fallback round totals for old state without hole-level data
   const [fallbackRounds, setFallbackRounds] = useState<(number | null)[]>(() => {
     return [player.rounds[0] ?? null, player.rounds[1] ?? null, player.rounds[2] ?? null, player.rounds[3] ?? null];
   });
@@ -80,7 +79,7 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
 
   const pars = holePars ?? Array(18).fill(4);
 
-  // Compute totals — only sum non-null holes
+  // Compute totals
   const computedRounds: (number | null)[] = [];
   let overallTotal = 0;
   let overallParForScored = 0;
@@ -92,7 +91,6 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
         const roundSum = scored.reduce((sum, s) => sum + s, 0);
         computedRounds.push(roundSum);
         overallTotal += roundSum;
-        // Add par only for scored holes
         holes.forEach((s, h) => { if (s != null) overallParForScored += pars[h] ?? 4; });
       } else {
         computedRounds.push(null);
@@ -100,7 +98,7 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
     } else if (fallbackRounds[i] != null) {
       computedRounds.push(fallbackRounds[i]);
       overallTotal += fallbackRounds[i]!;
-      overallParForScored += par; // full round par for fallback totals
+      overallParForScored += par;
     } else {
       computedRounds.push(null);
     }
@@ -109,11 +107,9 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
   const toPar = hasAnyScore ? overallTotal - overallParForScored : 0;
   const toParDisplay = !hasAnyScore ? "-" : toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : `${toPar}`;
 
-  // Active round hole data
   const activeHoles = holeData[activeRound];
   const canEditHoles = activeHoles != null;
 
-  // Front/back 9 totals for active round — only scored holes
   const sumScored = (holes: (number | null)[]) => {
     const scored = holes.filter((s): s is number => s != null);
     return scored.length > 0 ? scored.reduce((a, b) => a + b, 0) : null;
@@ -121,12 +117,29 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
   const front9 = activeHoles ? sumScored(activeHoles.slice(0, 9)) : null;
   const back9 = activeHoles ? sumScored(activeHoles.slice(9, 18)) : null;
   const roundTotal = activeHoles ? sumScored(activeHoles) : null;
-  // Round to-par based on scored holes only
   let roundParForScored = 0;
   if (activeHoles) {
     activeHoles.forEach((s, h) => { if (s != null) roundParForScored += pars[h] ?? 4; });
   }
   const roundToPar = roundTotal != null ? roundTotal - roundParForScored : null;
+
+  // Score type counts across all rounds
+  const scoreCounts = { egl: 0, brd: 0, par: 0, bog: 0, dbog: 0, thru: 0 };
+  if (player.holeScores) {
+    for (const round of player.holeScores) {
+      for (let h = 0; h < round.length; h++) {
+        const s = round[h];
+        if (s == null) continue;
+        scoreCounts.thru++;
+        const diff = s - (pars[h] ?? 4);
+        if (diff <= -2) scoreCounts.egl++;
+        else if (diff === -1) scoreCounts.brd++;
+        else if (diff === 0) scoreCounts.par++;
+        else if (diff === 1) scoreCounts.bog++;
+        else scoreCounts.dbog++;
+      }
+    }
+  }
 
   const updateHole = (holeIdx: number, value: number | null) => {
     setHoleData((prev) => {
@@ -140,7 +153,6 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
     });
   };
 
-  /** Initialize a round with all nulls (blank scorecard). */
   const addRound = (roundIdx: number) => {
     setHoleData((prev) => {
       const next = [...prev];
@@ -149,7 +161,6 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
     });
     setActiveRound(roundIdx);
   };
-
 
   const handleSave = () => {
     if (hasHoleData || holeData.some((h) => h != null)) {
@@ -163,11 +174,11 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
 
   const scoreColor = (score: number, holePar: number) => {
     const diff = score - holePar;
-    if (diff <= -2) return "#1565C0"; // eagle+
-    if (diff === -1) return "#2D8B52"; // birdie
-    if (diff === 0) return "#1A1D21";  // par
-    if (diff === 1) return "#D94438";  // bogey
-    return "#B71C1C";                  // double+
+    if (diff <= -2) return "#1565C0";
+    if (diff === -1) return "#2D8B52";
+    if (diff === 0) return "#1A1D21";
+    if (diff === 1) return "#D94438";
+    return "#B71C1C";
   };
 
   const scoreBg = (score: number, holePar: number) => {
@@ -181,20 +192,22 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
 
   return (
     <div style={modal.overlay} onClick={onClose}>
-      <div style={{ ...modal.dialog, width: 620 }} onClick={(e) => e.stopPropagation()}>
+      <div style={modal.dialog} onClick={(e) => e.stopPropagation()}>
         {/* Title bar */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #E2E5EA" }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.5 }}>Player Scores</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid #E2E5EA" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.5 }}>Player Scores</div>
           <button style={modal.closeBtn} onClick={onClose}>&times;</button>
         </div>
 
-        {/* Player header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: "1px solid #E2E5EA" }}>
-          <div>
-            <div style={modal.playerName}>{player.name}</div>
-            <div style={{ fontSize: 12, color: "#8E95A0", marginTop: 2 }}>{ordinal(player.ranking)} &middot; {player.country}</div>
+        {/* Player header — stacked */}
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #E2E5EA" }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+            <div>
+              <span style={{ fontSize: 17, fontWeight: 700, color: "#1A1D21" }}>{player.name}</span>
+              <span style={{ fontSize: 12, color: "#8E95A0", marginLeft: 8 }}>{ordinal(player.ranking)} &middot; {player.country}</span>
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <span style={modal.metaLabel}>Status</span>
               <select value={status} onChange={(e) => setStatus(e.target.value)} style={modal.select}>
@@ -205,204 +218,220 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <span style={modal.metaLabel}>Total</span>
-              <span style={{ ...modal.metaValue, fontSize: 20, color: toPar < 0 ? "#2D8B52" : toPar > 0 ? "#D94438" : "#1A1D21" }}>{toParDisplay}</span>
+              <span style={{ fontWeight: 700, fontSize: 18, color: toPar < 0 ? "#2D8B52" : toPar > 0 ? "#D94438" : "#1A1D21" }}>{toParDisplay}</span>
             </div>
           </div>
         </div>
 
-        {/* Round tabs */}
-        <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #E2E5EA", padding: "0 20px" }}>
-          {[0, 1, 2, 3].map((i) => {
-            const roundExists = holeData[i] != null || fallbackRounds[i] != null;
-            const isActive = i === activeRound && roundExists;
-            return (
-              <button
-                key={i}
-                onClick={() => roundExists ? setActiveRound(i) : addRound(i)}
-                style={{
-                  padding: "10px 16px",
-                  border: "none",
-                  borderBottom: isActive ? "2px solid #2D8B52" : "2px solid transparent",
-                  marginBottom: -1,
-                  background: "none",
-                  cursor: "pointer",
-                  fontSize: 13,
-                  fontWeight: isActive ? 700 : 500,
-                  color: !roundExists ? "#8E95A0" : isActive ? "#1A1D21" : "#8E95A0",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                R{i + 1}
-                {computedRounds[i] != null && (
-                  <span style={{ fontSize: 11, color: "#8E95A0", fontWeight: 400 }}>
-                    ({computedRounds[i]})
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        {/* Score-type summary bar */}
+        <div style={{ display: "flex", justifyContent: "space-around", padding: "10px 16px", borderBottom: "1px solid #E2E5EA", background: "#F9FAFB" }}>
+          {([
+            { label: "EGL", val: scoreCounts.egl, color: "#1565C0" },
+            { label: "BRD", val: scoreCounts.brd, color: "#2D8B52" },
+            { label: "PAR", val: scoreCounts.par, color: "#1A1D21" },
+            { label: "BOG", val: scoreCounts.bog, color: "#D94438" },
+            { label: "DBL", val: scoreCounts.dbog, color: "#B71C1C" },
+            { label: "THRU", val: scoreCounts.thru, color: "#8E95A0" },
+          ] as const).map(({ label, val, color }) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.3 }}>{label}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color, marginTop: 2 }}>{val || "-"}</div>
+            </div>
+          ))}
         </div>
 
-        {/* Hole grid */}
-        <div style={{ padding: "16px 20px", overflowX: "auto" }}>
-          {canEditHoles ? (
-            <>
-              {/* Front 9 */}
-              <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.3 }}>Front 9</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 4, marginBottom: 12 }}>
-                {pars.slice(0, 9).map((holePar, idx) => {
-                  const score = activeHoles![idx];
-                  return (
-                    <div key={idx} style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 10, color: "#8E95A0", marginBottom: 2 }}>
-                        {idx + 1} <span style={{ fontSize: 9 }}>P{holePar}</span>
-                      </div>
-                      <input
-                        type="number"
-                        value={score ?? ""}
-                        placeholder="-"
-                        onChange={(e) => {
-                          if (e.target.value === "") { updateHole(idx, null); return; }
-                          const v = parseInt(e.target.value);
-                          if (!isNaN(v) && v >= 1 && v <= 12) updateHole(idx, v);
-                        }}
-                        style={{
-                          width: "100%",
-                          padding: "6px 2px",
-                          borderRadius: 6,
-                          border: "1px solid #E2E5EA",
-                          fontSize: 14,
-                          fontWeight: 600,
-                          textAlign: "center",
-                          outline: "none",
-                          boxSizing: "border-box",
-                          color: score != null ? scoreColor(score, holePar) : "#CCC",
-                          background: score != null ? scoreBg(score, holePar) : "transparent",
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+        <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
+          {/* Round tabs */}
+          <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid #E2E5EA", padding: "0 16px" }}>
+            {[0, 1, 2, 3].map((i) => {
+              const roundExists = holeData[i] != null || fallbackRounds[i] != null;
+              const isActive = i === activeRound && roundExists;
+              return (
+                <button
+                  key={i}
+                  onClick={() => roundExists ? setActiveRound(i) : addRound(i)}
+                  style={{
+                    padding: "10px 14px",
+                    border: "none",
+                    borderBottom: isActive ? "2px solid #2D8B52" : "2px solid transparent",
+                    marginBottom: -1,
+                    background: "none",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: isActive ? 700 : 500,
+                    color: !roundExists ? "#8E95A0" : isActive ? "#1A1D21" : "#8E95A0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  R{i + 1}
+                  {computedRounds[i] != null && (
+                    <span style={{ fontSize: 11, color: "#8E95A0", fontWeight: 400 }}>
+                      ({computedRounds[i]})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-              {/* Back 9 */}
-              <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.3 }}>Back 9</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 4, marginBottom: 16 }}>
-                {pars.slice(9, 18).map((holePar, idx) => {
-                  const realIdx = idx + 9;
-                  const score = activeHoles![realIdx];
-                  return (
-                    <div key={realIdx} style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 10, color: "#8E95A0", marginBottom: 2 }}>
-                        {realIdx + 1} <span style={{ fontSize: 9 }}>P{holePar}</span>
+          {/* Hole grid */}
+          <div style={{ padding: "14px 16px" }}>
+            {canEditHoles ? (
+              <>
+                <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.3 }}>Front 9</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 4, marginBottom: 12 }}>
+                  {pars.slice(0, 9).map((holePar, idx) => {
+                    const score = activeHoles![idx];
+                    return (
+                      <div key={idx} style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 10, color: "#8E95A0", marginBottom: 2 }}>
+                          {idx + 1} <span style={{ fontSize: 9 }}>P{holePar}</span>
+                        </div>
+                        <input
+                          type="number"
+                          value={score ?? ""}
+                          placeholder="-"
+                          onChange={(e) => {
+                            if (e.target.value === "") { updateHole(idx, null); return; }
+                            const v = parseInt(e.target.value);
+                            if (!isNaN(v) && v >= 1 && v <= 12) updateHole(idx, v);
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "6px 2px",
+                            borderRadius: 6,
+                            border: "1px solid #E2E5EA",
+                            fontSize: 14,
+                            fontWeight: 600,
+                            textAlign: "center",
+                            outline: "none",
+                            boxSizing: "border-box",
+                            color: score != null ? scoreColor(score, holePar) : "#CCC",
+                            background: score != null ? scoreBg(score, holePar) : "transparent",
+                          }}
+                        />
                       </div>
-                      <input
-                        type="number"
-                        value={score ?? ""}
-                        placeholder="-"
-                        onChange={(e) => {
-                          if (e.target.value === "") { updateHole(realIdx, null); return; }
-                          const v = parseInt(e.target.value);
-                          if (!isNaN(v) && v >= 1 && v <= 12) updateHole(realIdx, v);
-                        }}
-                        style={{
-                          width: "100%",
-                          padding: "6px 2px",
-                          borderRadius: 6,
-                          border: "1px solid #E2E5EA",
-                          fontSize: 14,
-                          fontWeight: 600,
-                          textAlign: "center",
-                          outline: "none",
-                          boxSizing: "border-box",
-                          color: score != null ? scoreColor(score, holePar) : "#CCC",
-                          background: score != null ? scoreBg(score, holePar) : "transparent",
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
 
-              {/* Summary row */}
-              <div style={{
-                display: "flex",
-                gap: 16,
-                justifyContent: "center",
-                padding: "10px 0",
-                borderTop: "1px solid #E2E5EA",
-                fontSize: 13,
-              }}>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>Out</div>
-                  <div style={{ fontWeight: 600, color: "#1A1D21" }}>{front9}</div>
+                <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.3 }}>Back 9</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 4, marginBottom: 16 }}>
+                  {pars.slice(9, 18).map((holePar, idx) => {
+                    const realIdx = idx + 9;
+                    const score = activeHoles![realIdx];
+                    return (
+                      <div key={realIdx} style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 10, color: "#8E95A0", marginBottom: 2 }}>
+                          {realIdx + 1} <span style={{ fontSize: 9 }}>P{holePar}</span>
+                        </div>
+                        <input
+                          type="number"
+                          value={score ?? ""}
+                          placeholder="-"
+                          onChange={(e) => {
+                            if (e.target.value === "") { updateHole(realIdx, null); return; }
+                            const v = parseInt(e.target.value);
+                            if (!isNaN(v) && v >= 1 && v <= 12) updateHole(realIdx, v);
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "6px 2px",
+                            borderRadius: 6,
+                            border: "1px solid #E2E5EA",
+                            fontSize: 14,
+                            fontWeight: 600,
+                            textAlign: "center",
+                            outline: "none",
+                            boxSizing: "border-box",
+                            color: score != null ? scoreColor(score, realIdx < 18 ? holePar : 4) : "#CCC",
+                            background: score != null ? scoreBg(score, realIdx < 18 ? holePar : 4) : "transparent",
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>In</div>
-                  <div style={{ fontWeight: 600, color: "#1A1D21" }}>{back9}</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>Score</div>
-                  <div style={{ fontWeight: 600, color: "#1A1D21" }}>{roundTotal}</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>Total</div>
-                  <div style={{
-                    fontWeight: 600,
-                    color: roundToPar != null && roundToPar < 0 ? "#2D8B52" : roundToPar != null && roundToPar > 0 ? "#D94438" : "#1A1D21",
-                  }}>
-                    {roundToPar != null ? formatToPar(roundToPar) : "-"}
+
+                {/* Summary row */}
+                <div style={{
+                  display: "flex",
+                  gap: 16,
+                  justifyContent: "center",
+                  padding: "10px 0",
+                  borderTop: "1px solid #E2E5EA",
+                  fontSize: 13,
+                }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>Out</div>
+                    <div style={{ fontWeight: 600, color: "#1A1D21" }}>{front9}</div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>In</div>
+                    <div style={{ fontWeight: 600, color: "#1A1D21" }}>{back9}</div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>Score</div>
+                    <div style={{ fontWeight: 600, color: "#1A1D21" }}>{roundTotal}</div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 10, color: "#8E95A0", fontWeight: 600, textTransform: "uppercase" }}>Total</div>
+                    <div style={{
+                      fontWeight: 600,
+                      color: roundToPar != null && roundToPar < 0 ? "#2D8B52" : roundToPar != null && roundToPar > 0 ? "#D94438" : "#1A1D21",
+                    }}>
+                      {roundToPar != null ? formatToPar(roundToPar) : "-"}
+                    </div>
                   </div>
                 </div>
+              </>
+            ) : roundCount > 0 ? (
+              <div>
+                <div style={{ marginBottom: 8, fontSize: 11, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.3 }}>
+                  Round totals (no hole-level data)
+                </div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  {[0, 1, 2, 3].map((i) => {
+                    if (player.rounds[i] == null) return null;
+                    return (
+                      <div key={i} style={{ flex: 1 }}>
+                        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>
+                          R{i + 1}
+                        </label>
+                        <input
+                          type="number"
+                          value={fallbackRounds[i] ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value === "" ? null : Number(e.target.value);
+                            setFallbackRounds((prev) => {
+                              const next = [...prev];
+                              next[i] = v;
+                              return next;
+                            });
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            border: "1px solid #E2E5EA",
+                            fontSize: 14,
+                            outline: "none",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </>
-          ) : roundCount > 0 ? (
-            /* Fallback: editable round totals when no hole-level data */
-            <div>
-              <div style={{ marginBottom: 8, fontSize: 11, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.3 }}>
-                Round totals (no hole-level data)
+            ) : (
+              <div style={{ textAlign: "center", padding: "24px 0", color: "#8E95A0", fontSize: 13 }}>
+                Click <strong>+ R1</strong> above to enter scores
               </div>
-              <div style={{ display: "flex", gap: 12 }}>
-                {[0, 1, 2, 3].map((i) => {
-                  if (player.rounds[i] == null) return null;
-                  return (
-                    <div key={i} style={{ flex: 1 }}>
-                      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#8E95A0", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>
-                        R{i + 1}
-                      </label>
-                      <input
-                        type="number"
-                        value={fallbackRounds[i] ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value === "" ? null : Number(e.target.value);
-                          setFallbackRounds((prev) => {
-                            const next = [...prev];
-                            next[i] = v;
-                            return next;
-                          });
-                        }}
-                        style={{
-                          width: "100%",
-                          padding: "8px 12px",
-                          borderRadius: 8,
-                          border: "1px solid #E2E5EA",
-                          fontSize: 14,
-                          outline: "none",
-                          boxSizing: "border-box",
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div style={{ textAlign: "center", padding: "24px 0", color: "#8E95A0", fontSize: 13 }}>
-              Click <strong>+ R1</strong> above to enter scores
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Footer */}
@@ -460,16 +489,13 @@ export function SimPanel() {
     setLoading(false);
   };
 
-  // Which rounds are "on" based on current phase
   const PHASE_ROUND: Record<string, number> = { idle: 0, round1: 1, round2: 2, cut: 2, round3: 3, round4: 4, final: 4 };
   const completedRound = sim ? PHASE_ROUND[sim.phase] ?? 0 : 0;
 
-  /** Advance sim forward until we reach the target round. */
   const handleAdvanceToRound = async (targetRound: number) => {
     if (!sim) return;
     setLoading(true);
     try {
-      // Keep advancing until currentRound reaches target
       let phase = sim.phase;
       let round = sim.currentRound;
       while (round < targetRound || (phase === "cut" && targetRound > 2)) {
@@ -485,7 +511,6 @@ export function SimPanel() {
     setLoading(false);
   };
 
-  /** Rewind sim backward until we're before the target round. */
   const handleRewindToRound = async (targetRound: number) => {
     if (!sim) return;
     setLoading(true);
@@ -512,7 +537,6 @@ export function SimPanel() {
       await handleAdvanceToRound(round);
     }
   };
-
 
   const handleReset = async () => {
     setLoading(true);
@@ -541,6 +565,17 @@ export function SimPanel() {
     setLoading(false);
   };
 
+  const handleRollback = async () => {
+    setLoading(true);
+    try {
+      await rollbackSim();
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Rollback failed");
+    }
+    setLoading(false);
+  };
+
   const handlePlayerSave = async (playerId: number, updates: { rounds?: (number | null)[]; status: string; holeScores?: ((number | null)[] | null)[] }) => {
     try {
       const apiUpdates: { rounds?: (number | null)[]; status?: string; holeScores?: ((number | null)[] | null)[] } = {
@@ -556,7 +591,6 @@ export function SimPanel() {
     }
   };
 
-  // Compute cumulative to-par for a player (used for sorting + TOT column)
   const calcToPar = (p: LeaderboardPlayer) => {
     const pars = holePars ?? Array(18).fill(4);
     let total = 0;
@@ -574,7 +608,6 @@ export function SimPanel() {
     return { toPar: total, hasScore: hasRound };
   };
 
-  // Sort: players with scores first (by to-par), then unscored by world rank
   const sortedLeaderboard = [...leaderboard].sort((a, b) => {
     const aCalc = calcToPar(a);
     const bCalc = calcToPar(b);
@@ -584,7 +617,6 @@ export function SimPanel() {
     return a.ranking - b.ranking;
   });
 
-  // Compute positions from sorted order (with ties)
   const positionMap = new Map<number, { pos: number; tied: boolean }>();
   let pos = 1;
   for (let i = 0; i < sortedLeaderboard.length; i++) {
@@ -602,7 +634,6 @@ export function SimPanel() {
     }
     positionMap.set(p.playerId, { pos, tied: false });
   }
-  // Mark ties
   for (const [, val] of positionMap) {
     if (val.pos === 0) continue;
     const count = [...positionMap.values()].filter((v) => v.pos === val.pos).length;
@@ -649,248 +680,274 @@ export function SimPanel() {
 
       {error && <div style={styles.error}>{error}</div>}
 
-      {/* Tournament Info + Status */}
+      {/* Status Card — stacked vertically */}
       <div style={styles.card}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          {activeTournament && (
-            <div>
-              <div style={styles.tournamentName}>{activeTournament.name}</div>
-              <div style={styles.tournamentMeta}>
-                {activeTournament.course} &middot; Par {activeTournament.par} &middot; ${(activeTournament.purse / 1_000_000).toFixed(1)}M purse
-              </div>
-            </div>
-          )}
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={styles.phasePill}>
-              <span style={{
-                ...styles.phaseDot,
-                background: sim.phase === "final" ? "#8E95A0" : sim.phase === "idle" ? "#E2A03F" : "#2D8B52",
-              }} />
-              {PHASE_LABELS[sim.phase] || sim.phase}
-            </div>
-            <div style={styles.statusGrid}>
-              <StatusItem label="Round" value={sim.currentRound || "-"} />
-              <StatusItem label="Field" value={sim.fieldSize} />
-              <StatusItem label="Active" value={sim.activePlayers} />
-              <StatusItem label="Cut" value={sim.cutPlayers} />
-              <StatusItem label="WD" value={sim.wdPlayers} />
-              {sim.cutLine !== null && <StatusItem label="Cut Line" value={sim.cutLine} />}
+        {activeTournament && (
+          <div style={{ marginBottom: 10 }}>
+            <div style={styles.tournamentName}>{activeTournament.name}</div>
+            <div style={styles.tournamentMeta}>
+              {activeTournament.course} &middot; Par {activeTournament.par} &middot; ${(activeTournament.purse / 1_000_000).toFixed(1)}M purse
             </div>
           </div>
+        )}
+        <div style={styles.phasePill}>
+          <span style={{
+            ...styles.phaseDot,
+            background: sim.phase === "final" ? "#8E95A0" : sim.phase === "idle" ? "#E2A03F" : "#2D8B52",
+          }} />
+          {PHASE_LABELS[sim.phase] || sim.phase}
+        </div>
+        <div style={{ ...styles.statusGrid, marginTop: 10, paddingTop: 10, borderTop: "1px solid #E2E5EA" }}>
+          <StatusItem label="Round" value={sim.currentRound || "-"} />
+          <StatusItem label="Field" value={sim.fieldSize} />
+          <StatusItem label="Active" value={sim.activePlayers} />
+          <StatusItem label="Cut" value={sim.cutPlayers} />
+          <StatusItem label="WD" value={sim.wdPlayers} />
+          {sim.cutLine !== null && <StatusItem label="Cut Line" value={sim.cutLine} />}
         </div>
       </div>
 
-      {/* Leaderboard */}
-      <div style={styles.card}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <input
-              type="text"
-              placeholder="Search players..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
-              style={{ ...styles.input, flex: 1 }}
-            />
-            {(sim?.phase === "round4" || sim?.phase === "final") && (
-              <button
-                style={{
-                  ...styles.dangerBtn,
-                  background: sim.phase === "final" ? "#2D8B52" : "#1A73E8",
-                  borderColor: sim.phase === "final" ? "#2D8B52" : "#1A73E8",
-                  color: "#fff",
-                }}
-                onClick={handleComplete}
-                disabled={loading}
-              >
-                {sim.phase === "final" ? "Activate Next" : "Complete Week"}
-              </button>
-            )}
-            <button style={styles.dangerBtn} onClick={handleReset} disabled={loading}>
-              Reset
+      {/* Action Buttons */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        {(() => {
+          const canComplete = sim.phase === "round4" || sim.phase === "final";
+          return (
+            <button
+              style={{
+                ...styles.actionBtn,
+                flex: 1,
+                background: canComplete ? "#1A73E8" : "#E2E5EA",
+                color: canComplete ? "#fff" : "#8E95A0",
+                opacity: canComplete ? 1 : 0.6,
+              }}
+              onClick={handleComplete}
+              disabled={loading || !canComplete}
+            >
+              Complete Week
             </button>
-        </div>
-            <div style={{ position: "relative" }}>
-            {loading && (
-              <div style={styles.tableOverlay}>
-                <div style={styles.spinner} />
+          );
+        })()}
+        <button
+          style={{ ...styles.actionBtn, flex: 1, background: "#D94438", color: "#fff" }}
+          onClick={handleReset}
+          disabled={loading}
+        >
+          Reset
+        </button>
+      </div>
+
+      {/* Round Controls — 4 equal buttons */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+        {[1, 2, 3, 4].map((r) => {
+          const isOn = completedRound >= r;
+          return (
+            <button
+              key={r}
+              onClick={() => handleToggleRound(r)}
+              disabled={loading}
+              style={{
+                flex: 1,
+                padding: "10px 0",
+                borderRadius: 8,
+                border: isOn ? "1.5px solid #2D8B52" : "1.5px solid #E2E5EA",
+                background: isOn ? "#2D8B52" : "#fff",
+                color: isOn ? "#fff" : "#8E95A0",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              R{r}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Search */}
+      <input
+        type="text"
+        placeholder="Search players..."
+        value={searchQuery}
+        onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+        style={{ ...styles.input, marginTop: 10, marginBottom: 10 }}
+      />
+
+      {/* Player Cards */}
+      <div style={{ position: "relative" }}>
+        {loading && (
+          <div style={styles.tableOverlay}>
+            <div style={styles.spinner} />
+          </div>
+        )}
+
+        {/* Column header */}
+        <div style={{ display: "flex", alignItems: "center", padding: "0 14px 6px" }}>
+          <div style={{ width: 32, flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
+            <span style={styles.colLabel}>Player</span>
+          </div>
+          <div style={{ display: "flex", gap: COL.gap, flexShrink: 0 }}>
+            {["R1", "R2", "R3", "R4"].map((label) => (
+              <div key={label} style={{ width: COL.r, textAlign: "center" }}>
+                <span style={styles.colLabel}>{label}</span>
               </div>
-            )}
-            <table style={styles.table}>
-              <colgroup>
-                <col style={{ width: 40 }} />
-                <col />
-                <col style={{ width: 80 }} />
-                <col style={{ width: 36 }} />
-                <col style={{ width: 36 }} />
-                <col style={{ width: 36 }} />
-                <col style={{ width: 36 }} />
-                <col style={{ width: 36 }} />
-                <col style={{ width: 70 }} />
-                <col style={{ width: 55 }} />
-                <col style={{ width: 55 }} />
-                <col style={{ width: 55 }} />
-                <col style={{ width: 55 }} />
-                <col style={{ width: 50 }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th style={{ ...styles.th, textAlign: "left" }}>Pos</th>
-                  <th style={{ ...styles.th, textAlign: "left" }}>Player</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>DBL</th>
-                  <th style={styles.th}>BOG</th>
-                  <th style={styles.th}>PAR</th>
-                  <th style={styles.th}>BRD</th>
-                  <th style={styles.th}>EGL</th>
-                  <th style={styles.th}>Thru</th>
-                  {[1, 2, 3, 4].map((r) => {
-                    const isOn = completedRound >= r;
+            ))}
+            <div style={{ width: COL.p, textAlign: "right" }}>
+              <span style={styles.colLabel}>TOT</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Player list */}
+        {displayedPlayers.map((p) => {
+          const posData = positionMap.get(p.playerId);
+          const posLabel = !posData || posData.pos === 0 ? "-"
+            : p.status === "cut" ? "MC"
+            : posData.tied ? `T${posData.pos}`
+            : `${posData.pos}`;
+          const isCut = p.status === "cut";
+          const { toPar: cumToPar, hasScore } = calcToPar(p);
+          const totDisplay = !hasScore ? "-" : cumToPar === 0 ? "E" : cumToPar > 0 ? `+${cumToPar}` : `${cumToPar}`;
+
+          // Compute thru info
+          let thruLabel = "";
+          if (p.holeScores && p.holeScores.length > 0) {
+            for (let r = p.holeScores.length - 1; r >= 0; r--) {
+              const round = p.holeScores[r];
+              if (round && round.some((s) => s != null)) {
+                let lastHole = 0;
+                for (let h = round.length - 1; h >= 0; h--) {
+                  if (round[h] != null) { lastHole = h + 1; break; }
+                }
+                thruLabel = lastHole === 18 ? "" : `F${lastHole}`;
+                break;
+              }
+            }
+          }
+
+          return (
+            <div
+              key={p.playerId}
+              onClick={() => setEditingPlayer(p)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "10px 14px",
+                minHeight: 58,
+                boxSizing: "border-box",
+                background: "#fff",
+                borderRadius: 10,
+                border: "1px solid #E2E5EA",
+                marginBottom: 6,
+                cursor: "pointer",
+                opacity: isCut ? 0.5 : 1,
+              }}
+            >
+              {/* Position badge */}
+              <div style={{
+                width: 32,
+                height: 28,
+                borderRadius: 8,
+                background: "#F4F5F7",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#8E95A0",
+                flexShrink: 0,
+              }}>
+                {posLabel}
+              </div>
+
+              {/* Player info */}
+              <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
+                <div style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#1A1D21",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}>
+                  {p.name}
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 2, alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "#B0B5BC" }}>#{p.ranking}</span>
+                  <span style={{ fontSize: 11, color: "#B0B5BC" }}>{p.country}</span>
+                  {isCut && <span style={{ fontSize: 10, color: "#D94438", fontWeight: 600 }}>CUT</span>}
+                  {p.status === "wd" && <span style={{ fontSize: 10, color: "#D94438", fontWeight: 600 }}>WD</span>}
+                  {thruLabel && <span style={{ fontSize: 10, color: "#8E95A0", fontWeight: 500 }}>{thruLabel}</span>}
+                </div>
+              </div>
+
+              {/* Round scores + Total */}
+              <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "center" }}>
+                {[0, 1, 2, 3].map((i) => {
+                  const score = p.rounds[i];
+                  if (score == null) {
                     return (
-                      <th key={r} style={styles.th}>
-                        <button
-                          onClick={() => handleToggleRound(r)}
-                          disabled={loading}
-                          style={{
-                            padding: "4px 8px",
-                            borderRadius: 6,
-                            border: isOn ? "1px solid #2D8B52" : "1px solid #E2E5EA",
-                            background: isOn ? "#2D8B52" : "#fff",
-                            color: isOn ? "#fff" : "#8E95A0",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          R{r}
-                        </button>
-                      </th>
+                      <div key={i} style={{ width: COL.r, textAlign: "center", fontSize: 12, color: "#B0B5BC" }}>-</div>
                     );
-                  })}
-                  <th style={{ ...styles.th, textAlign: "right" }}>Tot</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedPlayers.map((p) => {
-                  const posData = positionMap.get(p.playerId);
-                  const posLabel = !posData || posData.pos === 0 ? "-"
-                    : p.status === "cut" ? "MC"
-                    : posData.tied ? `T${posData.pos}`
-                    : `${posData.pos}`;
+                  }
+                  const hs = p.holeScores?.[i];
+                  const holesPlayed = hs ? hs.filter((s) => s != null).length : 18;
+                  const isComplete = holesPlayed === 18;
+                  if (isComplete) {
+                    return (
+                      <div key={i} style={{ width: COL.r, textAlign: "center", fontSize: 12, fontWeight: 600, color: "#1A1D21" }}>{score}</div>
+                    );
+                  }
+                  const rtp = score - (holePars ?? Array(18).fill(4)).slice(0, holesPlayed).reduce((a: number, b: number) => a + b, 0);
+                  const rtpStr = rtp === 0 ? "E" : rtp > 0 ? `+${rtp}` : `${rtp}`;
                   return (
-                  <tr key={p.playerId} style={p.status === "cut" ? { opacity: 0.5 } : {}}>
-                    <td style={{ ...styles.td, textAlign: "left" }}>{posLabel}</td>
-                    <td style={{ ...styles.td, textAlign: "left", fontWeight: 500 }}>
-                      <span style={{ color: "#B0B5BC", fontSize: 11, fontWeight: 400, marginRight: 6 }}>{p.ranking}</span>
-                      <span style={{ cursor: "pointer" }} onClick={() => setEditingPlayer(p)}>{p.name}</span>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={styles.statusBadge}>Active</span>
-                    </td>
-                    {(() => {
-                      const counts = { egl: 0, brd: 0, par: 0, bog: 0, dbog: 0 };
-                      const pars = holePars ?? [];
-                      if (p.holeScores) {
-                        for (const round of p.holeScores) {
-                          for (let h = 0; h < round.length; h++) {
-                            const s = round[h];
-                            if (s == null) continue;
-                            const diff = s - (pars[h] ?? 4);
-                            if (diff <= -2) counts.egl++;
-                            else if (diff === -1) counts.brd++;
-                            else if (diff === 0) counts.par++;
-                            else if (diff === 1) counts.bog++;
-                            else counts.dbog++;
-                          }
-                        }
-                      }
-                      return (
-                        <>
-                          <td style={styles.td}>{counts.dbog || "-"}</td>
-                          <td style={styles.td}>{counts.bog || "-"}</td>
-                          <td style={styles.td}>{counts.par || "-"}</td>
-                          <td style={styles.td}>{counts.brd || "-"}</td>
-                          <td style={styles.td}>{counts.egl || "-"}</td>
-                        </>
-                      );
-                    })()}
-                    <td style={styles.td}>
-                      {(() => {
-                        if (p.holeScores && p.holeScores.length > 0) {
-                          for (let r = p.holeScores.length - 1; r >= 0; r--) {
-                            const round = p.holeScores[r];
-                            if (round && round.some((s) => s != null)) {
-                              let lastHole = 0;
-                              for (let h = round.length - 1; h >= 0; h--) {
-                                if (round[h] != null) { lastHole = h + 1; break; }
-                              }
-                              return <>{lastHole}<span style={{ color: "#B0B5BC", fontSize: 10, fontWeight: 400, marginLeft: 2 }}>(R{r + 1})</span></>;
-                            }
-                          }
-                        } else if (p.rounds.length > 0) {
-                          return <>18<span style={{ color: "#B0B5BC", fontSize: 10, fontWeight: 400, marginLeft: 2 }}>(R{p.rounds.length})</span></>;
-                        }
-                        return "-";
-                      })()}
-                    </td>
-                    {[0, 1, 2, 3].map((i) => {
-                      const score = p.rounds[i];
-                      if (score == null) return <td key={i} style={styles.td}>-</td>;
-                      const hs = p.holeScores?.[i];
-                      const holesPlayed = hs ? hs.filter((s) => s != null).length : 18;
-                      const isComplete = holesPlayed === 18;
-                      if (isComplete) {
-                        return (
-                          <td key={i} style={{ ...styles.td, fontWeight: 600 }}>{score}</td>
-                        );
-                      }
-                      const rtp = score - (holePars ?? Array(18).fill(4)).slice(0, holesPlayed).reduce((a, b) => a + b, 0);
-                      const rtpStr = rtp === 0 ? "E" : rtp > 0 ? `+${rtp}` : `${rtp}`;
-                      return (
-                        <td key={i} style={{ ...styles.td, color: rtp < 0 ? "#2D8B52" : rtp > 0 ? "#D94438" : "#1A1D21", fontWeight: 600 }}>
-                          {rtpStr}
-                        </td>
-                      );
-                    })}
-                    {(() => {
-                      const { toPar: cumToPar, hasScore } = calcToPar(p);
-                      const display = !hasScore ? "-" : cumToPar === 0 ? "E" : cumToPar > 0 ? `+${cumToPar}` : `${cumToPar}`;
-                      return (
-                        <td style={{
-                          ...styles.td,
-                          textAlign: "right",
-                          color: cumToPar < 0 ? "#2D8B52" : cumToPar > 0 ? "#D94438" : "#1A1D21",
-                          fontWeight: 600,
-                        }}>
-                          {display}
-                        </td>
-                      );
-                    })()}
-                  </tr>
+                    <div key={i} style={{
+                      width: COL.r,
+                      textAlign: "center",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: rtp < 0 ? "#2D8B52" : rtp > 0 ? "#D94438" : "#1A1D21",
+                    }}>
+                      {rtpStr}
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-            {totalPages > 1 && (
-              <div style={styles.pagination}>
-                <button
-                  style={styles.pageBtn}
-                  onClick={() => setPage((p) => p - 1)}
-                  disabled={page === 0}
-                >
-                  Prev
-                </button>
-                <span style={styles.pageInfo}>
-                  {page + 1} of {totalPages}
-                </span>
-                <button
-                  style={styles.pageBtn}
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={page >= totalPages - 1}
-                >
-                  Next
-                </button>
+                <div style={{
+                  width: COL.p,
+                  textAlign: "right",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: hasScore ? (cumToPar < 0 ? "#2D8B52" : cumToPar > 0 ? "#D94438" : "#1A1D21") : "#B0B5BC",
+                }}>
+                  {totDisplay}
+                </div>
               </div>
-            )}
             </div>
+          );
+        })}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={styles.pagination}>
+            <button
+              style={styles.pageBtn}
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page === 0}
+            >
+              Prev
+            </button>
+            <span style={styles.pageInfo}>
+              {page + 1} of {totalPages}
+            </span>
+            <button
+              style={styles.pageBtn}
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= totalPages - 1}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Player Edit Modal */}
@@ -916,7 +973,7 @@ function StatusItem({ label, value }: { label: string; value: string | number })
   );
 }
 
-// --- Modal styles ---
+// --- Modal styles (Bottom Sheet) ---
 
 const modal: Record<string, React.CSSProperties> = {
   overlay: {
@@ -924,38 +981,20 @@ const modal: Record<string, React.CSSProperties> = {
     inset: 0,
     background: "rgba(0,0,0,0.4)",
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "center",
     zIndex: 1000,
   },
   dialog: {
     background: "#fff",
-    borderRadius: 12,
-    width: 480,
-    maxWidth: "90vw",
-    boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
+    borderRadius: "18px 18px 0 0",
+    width: "100%",
+    maxWidth: 430,
+    maxHeight: "85vh",
+    boxShadow: "0 -4px 30px rgba(0,0,0,0.2)",
     overflow: "hidden",
-  },
-  header: {
     display: "flex",
-    alignItems: "flex-start",
-    gap: 12,
-    padding: "20px 20px 16px",
-    borderBottom: "1px solid #E2E5EA",
-  },
-  playerName: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: "#1A1D21",
-    marginBottom: 8,
-  },
-  headerMeta: {
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap" as const,
-    gap: 4,
-    fontSize: 13,
-    justifyContent: "space-between",
+    flexDirection: "column",
   },
   metaLabel: {
     color: "#8E95A0",
@@ -963,12 +1002,6 @@ const modal: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     textTransform: "uppercase" as const,
     letterSpacing: 0.3,
-  },
-  metaValue: {
-    color: "#1A1D21",
-    fontWeight: 600,
-    fontSize: 13,
-    marginLeft: 4,
   },
   select: {
     padding: "3px 8px",
@@ -990,39 +1023,11 @@ const modal: Record<string, React.CSSProperties> = {
     padding: "0 4px",
     lineHeight: 1,
   },
-  body: {
-    padding: 20,
-  },
-  roundRow: {
-    display: "flex",
-    gap: 12,
-  },
-  roundField: {
-    flex: 1,
-  },
-  fieldLabel: {
-    display: "block",
-    fontSize: 11,
-    fontWeight: 600,
-    color: "#8E95A0",
-    textTransform: "uppercase" as const,
-    letterSpacing: 0.3,
-    marginBottom: 4,
-  },
-  fieldInput: {
-    width: "100%",
-    padding: "8px 12px",
-    borderRadius: 8,
-    border: "1px solid #E2E5EA",
-    fontSize: 14,
-    outline: "none",
-    boxSizing: "border-box" as const,
-  },
   footer: {
     display: "flex",
     justifyContent: "flex-end",
     gap: 8,
-    padding: "16px 20px",
+    padding: "14px 16px",
     borderTop: "1px solid #E2E5EA",
     background: "#F9FAFB",
   },
@@ -1052,18 +1057,18 @@ const modal: Record<string, React.CSSProperties> = {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    maxWidth: 900,
+    maxWidth: 430,
     margin: "0 auto",
-    padding: "20px 16px",
+    padding: "12px 16px 100px",
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     background: "#F4F5F7",
     minHeight: "100vh",
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 700,
     color: "#1A1D21",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   loading: {
     color: "#8E95A0",
@@ -1074,12 +1079,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     gap: 0,
     overflowX: "auto",
-    marginBottom: 16,
+    marginBottom: 12,
     borderBottom: "2px solid #E2E5EA",
     WebkitOverflowScrolling: "touch",
   },
   tab: {
-    padding: "10px 16px",
+    padding: "10px 14px",
     border: "none",
     borderBottom: "2px solid transparent",
     marginBottom: -2,
@@ -1109,16 +1114,13 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "1px 4px",
     lineHeight: "14px",
   },
-  tournamentHeader: {
-    marginBottom: 12,
-  },
   tournamentName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 700,
     color: "#1A1D21",
   },
   tournamentMeta: {
-    fontSize: 13,
+    fontSize: 12,
     color: "#8E95A0",
     marginTop: 2,
   },
@@ -1148,49 +1150,17 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fff",
     borderRadius: 12,
     border: "1px solid #E2E5EA",
-    padding: 16,
+    padding: "14px 16px",
     marginBottom: 12,
-  },
-  cardHeader: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: "#1A1D21",
-    marginBottom: 12,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
   statusGrid: {
     display: "flex",
-    gap: 16,
+    gap: 12,
     flexWrap: "wrap",
-  },
-  buttonRow: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  primaryBtn: {
-    padding: "8px 16px",
-    borderRadius: 8,
-    border: "none",
-    background: "#2D8B52",
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  dangerBtn: {
-    padding: "8px 16px",
-    borderRadius: 8,
-    border: "none",
-    background: "#D94438",
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: "pointer",
+    justifyContent: "space-around",
   },
   input: {
-    padding: "8px 12px",
+    padding: "10px 12px",
     borderRadius: 8,
     border: "1px solid #E2E5EA",
     fontSize: 13,
@@ -1198,26 +1168,20 @@ const styles: Record<string, React.CSSProperties> = {
     outline: "none",
     boxSizing: "border-box",
   },
-  editBtn: {
-    background: "none",
-    border: "1px solid #E2E5EA",
-    borderRadius: 6,
-    padding: "2px 8px",
-    fontSize: 11,
-    color: "#8E95A0",
+  actionBtn: {
+    padding: "10px 16px",
+    borderRadius: 8,
+    border: "none",
+    fontSize: 13,
+    fontWeight: 600,
     cursor: "pointer",
-    fontWeight: 500,
   },
-  statusBadge: {
-    display: "inline-block",
+  colLabel: {
     fontSize: 10,
     fontWeight: 600,
-    color: "#2D8B52",
-    background: "#E8F5EE",
-    borderRadius: 4,
-    padding: "1px 5px",
-    letterSpacing: 0.3,
+    color: "#8E95A0",
     textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   pagination: {
     display: "flex",
@@ -1227,8 +1191,8 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 12,
   },
   pageBtn: {
-    padding: "6px 14px",
-    borderRadius: 6,
+    padding: "8px 16px",
+    borderRadius: 8,
     border: "1px solid #E2E5EA",
     background: "#fff",
     color: "#1A1D21",
@@ -1259,27 +1223,5 @@ const styles: Record<string, React.CSSProperties> = {
     borderTopColor: "#2D8B52",
     borderRadius: "50%",
     animation: "spin 0.7s linear infinite",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    tableLayout: "fixed",
-    fontSize: 13,
-  },
-  th: {
-    padding: "6px 8px",
-    textAlign: "center",
-    fontSize: 11,
-    fontWeight: 600,
-    color: "#8E95A0",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-    borderBottom: "1px solid #E2E5EA",
-  },
-  td: {
-    padding: "6px 8px",
-    textAlign: "center",
-    borderBottom: "1px solid #F4F5F7",
-    color: "#1A1D21",
   },
 };
