@@ -44,6 +44,10 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
 
   const viewedTournament = tournaments[viewingWeek] || null;
 
+  const fullRefresh = useCallback(async () => {
+    window.location.reload();
+  }, []);
+
   if (myTeamId === null) {
     return (
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", gap: 12 }}>
@@ -58,10 +62,6 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
       </div>
     );
   }
-
-  const fullRefresh = useCallback(async () => {
-    window.location.reload();
-  }, []);
 
   return (
     <PullToRefresh onRefresh={fullRefresh} colors={C}>
