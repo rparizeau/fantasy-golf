@@ -24,7 +24,7 @@ interface RosterProps {
 
 interface CachedWeek {
   data: RosterData;
-  rank: { myRank: number; myRankTied: boolean; myPoints: number; leaderPoints: number; totalTeams: number; projectedTotal: number; rivalAbove: { name: string; points: number; rank: number } | null; rivalBelow: { name: string; points: number; rank: number } | null } | null;
+  rank: { myRank: number; myRankTied: boolean; myPoints: number; totalTeams: number; projectedTotal: number; rivalAbove: { name: string; points: number; rank: number } | null; rivalBelow: { name: string; points: number; rank: number } | null } | null;
 }
 
 export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek: _onChangeWeek, isMajor: _isMajor }: RosterProps) {
@@ -41,7 +41,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const [myRankTied, setMyRankTied] = useState(false);
   const [totalTeams, setTotalTeams] = useState(0);
   const [myPoints, setMyPoints] = useState(0);
-  const [leaderPoints, setLeaderPoints] = useState(0);
   const [rivalAbove, setRivalAbove] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [rivalBelow, setRivalBelow] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [projectedTotal, setProjectedTotal] = useState(0);
@@ -63,7 +62,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       setMyRank(rankData.myRank);
       setMyRankTied(rankData.myRankTied);
       setTotalTeams(rankData.totalTeams);
-      setLeaderPoints(rankData.leaderPoints);
       setProjectedTotal(rankData.projectedTotal);
       setRivalAbove(rankData.rivalAbove);
       setRivalBelow(rankData.rivalBelow);
@@ -71,7 +69,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       setMyRank(0);
       setMyRankTied(false);
       setTotalTeams(0);
-      setLeaderPoints(0);
       setProjectedTotal(0);
       setRivalAbove(null);
       setRivalBelow(null);
@@ -151,7 +148,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
               myRank: sorted.findIndex((t) => t.totalPoints === myPts) + 1,
               myRankTied: tied,
               myPoints: d.roster.filter((p) => p.isActive).reduce((sum, p) => sum + p.points, 0),
-              leaderPoints: sorted[0].totalPoints,
               totalTeams: sorted.length,
               projectedTotal: projTotal,
               rivalAbove: above,

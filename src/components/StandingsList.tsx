@@ -18,12 +18,6 @@ export interface StandingsEntry {
 // Column widths matching Roster PlayerCard
 const COL = { r: 26, p: 46, gap: 2 };
 
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
 export function StandingsList<T extends StandingsEntry>({
   entries,
   colors: C,
