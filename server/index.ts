@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth.js";
 import simRoutes from "./routes/sim.js";
+import simVersionRoutes from "./routes/sim-version.js";
 import tournamentRoutes from "./routes/tournament.js";
 import leagueRoutes from "./routes/league.js";
 import playerRoutes from "./routes/players.js";
@@ -19,6 +20,7 @@ app.use(express.json());
 
 // API routes
 app.use("/api/auth", authRoutes);
+app.use("/api/sim", requireAuth, simVersionRoutes);
 app.use("/api/sim", requireAdmin, simRoutes);
 app.use("/api/tournament", tournamentRoutes);
 app.use("/api/league", requireAuth, leagueRoutes);

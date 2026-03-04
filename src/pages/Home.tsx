@@ -10,9 +10,10 @@ interface HomeProps {
   tournaments: TournamentListItem[];
   currentTournamentId: number;
   viewingWeek: number;
+  simTick: number;
 }
 
-export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTournamentId, viewingWeek }: HomeProps) {
+export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTournamentId, viewingWeek, simTick }: HomeProps) {
   const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +37,11 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
     setLoading(true);
     refresh();
   }, [refresh]);
+
+  // Silent re-fetch on sim tick (no loading spinner)
+  useEffect(() => {
+    if (simTick > 0) refresh();
+  }, [simTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (

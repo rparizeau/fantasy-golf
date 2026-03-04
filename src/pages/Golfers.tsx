@@ -8,6 +8,7 @@ interface GolfersProps {
   leagueId: number;
   teamId: number;
   colors: Theme;
+  simTick: number;
 }
 
 const BTN = 36;
@@ -21,7 +22,7 @@ const statCols: { key: keyof PlayerPoolEntry; label: string }[] = [
   { key: "seasonPoints", label: "TOT" },
 ];
 
-export function Golfers({ leagueId, teamId, colors: C }: GolfersProps) {
+export function Golfers({ leagueId, teamId, colors: C, simTick }: GolfersProps) {
   const [players, setPlayers] = useState<PlayerPoolEntry[]>([]);
   const [myRoster, setMyRoster] = useState<RosterPlayer[]>([]);
   const [rosterSettings, setRosterSettings] = useState<RosterData["settings"] | null>(null);
@@ -54,6 +55,11 @@ export function Golfers({ leagueId, teamId, colors: C }: GolfersProps) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Silent re-fetch on sim tick (no loading spinner)
+  useEffect(() => {
+    if (simTick > 0) refresh();
+  }, [simTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derive unique teams from pool data
   const teamsInLeague = (() => {

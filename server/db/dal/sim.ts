@@ -34,6 +34,32 @@ export interface SimState {
   pointsAccumulated?: boolean;
 }
 
+// --- Version (lightweight fingerprint for polling) ---
+
+export interface SimVersion {
+  tournamentId: number;
+  phase: string;
+  currentRound: number;
+  fieldSize: number;
+  cutLine: number | null;
+}
+
+export async function loadSimVersion(): Promise<SimVersion> {
+  const id = await getActiveTournamentId();
+  const [row] = await db.select({
+    tournamentId: simTournaments.tournamentId,
+    phase: simTournaments.phase,
+    currentRound: simTournaments.currentRound,
+    fieldSize: simTournaments.fieldSize,
+    cutLine: simTournaments.cutLine,
+  }).from(simTournaments).where(eq(simTournaments.tournamentId, id));
+
+  if (!row) {
+    return { tournamentId: id, phase: "idle", currentRound: 0, fieldSize: 0, cutLine: null };
+  }
+  return row;
+}
+
 // --- Active Tournament ---
 
 export async function getActiveTournamentId(): Promise<number> {

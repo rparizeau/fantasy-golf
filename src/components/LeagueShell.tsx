@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { Theme } from "../theme";
 import type { TournamentListItem } from "../api";
 import { getTournamentList, getLeagues } from "../api";
+import { useSimVersion } from "../hooks/useSimVersion";
 import { LeagueHeader } from "./LeagueHeader";
 import { PageContent } from "./PageContent";
 import { BottomNav } from "./BottomNav";
@@ -23,18 +24,19 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
   const [viewingWeek, setViewingWeek] = useState<number>(0);
   const [myTeamId, setMyTeamId] = useState<number | null>(null);
   const [seasonPoints, setSeasonPoints] = useState(0);
+  const { tick: simTick } = useSimVersion();
 
   useEffect(() => {
     getTournamentList().then((list) => {
-      setTournaments(list);
+      setTournaments((prev) => JSON.stringify(prev) === JSON.stringify(list) ? prev : list);
       const current = list.find((t) => t.current) || list[0];
       if (current) {
-        setCurrentTournamentId(current.id);
+        setCurrentTournamentId((prev) => prev === current.id ? prev : current.id);
         const idx = list.findIndex((t) => t.id === current.id);
-        setViewingWeek(idx >= 0 ? idx : 0);
+        setViewingWeek((prev) => prev === idx ? prev : (idx >= 0 ? idx : 0));
       }
     }).catch(() => {});
-  }, []);
+  }, [simTick]);
 
   useEffect(() => {
     getLeagues().then((leagues) => {
@@ -92,6 +94,7 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
         currentTournamentId={currentTournamentId}
         viewingWeek={viewingWeek}
         onChangeWeek={setViewingWeek}
+        simTick={simTick}
       />
       <BottomNav activePage={activePage} colors={C} onChangePage={onChangePage} />
     </PullToRefresh>

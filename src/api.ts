@@ -20,6 +20,20 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+// --- Sim Version (polling) ---
+
+export interface SimVersion {
+  tournamentId: number;
+  phase: string;
+  currentRound: number;
+  fieldSize: number;
+  cutLine: number | null;
+}
+
+export function getSimVersion() {
+  return fetchJSON<SimVersion>("/sim/version");
+}
+
 // --- Sim ---
 
 export interface SimStatus {

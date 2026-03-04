@@ -7,9 +7,10 @@ interface LeagueStandingsProps {
   leagueId: number;
   myTeamId: number;
   colors: Theme;
+  simTick: number;
 }
 
-export function LeagueStandings({ leagueId, myTeamId, colors: C }: LeagueStandingsProps) {
+export function LeagueStandings({ leagueId, myTeamId, colors: C, simTick }: LeagueStandingsProps) {
   const [standings, setStandings] = useState<SeasonStanding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,11 @@ export function LeagueStandings({ leagueId, myTeamId, colors: C }: LeagueStandin
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Silent re-fetch on sim tick (no loading spinner)
+  useEffect(() => {
+    if (simTick > 0) refresh();
+  }, [simTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (

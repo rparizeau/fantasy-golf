@@ -15,15 +15,16 @@ interface PageContentProps {
   currentTournamentId: number;
   viewingWeek: number;
   onChangeWeek: (week: number) => void;
+  simTick: number;
 }
 
-export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek }: PageContentProps) {
+export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek, simTick }: PageContentProps) {
 
   switch (page) {
     case "home":
       return (
         <div style={{ flex: 1 }}>
-          <Home leagueId={leagueId} myTeamId={myTeamId} colors={C} tournaments={tournaments} currentTournamentId={currentTournamentId} viewingWeek={viewingWeek} />
+          <Home leagueId={leagueId} myTeamId={myTeamId} colors={C} tournaments={tournaments} currentTournamentId={currentTournamentId} viewingWeek={viewingWeek} simTick={simTick} />
         </div>
       );
     case "scorecard":
@@ -38,19 +39,20 @@ export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, 
             viewingWeek={viewingWeek}
             onChangeWeek={onChangeWeek}
             isMajor={tournaments[viewingWeek]?.isMajor ?? false}
+            simTick={simTick}
           />
         </div>
       );
     case "golfers":
       return (
         <div style={{ flex: 1 }}>
-          <Golfers leagueId={leagueId} teamId={myTeamId} colors={C} />
+          <Golfers leagueId={leagueId} teamId={myTeamId} colors={C} simTick={simTick} />
         </div>
       );
     case "league":
       return (
         <div style={{ flex: 1 }}>
-          <LeagueStandings leagueId={leagueId} myTeamId={myTeamId} colors={C} />
+          <LeagueStandings leagueId={leagueId} myTeamId={myTeamId} colors={C} simTick={simTick} />
         </div>
       );
     case "chat":

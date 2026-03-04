@@ -319,10 +319,54 @@ async function seedDev() {
   }
   console.log(`  ✓ tournament rosters: ${trCount}`);
 
-  // ─── 8. Sim state (fresh — no scores, no rounds) ───────────
+  // ─── 8. Sim state (fresh — pre-built so first R1 advance is fast) ─
   const firstTournamentId = tournamentsRaw[0]?.id ?? 1;
   await db.insert(schema.simActive).values({ id: 1, activeTournamentId: firstTournamentId });
-  console.log(`  ✓ sim: fresh idle (tournament ${firstTournamentId})`);
+
+  // Pre-build sim_tournaments + sim_players (the expensive part of first advance)
+  const allGolfers = await db.select().from(schema.golfers);
+  const [tournamentRow] = await db.select().from(schema.tournaments).where(
+    (await import("drizzle-orm")).eq(schema.tournaments.id, firstTournamentId)
+  );
+  const [courseRow] = tournamentRow
+    ? await db.select().from(schema.courses).where(
+        (await import("drizzle-orm")).eq(schema.courses.id, tournamentRow.courseId)
+      )
+    : [null];
+  const holePars = courseRow?.holes as number[] ?? Array(18).fill(4);
+  const par = tournamentRow ? holePars.reduce((a, b) => a + b, 0) : 72;
+
+  await db.insert(schema.simTournaments).values({
+    tournamentId: firstTournamentId,
+    phase: "idle",
+    currentRound: 0,
+    par,
+    holePars,
+    cutLine: null,
+    fieldSize: allGolfers.length,
+    overrides: {},
+    isEarningsAccumulated: false,
+    isPointsAccumulated: false,
+  });
+
+  if (allGolfers.length > 0) {
+    await db.insert(schema.simPlayers).values(
+      allGolfers.map((g) => ({
+        tournamentId: firstTournamentId,
+        golferId: g.id,
+        name: g.name,
+        origin: g.origin,
+        ranking: g.ranking,
+        rounds: [],
+        holeScores: null,
+        total: 0,
+        toPar: 0,
+        position: g.ranking,
+        statusEnum: "active" as const,
+      }))
+    );
+  }
+  console.log(`  ✓ sim: pre-built idle (tournament ${firstTournamentId}, ${allGolfers.length} players)`);
 
   console.log("\n✅ Dev data seeded.");
   await client.end();

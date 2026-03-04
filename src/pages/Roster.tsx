@@ -19,6 +19,7 @@ interface RosterProps {
   viewingWeek: number;
   onChangeWeek: (week: number) => void;
   isMajor: boolean;
+  simTick: number;
 }
 
 interface CachedWeek {
@@ -26,7 +27,7 @@ interface CachedWeek {
   rank: { myRank: number; myRankTied: boolean; myPoints: number; totalTeams: number; projectedTotal: number; rivalAbove: { name: string; points: number; rank: number } | null; rivalBelow: { name: string; points: number; rank: number } | null } | null;
 }
 
-export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek: _onChangeWeek, isMajor: _isMajor }: RosterProps) {
+export function Roster({ leagueId, teamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek: _onChangeWeek, isMajor: _isMajor, simTick }: RosterProps) {
   const [data, setData] = useState<RosterData | null>(null);
   const [roster, setRoster] = useState<RosterPlayer[]>([]);
   const [reserve, setReserve] = useState<RosterPlayer[]>([]);
@@ -48,6 +49,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const cacheRef = useRef(new Map<number, CachedWeek>());
   const initialLoadRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
+  const silentRef = useRef(false);
 
   const applyData = useCallback((d: RosterData, rankData: CachedWeek["rank"]) => {
     setData(d);
@@ -98,10 +100,11 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       setLoading(false);
     }
 
-    // No cache — show fetching overlay (skip on initial load since `loading` handles that)
+    // No cache — show fetching overlay (skip on initial load and silent sim refreshes)
     if (!cached) {
-      if (!initialLoadRef.current) setFetching(true);
+      if (!initialLoadRef.current && !silentRef.current) setFetching(true);
     }
+    silentRef.current = false;
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -173,6 +176,17 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Silent re-fetch on sim tick (no loading/fetching spinner), invalidate current-week cache first
+  useEffect(() => {
+    if (simTick > 0) {
+      const currentWeekIdx = tournaments.findIndex((t) => t.id === currentTournamentId);
+      const currentTid = tournaments[currentWeekIdx]?.id;
+      if (currentTid != null) cacheRef.current.delete(currentTid);
+      silentRef.current = true;
+      refresh();
+    }
+  }, [simTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch season rank/points on mount and when week changes (data may update after completing a week)
   useEffect(() => {

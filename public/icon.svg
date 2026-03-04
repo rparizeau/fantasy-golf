@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1A3A2A"/>
+      <stop offset="100%" stop-color="#0F2418"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Pole -->
+  <line x1="168" y1="72" x2="168" y2="430" stroke="#D4AF37" stroke-width="12" stroke-linecap="round"/>
+  <!-- Flag -->
+  <path d="M168 72 L380 136 L168 200 Z" fill="#D4AF37" opacity="0.95"/>
+  <!-- Inner flag accent -->
+  <path d="M168 72 L380 136 L168 200 Z" fill="#E8C84A" opacity="0.3"/>
+  <!-- Ground ellipse -->
+  <ellipse cx="256" cy="432" rx="120" ry="20" fill="#D4AF37" opacity="0.3"/>
+</svg>
