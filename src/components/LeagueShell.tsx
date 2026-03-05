@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Theme } from "../theme";
-import type { TournamentListItem } from "../api";
+import type { TournamentListItem, LeagueSummary } from "../api";
 import { getTournamentList, getLeagues } from "../api";
 import { useSimVersion } from "../hooks/useSimVersion";
 import { LeagueHeader } from "./LeagueHeader";
@@ -16,14 +16,16 @@ interface LeagueShellProps {
   onToggleTheme: () => void;
   onBack: () => void;
   onChangePage: (id: string) => void;
+  onChangeLeague: (id: number) => void;
 }
 
-export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleTheme, onBack, onChangePage }: LeagueShellProps) {
+export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleTheme, onBack, onChangePage, onChangeLeague }: LeagueShellProps) {
   const [tournaments, setTournaments] = useState<TournamentListItem[]>([]);
   const [currentTournamentId, setCurrentTournamentId] = useState<number>(0);
   const [viewingWeek, setViewingWeek] = useState<number>(0);
   const [myTeamId, setMyTeamId] = useState<number | null>(null);
   const [seasonPoints, setSeasonPoints] = useState(0);
+  const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
   const { tick: simTick } = useSimVersion();
 
   useEffect(() => {
@@ -39,8 +41,9 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
   }, [simTick]);
 
   useEffect(() => {
-    getLeagues().then((leagues) => {
-      const league = leagues.find((l) => l.id === leagueId);
+    getLeagues().then((all) => {
+      setLeagues(all);
+      const league = all.find((l) => l.id === leagueId);
       if (league) {
         setMyTeamId(league.myTeamId);
         setSeasonPoints(league.points);
@@ -84,6 +87,8 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
         viewingWeek={viewingWeek}
         onChangeWeek={setViewingWeek}
         seasonPoints={seasonPoints}
+        leagues={leagues}
+        onChangeLeague={onChangeLeague}
       />
       <PageContent
         page={activePage}
