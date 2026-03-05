@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { loadActiveSimState, getActiveTournamentId } from "../db/dal/sim.js";
 import { loadGolfers, loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
-import { formatScore, calculatePlayerPoints, DEFAULT_SCORING } from "../sim/engine.js";
+import { formatScore, calculatePlayerPoints, calculateRoundPoints, holeToPoints, DEFAULT_SCORING } from "../sim/engine.js";
 import { getLeague } from "../db/dal/league.js";
 
 const router = Router();
@@ -47,7 +47,16 @@ router.get("/:id", async (req, res) => {
   }
 
   const holePars = state.holePars ?? [];
-  const points = sim ? calculatePlayerPoints(sim.holeScores, holePars, scoring) : 0;
+  const holeScores = sim?.holeScores ?? [];
+  const points = sim ? calculatePlayerPoints(holeScores, holePars, scoring) : 0;
+  const roundPoints = sim ? calculateRoundPoints(holeScores, holePars, scoring) : [];
+
+  // 2D array of per-hole point values mirroring holeScores
+  const holePoints: number[][] = holeScores.map((round) =>
+    round.map((score, h) =>
+      score != null ? holeToPoints(score, holePars[h] ?? 4, scoring) : 0
+    )
+  );
 
   res.json({
     playerId: seed.id,
@@ -61,6 +70,10 @@ router.get("/:id", async (req, res) => {
     rounds: sim?.rounds ?? [],
     earnings,
     points,
+    holeScores,
+    holePars,
+    roundPoints,
+    holePoints,
   });
 });
 

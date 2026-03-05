@@ -250,7 +250,7 @@ export function Golfers({ leagueId, teamId, colors: C, simTick }: GolfersProps) 
       )}
 
       {modalPlayerId !== null && (
-        <PlayerModal playerId={modalPlayerId} colors={C} onClose={() => setModalPlayerId(null)} />
+        <PlayerModal playerId={modalPlayerId} leagueId={leagueId} colors={C} onClose={() => setModalPlayerId(null)} />
       )}
 
       {actionModal && (

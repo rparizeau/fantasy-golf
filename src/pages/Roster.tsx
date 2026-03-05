@@ -643,7 +643,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       </div>
 
       {modalPlayerId !== null && (
-        <PlayerModal playerId={modalPlayerId} colors={C} onClose={() => setModalPlayerId(null)} />
+        <PlayerModal playerId={modalPlayerId} leagueId={leagueId} colors={C} onClose={() => setModalPlayerId(null)} />
       )}
     </div>
   );

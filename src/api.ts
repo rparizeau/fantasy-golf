@@ -398,10 +398,15 @@ export interface PlayerDetail {
   rounds: number[];
   earnings: number;
   points: number;
+  holeScores: (number | null)[][];
+  holePars: number[];
+  roundPoints: number[];
+  holePoints: number[][];
 }
 
-export function getPlayer(id: number) {
-  return fetchJSON<PlayerDetail>(`/player/${id}`);
+export function getPlayer(id: number, leagueId?: number) {
+  const qs = leagueId != null ? `?leagueId=${leagueId}` : "";
+  return fetchJSON<PlayerDetail>(`/player/${id}${qs}`);
 }
 
 // --- Mulligan (Build 7+) ---
