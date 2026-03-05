@@ -1,10 +1,9 @@
 interface ManagerIconProps {
   size?: number;
-  bgColor: string;
-  ballColor: string;
+  bgColor?: string;
 }
 
-export function ManagerIcon({ size = 30, bgColor, ballColor }: ManagerIconProps) {
+export function ManagerIcon({ size = 30, bgColor = "#2D6B4A" }: ManagerIconProps) {
   const s = size * 0.6;
   return (
     <div
@@ -19,7 +18,7 @@ export function ManagerIcon({ size = 30, bgColor, ballColor }: ManagerIconProps)
         flexShrink: 0,
       }}
     >
-      <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={ballColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
         <circle cx="9" cy="7" r="4" />
         <path d="M23 21v-2a4 4 0 0 0-3-3.87" />

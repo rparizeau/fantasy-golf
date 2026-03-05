@@ -124,7 +124,7 @@ export function StandingsList<T extends StandingsEntry>({
                 </div>
               </div>
 
-              <ManagerIcon size={28} bgColor={entry.color ?? undefined} />
+              <ManagerIcon size={28} bgColor={entry.color ?? "#2D6B4A"} />
 
               {/* Team info */}
               <div style={{ flex: 1, minWidth: 0 }}>

@@ -456,7 +456,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   {/* Icon with season rank badge offset top-left */}
                   <div style={{ position: "relative", flexShrink: 0 }}>
-                    <ManagerIcon size={42} bgColor={data.color ?? undefined} />
+                    <ManagerIcon size={42} bgColor={data.color ?? "#2D6B4A"} />
                     {isOwnTeam && seasonRank > 0 && (
                       <span style={{
                         position: "absolute",
@@ -517,7 +517,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                               gap: 10,
                             }}
                           >
-                            <ManagerIcon size={28} bgColor={m.color ?? undefined} />
+                            <ManagerIcon size={28} bgColor={m.color ?? "#2D6B4A"} />
                             <div>
                               <p style={{ fontSize: 14, fontWeight: m.teamId === viewingTeamId ? 600 : 400, color: C.txt, margin: 0 }}>{m.teamName}</p>
                               <p style={{ fontSize: 11, color: C.txt2, margin: 0 }}>{m.managerName}</p>
