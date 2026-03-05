@@ -61,9 +61,10 @@ export default function App() {
           onToggleTheme={toggleTheme}
           onBack={exitLeague}
           onChangePage={changePage}
+          onChangeLeague={enterLeague}
         />
       ) : (
-        <Lobby isDark={isDark} colors={C} onToggleTheme={toggleTheme} onEnterLeague={enterLeague} onEnterLeaguePage={enterLeaguePage} />
+        <Lobby isDark={isDark} colors={C} onToggleTheme={toggleTheme} onEnterLeaguePage={enterLeaguePage} />
       )}
     </div>
   );
