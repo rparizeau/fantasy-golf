@@ -47,10 +47,16 @@ export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeague, onEnter
       </div>
 
       <div style={{ padding: "0 16px", marginTop: 8 }}>
-        {/* SECTION BODY */}
-        <p style={{ color: C.txt2, fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.8, margin: "0 0 12px" }}>
-          Your Leagues
-        </p>
+        {/* SECTION HEADER with POS + PTS columns */}
+        <div style={{ display: "flex", alignItems: "center", padding: "0 0 8px" }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>Your Leagues</span>
+          </div>
+          <div style={{ display: "flex", gap: 2, flexShrink: 0, marginRight: 30 }}>
+            <div style={{ width: 36, textAlign: "center" }}><span style={{ color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>POS</span></div>
+            <div style={{ width: 46, textAlign: "right" }}><span style={{ color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>PTS</span></div>
+          </div>
+        </div>
 
         {/* League Cards */}
         {loading
@@ -185,33 +191,61 @@ function LeagueCard({
         overflow: "hidden",
       }}
     >
-      {/* League name title */}
-      <div style={{ padding: "10px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <p style={{ color: C.txt3, fontSize: 11, margin: 0, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 600 }}>{l.name}</p>
-        <p style={{ color: C.txt3, fontSize: 11, margin: 0, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 600 }}>Week {l.week}</p>
-      </div>
-      {/* Home — team info */}
-      <div onClick={onTap} style={{ padding: "12px 16px", cursor: "pointer" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <ManagerIcon size={42} bgColor={l.teamColor ?? "#003C80"} ballColor={l.teamSecondaryColor ?? "#FFFFFF"} />
-            <div style={{ minWidth: 0 }}>
-              <p style={{ color: C.txt, fontSize: 18, fontWeight: 700, margin: 0 }}>{l.team}</p>
+      {/* Team info */}
+      <div onClick={onTap} style={{ padding: "12px 14px", cursor: "pointer" }}>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <ManagerIcon size={42} bgColor={l.teamColor ?? undefined} />
               {l.rank > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 24, height: 18, borderRadius: 5, background: C.goldDim, color: C.gold, fontSize: 11, fontWeight: 700, padding: "0 5px" }}>{l.rankTied ? "T" : ""}{l.rank}</span>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: C.txt2 }}>{l.points} pts</span>
-                </div>
+                <span style={{
+                  position: "absolute",
+                  top: -4,
+                  left: -6,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: 20,
+                  height: 18,
+                  borderRadius: 5,
+                  background: C.goldDim,
+                  color: C.gold,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "0 4px",
+                  border: `1px solid ${C.gold}`,
+                }}>{l.rankTied ? "T" : ""}{l.rank}</span>
               )}
             </div>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ color: C.txt, fontSize: 18, fontWeight: 700, margin: 0 }}>{l.team}</p>
+              <p style={{ fontSize: 12, fontWeight: 500, color: C.txt2, margin: "2px 0 0" }}>{l.name} · Week {l.week}</p>
+            </div>
           </div>
-          <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
-            <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{l.weekPoints} pts</p>
-            {l.weekRank > 0 && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginTop: 2 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 24, height: 18, borderRadius: 5, background: C.card2, color: C.txt2, fontSize: 11, fontWeight: 700, padding: "0 5px" }}>{l.weekRankTied ? "T" : ""}{l.weekRank}</span>
-              </div>
-            )}
+          <div style={{ display: "flex", gap: 2, flexShrink: 0, marginRight: 15, alignItems: "center" }}>
+            <div style={{ width: 36, display: "flex", justifyContent: "center" }}>
+              {l.weekRank > 0 ? (
+                <span style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: 20,
+                  height: 18,
+                  borderRadius: 5,
+                  background: C.card2,
+                  color: C.txt2,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "0 4px",
+                  border: `1px solid ${C.border}`,
+                }}>{l.weekRankTied ? "T" : ""}{l.weekRank}</span>
+              ) : (
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.txt3 }}>-</span>
+              )}
+            </div>
+            <div style={{ width: 46, textAlign: "right" }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: l.weekPoints > 0 ? C.txt : C.txt3, margin: 0 }}>{l.weekPoints || "-"}</p>
+            </div>
           </div>
         </div>
       </div>

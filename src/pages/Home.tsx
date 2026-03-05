@@ -73,6 +73,7 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
         myTeamId={myTeamId}
         showThru={false}
         showRounds={true}
+        badgeColor={tournaments[viewingWeek]?.color}
         emptyMessage={isFuture ? "Tournament hasn't started yet." : "No leaderboard data yet. Sim a round to see results."}
       />
     </div>

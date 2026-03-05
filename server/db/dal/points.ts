@@ -162,6 +162,19 @@ export async function writePointsForRound(
   const grRows = await db.select().from(golferRoster)
     .where(inArray(golferRoster.rosterId, rosterIds));
 
+  // Delete existing points for this round (idempotent — prevents duplicates on re-advance)
+  const grIds = grRows.map((r) => r.id);
+  if (grIds.length > 0) {
+    for (let i = 0; i < grIds.length; i += 500) {
+      await db.delete(managerPoints).where(
+        and(
+          inArray(managerPoints.golferRosterId, grIds.slice(i, i + 500)),
+          eq(managerPoints.roundNumber, roundNumber),
+        ),
+      );
+    }
+  }
+
   // Build mapping: golfer_roster.id → { golferId, leagueId }
   const rosterToTrId = new Map(rosterRows.map((r) => [r.id, r.rosterableId]));
   const trToLtId = new Map(trRows.map((r) => [r.id, r.leagueTournamentId]));
@@ -346,6 +359,44 @@ export async function writeTournamentResults(tournamentId: number): Promise<void
           },
         });
     }
+  }
+}
+
+/**
+ * Delete all manager_points rows for a given tournament + round across all leagues.
+ * Used when rewinding a round to prevent duplicate points on re-advance.
+ */
+export async function deletePointsForTournamentRound(
+  tournamentId: number,
+  roundNumber: number,
+): Promise<void> {
+  const ltRows = await db.select({ id: leagueTournament.id }).from(leagueTournament)
+    .where(eq(leagueTournament.tournamentId, tournamentId));
+  if (ltRows.length === 0) return;
+
+  const trRows = await db.select({ id: tournamentRosters.id }).from(tournamentRosters)
+    .where(inArray(tournamentRosters.leagueTournamentId, ltRows.map((r) => r.id)));
+  if (trRows.length === 0) return;
+
+  const rosterRows = await db.select({ id: rosters.id }).from(rosters)
+    .where(and(
+      inArray(rosters.rosterableId, trRows.map((r) => r.id)),
+      eq(rosters.rosterableType, "tournament_roster"),
+    ));
+  if (rosterRows.length === 0) return;
+
+  const grRows = await db.select({ id: golferRoster.id }).from(golferRoster)
+    .where(inArray(golferRoster.rosterId, rosterRows.map((r) => r.id)));
+  if (grRows.length === 0) return;
+
+  const grIds = grRows.map((r) => r.id);
+  for (let i = 0; i < grIds.length; i += 500) {
+    await db.delete(managerPoints).where(
+      and(
+        inArray(managerPoints.golferRosterId, grIds.slice(i, i + 500)),
+        eq(managerPoints.roundNumber, roundNumber),
+      ),
+    );
   }
 }
 

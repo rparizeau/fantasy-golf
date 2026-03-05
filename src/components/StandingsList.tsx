@@ -25,6 +25,7 @@ export function StandingsList<T extends StandingsEntry>({
   title,
   showThru = true,
   showRounds = false,
+  badgeColor,
   renderExpanded,
   emptyMessage,
 }: {
@@ -34,6 +35,7 @@ export function StandingsList<T extends StandingsEntry>({
   title?: string;
   showThru?: boolean;
   showRounds?: boolean;
+  badgeColor?: string;
   renderExpanded?: (entry: T, colors: Theme) => React.ReactNode;
   emptyMessage?: string;
 }) {
@@ -101,25 +103,28 @@ export function StandingsList<T extends StandingsEntry>({
               }}
             >
               {/* Rank */}
-              <div
-                style={{
-                  width: 32,
-                  height: 28,
-                  borderRadius: 8,
-                  background: showThru ? C.goldDim : C.card2,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: showThru ? C.gold : C.txt2,
-                  flexShrink: 0,
-                }}
-              >
-                {posLabel}
+              <div style={{ width: 32, display: "flex", justifyContent: "center", flexShrink: 0 }}>
+                <div
+                  style={{
+                    minWidth: 20,
+                    height: 18,
+                    borderRadius: 5,
+                    background: showThru ? C.goldDim : badgeColor ? `${badgeColor}20` : C.card2,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: showThru ? C.gold : badgeColor ?? C.txt2,
+                    padding: "0 4px",
+                    border: `1px solid ${showThru ? C.gold : badgeColor ?? C.border}`,
+                  }}
+                >
+                  {posLabel}
+                </div>
               </div>
 
-              <ManagerIcon size={28} bgColor={entry.color ?? "#003C80"} ballColor={entry.secondaryColor ?? "#FFFFFF"} />
+              <ManagerIcon size={28} bgColor={entry.color ?? undefined} />
 
               {/* Team info */}
               <div style={{ flex: 1, minWidth: 0 }}>

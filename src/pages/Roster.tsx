@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getRoster, setLineup, getFantasyLeaderboard, getLeagues, type RosterPlayer, type RosterData, type TournamentListItem } from "../api";
+import { getRoster, setLineup, getFantasyLeaderboard, getLeagues, getLeagueInfo, type RosterPlayer, type RosterData, type TournamentListItem, type LeagueInfo } from "../api";
 import { PlayerModal } from "../components/PlayerModal";
 import { ManagerIcon } from "../components/ManagerIcon";
 import type { Theme } from "../theme";
@@ -38,18 +38,23 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const [modalPlayerId, setModalPlayerId] = useState<number | null>(null);
   const [moving, setMoving] = useState<number | null>(null);
   const [myRank, setMyRank] = useState(0);
-  const [myRankTied, setMyRankTied] = useState(false);
+  const [, setMyRankTied] = useState(false);
   const [totalTeams, setTotalTeams] = useState(0);
   const [myPoints, setMyPoints] = useState(0);
   const [rivalAbove, setRivalAbove] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [rivalBelow, setRivalBelow] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [projectedTotal, setProjectedTotal] = useState(0);
   const [seasonRank, setSeasonRank] = useState(0);
-  const [seasonPoints, setSeasonPoints] = useState(0);
-  const cacheRef = useRef(new Map<number, CachedWeek>());
+  const [seasonRankTied, setSeasonRankTied] = useState(false);
+  const [, setSeasonPoints] = useState(0);
+  const cacheRef = useRef(new Map<string, CachedWeek>());
   const initialLoadRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
   const silentRef = useRef(false);
+  const [viewingTeamId, setViewingTeamId] = useState(teamId);
+  const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
+  const [members, setMembers] = useState<LeagueInfo["members"]>([]);
+  const teamDropdownRef = useRef<HTMLDivElement>(null);
 
   const applyData = useCallback((d: RosterData, rankData: CachedWeek["rank"]) => {
     setData(d);
@@ -81,7 +86,8 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
     if (tid == null) return;
     const currentWeekIdx = tournaments.findIndex((t) => t.id === currentTournamentId);
     const isCurrentWeek = viewingWeek === currentWeekIdx;
-    const cached = cacheRef.current.get(tid);
+    const cacheKey = `${tid}:${viewingTeamId}`;
+    const cached = cacheRef.current.get(cacheKey);
 
     // Cancel any in-flight request
     abortRef.current?.abort();
@@ -111,7 +117,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
 
     try {
       const [d, lb] = await Promise.all([
-        getRoster(leagueId, teamId, tid, { signal: controller.signal }),
+        getRoster(leagueId, viewingTeamId, tid, { signal: controller.signal }),
         getFantasyLeaderboard(leagueId, tid, { signal: controller.signal }),
       ]);
 
@@ -123,7 +129,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         const hasScores = lb.teams.some(t => t.totalPoints !== 0);
         if (hasScores) {
           const sorted = lb.teams;
-          const myIdx = sorted.findIndex(t => t.teamId === teamId);
+          const myIdx = sorted.findIndex(t => t.teamId === viewingTeamId);
           if (myIdx >= 0) {
             type Rival = { name: string; points: number; rank: number } | null;
             const myPts = sorted[myIdx].totalPoints;
@@ -159,7 +165,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         }
       }
 
-      cacheRef.current.set(tid, { data: d, rank: rankData });
+      cacheRef.current.set(cacheKey, { data: d, rank: rankData });
       applyData(d, rankData);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
@@ -171,7 +177,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         initialLoadRef.current = false;
       }
     }
-  }, [leagueId, teamId, viewingWeek, tournaments, currentTournamentId, applyData]);
+  }, [leagueId, teamId, viewingTeamId, viewingWeek, tournaments, currentTournamentId, applyData]);
 
   useEffect(() => {
     refresh();
@@ -182,7 +188,11 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
     if (simTick > 0) {
       const currentWeekIdx = tournaments.findIndex((t) => t.id === currentTournamentId);
       const currentTid = tournaments[currentWeekIdx]?.id;
-      if (currentTid != null) cacheRef.current.delete(currentTid);
+      if (currentTid != null) {
+        for (const key of cacheRef.current.keys()) {
+          if (key.startsWith(`${currentTid}:`)) cacheRef.current.delete(key);
+        }
+      }
       silentRef.current = true;
       refresh();
     }
@@ -194,10 +204,34 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       const mine = leagues.find((l) => l.id === leagueId);
       if (mine) {
         setSeasonRank(mine.rank);
+        setSeasonRankTied(mine.rankTied);
         setSeasonPoints(mine.points);
       }
     }).catch(() => {});
   }, [leagueId, viewingWeek]);
+
+  // Fetch league members for team dropdown
+  useEffect(() => {
+    getLeagueInfo(leagueId).then((info) => setMembers(info.members)).catch(() => {});
+  }, [leagueId]);
+
+  // Reset viewingTeamId when own team changes (league switch)
+  useEffect(() => {
+    setViewingTeamId(teamId);
+    setTeamDropdownOpen(false);
+  }, [teamId]);
+
+  // Outside-click to close team dropdown
+  useEffect(() => {
+    if (!teamDropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (teamDropdownRef.current && !teamDropdownRef.current.contains(e.target as Node)) {
+        setTeamDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [teamDropdownOpen]);
 
   const settings = data?.settings;
   const activeSize = settings?.activeSize ?? 5;
@@ -206,10 +240,11 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const benchSize = rosterSize - activeSize;
 
   const autoSave = (newRoster: RosterPlayer[]) => {
+    if (viewingTeamId !== teamId) return;
     const activeIds = newRoster.filter((p) => p.isActive).map((p) => p.playerId);
     if (activeIds.length !== activeSize) return;
     const tid = tournaments[viewingWeek]?.id;
-    if (tid != null) cacheRef.current.delete(tid);
+    if (tid != null) cacheRef.current.delete(`${tid}:${viewingTeamId}`);
     setLineup(leagueId, teamId, activeIds, tid).catch((e) => {
       setError(e instanceof Error ? e.message : "Failed to save lineup");
     });
@@ -355,8 +390,11 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const currentWeekIndex = tournaments.findIndex((t) => t.id === currentTournamentId);
   const isPastWeek = viewingWeek < currentWeekIndex;
   const isFutureWeek = viewingWeek > currentWeekIndex;
-  const canMove = !locked && !isPastWeek;
+  const isOwnTeam = viewingTeamId === teamId;
+  const canMove = !locked && !isPastWeek && isOwnTeam;
   const par = tournaments[viewingWeek]?.par ?? 72;
+  const viewedMember = members.find((m) => m.teamId === viewingTeamId);
+  const firstName = viewedMember?.managerName?.split(" ")[0] ?? "";
 
   // Team round totals from active roster
   const teamRoundPoints = [0, 1, 2, 3].map((ri) =>
@@ -367,7 +405,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   );
 
   return (
-    <div style={{ paddingBottom: 100, position: "relative" }}>
+    <div style={{ position: "relative" }}>
       {fetching && !loading && (
         <div style={{
           position: "absolute",
@@ -416,10 +454,10 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {/* Icon with week rank badge offset top-left */}
+                  {/* Icon with season rank badge offset top-left */}
                   <div style={{ position: "relative", flexShrink: 0 }}>
-                    <ManagerIcon size={42} bgColor={data.color ?? "#003C80"} ballColor={data.secondaryColor ?? "#FFFFFF"} />
-                    {myRank > 0 && (
+                    <ManagerIcon size={42} bgColor={data.color ?? undefined} />
+                    {isOwnTeam && seasonRank > 0 && (
                       <span style={{
                         position: "absolute",
                         top: -4,
@@ -430,21 +468,62 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                         minWidth: 20,
                         height: 18,
                         borderRadius: 5,
-                        background: C.card2,
-                        color: C.txt2,
+                        background: C.goldDim,
+                        color: C.gold,
                         fontSize: 11,
                         fontWeight: 700,
                         padding: "0 4px",
-                        border: `1px solid ${C.border}`,
-                      }}>{myRankTied ? "T" : ""}{myRank}</span>
+                        border: `1px solid ${C.gold}`,
+                      }}>{seasonRankTied ? "T" : ""}{seasonRank}</span>
                     )}
                   </div>
-                  <div>
-                    <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{data.teamName}</p>
-                    {seasonRank > 0 && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 24, height: 18, borderRadius: 5, background: C.goldDim, color: C.gold, fontSize: 11, fontWeight: 700, padding: "0 5px" }}>{seasonRank}</span>
-                        <span style={{ fontSize: 12, fontWeight: 500, color: C.txt2 }}>{seasonPoints} pts</span>
+                  <div style={{ position: "relative" }} ref={teamDropdownRef}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setTeamDropdownOpen(!teamDropdownOpen); }}
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                    >
+                      <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{data.teamName}</p>
+                      <span style={{ fontSize: 10, color: C.txt3 }}>{teamDropdownOpen ? "▲" : "▼"}</span>
+                    </button>
+                    {firstName && (
+                      <p style={{ fontSize: 12, fontWeight: 500, color: C.txt2, margin: "2px 0 0" }}>{firstName}</p>
+                    )}
+                    {teamDropdownOpen && (
+                      <div style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: -52,
+                        zIndex: 50,
+                        background: C.card,
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 10,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                        maxHeight: 300,
+                        overflowY: "auto",
+                        minWidth: 240,
+                        marginTop: 6,
+                      }}>
+                        {members.map((m, i) => (
+                          <div
+                            key={m.teamId}
+                            onClick={(e) => { e.stopPropagation(); setViewingTeamId(m.teamId); setTeamDropdownOpen(false); }}
+                            style={{
+                              padding: "10px 14px",
+                              cursor: "pointer",
+                              background: m.teamId === viewingTeamId ? `${m.color ?? C.green}20` : "transparent",
+                              borderBottom: i < members.length - 1 ? `1px solid ${C.border}` : "none",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                            }}
+                          >
+                            <ManagerIcon size={28} bgColor={m.color ?? undefined} />
+                            <div>
+                              <p style={{ fontSize: 14, fontWeight: m.teamId === viewingTeamId ? 600 : 400, color: C.txt, margin: 0 }}>{m.teamName}</p>
+                              <p style={{ fontSize: 11, color: C.txt2, margin: 0 }}>{m.managerName}</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -538,7 +617,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       {/* Bench */}
       <div style={{ background: C.card }}>
         {sectionHeader(`Bench (${benchPlayers.length}/${benchSize})`)}
-        <div style={{ padding: "0 16px 6px" }}>
+        <div style={{ padding: "0 16px 16px" }}>
 
           {benchPlayers.map((p) => (
             <PlayerCard key={p.playerId} player={p} par={par} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
@@ -552,7 +631,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       {/* Reserve */}
       <div style={{ background: C.bg }}>
         {sectionHeader(`Reserve (${sortedReserve.length}/${reserveSize})`)}
-        <div style={{ padding: "0 16px 6px" }}>
+        <div style={{ padding: "0 16px 100px" }}>
 
           {sortedReserve.map((p) => (
             <PlayerCard key={p.playerId} player={p} par={par} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />

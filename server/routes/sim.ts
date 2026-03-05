@@ -7,7 +7,7 @@ import {
 import { loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
 import { getAllLeagues, getLineupsForTeams, autoCopyLineups } from "../db/dal/league.js";
 import { advance, rewind, setOverride, updatePlayer, calculatePlayerPoints } from "../sim/engine.js";
-import { writePointsForRound, writeTournamentResults, deleteTournamentResults } from "../db/dal/points.js";
+import { writePointsForRound, writeTournamentResults, deleteTournamentResults, deletePointsForTournamentRound } from "../db/dal/points.js";
 
 function buildPlayerEarnings(simState: SimState, purse: number, payoutTable: { position: number; pct: number }[]): Map<number, number> {
   const map = new Map<number, number>();
@@ -179,8 +179,16 @@ router.post("/rewind", async (_req, res) => {
     return;
   }
 
+  const prevRound = state.currentRound;
   const updated = rewind(state);
   await saveSimState(updated);
+
+  // Delete points for the rewound round to prevent duplicates on re-advance
+  if (prevRound > updated.currentRound) {
+    await deletePointsForTournamentRound(state.tournamentId, prevRound).catch((e) => {
+      console.error("Failed to delete round points on rewind:", e);
+    });
+  }
 
   res.json({
     phase: updated.phase,
