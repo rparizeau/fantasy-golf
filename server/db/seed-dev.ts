@@ -43,58 +43,76 @@ const LEAGUES = [
     name: "Gruesome Twosome",
     rosterCount: 8, lineupCount: 2, reserveCount: 2,
     teams: [
-      { manager: "Bobby", teamName: "Bogey Bros", colors: ["#1A1A2E", "#E94560"] },
-      { manager: "Jake", teamName: "The Sandbaggers", colors: ["#006B54", "#FFD700"] },
-      { manager: "Mike", teamName: "Birdie Brigade", colors: ["#0F4C75", "#BBE1FA"] },
-      { manager: "Sarah", teamName: "Eagle Eyes", colors: ["#5C2D91", "#FFB900"] },
-      { manager: "Tom", teamName: "Par-tee Animals", colors: ["#CC0000", "#FFFFFF"] },
-      { manager: "Lisa", teamName: "Fore Play", colors: ["#E8659B", "#FFFFFF"] },
-      { manager: "Dave", teamName: "Slice of Life", colors: ["#2D6A4F", "#D4AF37"] },
-      { manager: "Emma", teamName: "Cart Narcs", colors: ["#FF6B35", "#1A1A1A"] },
-      { manager: "Chris", teamName: "Putt Pirates", colors: ["#1B1B3A", "#FFD700"] },
-      { manager: "Alex", teamName: "Fairway Bandits", colors: ["#344E41", "#DAD7CD"] },
-      { manager: "Ryan", teamName: "Green Machine", colors: ["#2D8B52", "#FFFFFF"] },
-      { manager: "Megan", teamName: "Rough Riders", colors: ["#8B4513", "#F5DEB3"] },
+      { manager: "Bobby", teamName: "Bogey Bros", colors: ["#1E3A5F", "#FFFFFF"] },
+      { manager: "Jake", teamName: "The Sandbaggers", colors: ["#059669", "#FFFFFF"] },
+      { manager: "Mike", teamName: "Birdie Brigade", colors: ["#2563EB", "#FFFFFF"] },
+      { manager: "Sarah", teamName: "Eagle Eyes", colors: ["#7C3AED", "#FFFFFF"] },
+      { manager: "Tom", teamName: "Par-tee Animals", colors: ["#DC2626", "#FFFFFF"] },
+      { manager: "Lisa", teamName: "Fore Play", colors: ["#DB2777", "#FFFFFF"] },
+      { manager: "Dave", teamName: "Slice of Life", colors: ["#0891B2", "#FFFFFF"] },
+      { manager: "Emma", teamName: "Cart Narcs", colors: ["#EA580C", "#FFFFFF"] },
+      { manager: "Chris", teamName: "Putt Pirates", colors: ["#4338CA", "#FFFFFF"] },
+      { manager: "Alex", teamName: "Fairway Bandits", colors: ["#64748B", "#FFFFFF"] },
+      { manager: "Ryan", teamName: "Green Machine", colors: ["#16A34A", "#FFFFFF"] },
+      { manager: "Megan", teamName: "Rough Riders", colors: ["#A16207", "#FFFFFF"] },
     ],
   },
   {
     name: "The Foursome",
     rosterCount: 8, lineupCount: 4, reserveCount: 0,
     teams: [
-      { manager: "Bobby", teamName: "Pin Seekers", colors: ["#003C80", "#FFD700"] },
-      { manager: "Dan", teamName: "Tee Time Bandits", colors: ["#2C3E50", "#E74C3C"] },
-      { manager: "Kate", teamName: "Iron Maidens", colors: ["#4A0E4E", "#E8A0BF"] },
-      { manager: "Nick", teamName: "Driver's Ed", colors: ["#1A5276", "#F39C12"] },
-      { manager: "Jess", teamName: "Club Soda", colors: ["#16A085", "#ECF0F1"] },
-      { manager: "Matt", teamName: "Chip Shots", colors: ["#C0392B", "#FFFFFF"] },
-      { manager: "Amy", teamName: "Mulligan Stew", colors: ["#8E44AD", "#F1C40F"] },
-      { manager: "Ben", teamName: "Caddy Shack", colors: ["#27AE60", "#1A1A1A"] },
-      { manager: "Zoe", teamName: "Ace Ventura", colors: ["#E67E22", "#FFFFFF"] },
-      { manager: "Tyler", teamName: "Sand Trap Stars", colors: ["#D4A03C", "#3D2B1F"] },
-      { manager: "Sam", teamName: "Divot Diggers", colors: ["#5D4037", "#FFCC80"] },
-      { manager: "Luke", teamName: "Links Legends", colors: ["#1C2841", "#C9B037"] },
+      { manager: "Bobby", teamName: "Pin Seekers", colors: ["#003C80", "#FFFFFF"] },
+      { manager: "Dan", teamName: "Tee Time Bandits", colors: ["#BE123C", "#FFFFFF"] },
+      { manager: "Kate", teamName: "Iron Maidens", colors: ["#6D28D9", "#FFFFFF"] },
+      { manager: "Nick", teamName: "Driver's Ed", colors: ["#0369A1", "#FFFFFF"] },
+      { manager: "Jess", teamName: "Club Soda", colors: ["#0D9488", "#FFFFFF"] },
+      { manager: "Matt", teamName: "Chip Shots", colors: ["#B91C1C", "#FFFFFF"] },
+      { manager: "Amy", teamName: "Mulligan Stew", colors: ["#9333EA", "#FFFFFF"] },
+      { manager: "Ben", teamName: "Caddy Shack", colors: ["#15803D", "#FFFFFF"] },
+      { manager: "Zoe", teamName: "Ace Ventura", colors: ["#C2410C", "#FFFFFF"] },
+      { manager: "Tyler", teamName: "Sand Trap Stars", colors: ["#CA8A04", "#FFFFFF"] },
+      { manager: "Sam", teamName: "Divot Diggers", colors: ["#78350F", "#FFFFFF"] },
+      { manager: "Luke", teamName: "Links Legends", colors: ["#1E293B", "#FFFFFF"] },
     ],
   },
   {
     name: "Thin Lines",
     rosterCount: 8, lineupCount: 2, reserveCount: 2,
     teams: [
-      { manager: "Bobby", teamName: "Commissioner's Cut", colors: ["#1A1A1A", "#D4AF37"] },
-      { manager: "Hailey", teamName: "Wedge Warriors", colors: ["#6C3483", "#FFFFFF"] },
-      { manager: "Josh", teamName: "The Handicappers", colors: ["#154360", "#48C9B0"] },
-      { manager: "Rachel", teamName: "Bogey Nights", colors: ["#2E4053", "#F5B041"] },
-      { manager: "Ethan", teamName: "Putt Busters", colors: ["#922B21", "#FDEBD0"] },
-      { manager: "Olivia", teamName: "The Back Nine", colors: ["#0B5345", "#ABEBC6"] },
-      { manager: "Kyle", teamName: "Sub Par", colors: ["#1F618D", "#AED6F1"] },
-      { manager: "Nate", teamName: "Cart Path Crusaders", colors: ["#7D6608", "#F9E79F"] },
-      { manager: "Derek", teamName: "Swing Kings", colors: ["#4A235A", "#D7BDE2"] },
-      { manager: "Kelly", teamName: "Hole in Fun", colors: ["#E74C3C", "#FADBD8"] },
-      { manager: "Jake", teamName: "Duffer's Delight", colors: ["#117A65", "#D5F5E3"] },
-      { manager: "Mike", teamName: "The Caddies", colors: ["#2C3E50", "#85C1E9"] },
-      { manager: "Sarah", teamName: "Front Nine Crew", colors: ["#784212", "#FAD7A0"] },
-      { manager: "Tom", teamName: "Golf Nuts", colors: ["#1A5276", "#FFFFFF"] },
-      { manager: "Lisa", teamName: "Under Par Stars", colors: ["#7B241C", "#F5B7B1"] },
-      { manager: "Dave", teamName: "Tee Rex", colors: ["#145A32", "#F9E79F"] },
+      { manager: "Bobby", teamName: "Commissioner's Cut", colors: ["#1A1A1A", "#FFFFFF"] },
+      { manager: "Hailey", teamName: "Wedge Warriors", colors: ["#7E22CE", "#FFFFFF"] },
+      { manager: "Josh", teamName: "The Handicappers", colors: ["#1D4ED8", "#FFFFFF"] },
+      { manager: "Rachel", teamName: "Bogey Nights", colors: ["#475569", "#FFFFFF"] },
+      { manager: "Ethan", teamName: "Putt Busters", colors: ["#E11D48", "#FFFFFF"] },
+      { manager: "Olivia", teamName: "The Back Nine", colors: ["#047857", "#FFFFFF"] },
+      { manager: "Kyle", teamName: "Sub Par", colors: ["#0284C7", "#FFFFFF"] },
+      { manager: "Nate", teamName: "Cart Path Crusaders", colors: ["#D97706", "#FFFFFF"] },
+      { manager: "Derek", teamName: "Swing Kings", colors: ["#581C87", "#FFFFFF"] },
+      { manager: "Kelly", teamName: "Hole in Fun", colors: ["#F43F5E", "#FFFFFF"] },
+      { manager: "Jake", teamName: "Duffer's Delight", colors: ["#0F766E", "#FFFFFF"] },
+      { manager: "Mike", teamName: "The Caddies", colors: ["#1E40AF", "#FFFFFF"] },
+      { manager: "Sarah", teamName: "Front Nine Crew", colors: ["#9A3412", "#FFFFFF"] },
+      { manager: "Tom", teamName: "Golf Nuts", colors: ["#0C4A6E", "#FFFFFF"] },
+      { manager: "Lisa", teamName: "Under Par Stars", colors: ["#9F1239", "#FFFFFF"] },
+      { manager: "Dave", teamName: "Tee Rex", colors: ["#166534", "#FFFFFF"] },
+    ],
+  },
+  {
+    name: "The Dirty Dozen",
+    rosterCount: 6, lineupCount: 2, reserveCount: 0,
+    teams: [
+      { manager: "Bobby", teamName: "Grip It & Rip It", colors: ["#0F172A", "#F59E0B"] },
+      { manager: "Jess", teamName: "Tee It High", colors: ["#7C3AED", "#E0E7FF"] },
+      { manager: "Dan", teamName: "The Shankers", colors: ["#DC2626", "#FECACA"] },
+      { manager: "Kate", teamName: "Putter Butter", colors: ["#059669", "#D1FAE5"] },
+      { manager: "Nick", teamName: "Fade City", colors: ["#2563EB", "#DBEAFE"] },
+      { manager: "Matt", teamName: "The Yips", colors: ["#B91C1C", "#FEE2E2"] },
+      { manager: "Amy", teamName: "Albatross Alley", colors: ["#9333EA", "#F3E8FF"] },
+      { manager: "Ben", teamName: "Lag Putts", colors: ["#15803D", "#DCFCE7"] },
+      { manager: "Zoe", teamName: "Stinger Squad", colors: ["#EA580C", "#FED7AA"] },
+      { manager: "Tyler", teamName: "The Draws", colors: ["#CA8A04", "#FEF9C3"] },
+      { manager: "Hailey", teamName: "Bogey Free", colors: ["#6D28D9", "#EDE9FE"] },
+      { manager: "Josh", teamName: "Dormie Club", colors: ["#0891B2", "#CFFAFE"] },
     ],
   },
 ];
@@ -141,6 +159,7 @@ async function seedDev() {
   console.log("🧪 Seeding dev/test data...");
 
   // ─── Clear test data (keep reference data) ────────────────
+  await db.delete(schema.tournamentResults);
   await db.delete(schema.managerPoints);
   await db.delete(schema.simPlayers);
   await db.delete(schema.simTournaments);
@@ -321,7 +340,8 @@ async function seedDev() {
 
   // ─── 8. Sim state (fresh — pre-built so first R1 advance is fast) ─
   const firstTournamentId = tournamentsRaw[0]?.id ?? 1;
-  await db.insert(schema.simActive).values({ id: 1, activeTournamentId: firstTournamentId });
+  await db.insert(schema.simActive).values({ id: 1, activeTournamentId: firstTournamentId })
+    .onConflictDoUpdate({ target: schema.simActive.id, set: { activeTournamentId: firstTournamentId } });
 
   // Pre-build sim_tournaments + sim_players (the expensive part of first advance)
   const allGolfers = await db.select().from(schema.golfers);

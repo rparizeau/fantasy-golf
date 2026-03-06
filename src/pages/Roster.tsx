@@ -453,7 +453,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
               marginBottom: 6,
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
                   {/* Icon with season rank badge offset top-left */}
                   <div style={{ position: "relative", flexShrink: 0 }}>
                     <ManagerIcon size={42} bgColor={data.color ?? "#2D6B4A"} />
@@ -477,13 +477,13 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                       }}>{seasonRankTied ? "T" : ""}{seasonRank}</span>
                     )}
                   </div>
-                  <div style={{ position: "relative" }} ref={teamDropdownRef}>
+                  <div style={{ position: "relative", minWidth: 0, flex: 1 }} ref={teamDropdownRef}>
                     <button
                       onClick={(e) => { e.stopPropagation(); setTeamDropdownOpen(!teamDropdownOpen); }}
-                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "baseline", gap: 4, maxWidth: "100%", minWidth: 0 }}
                     >
-                      <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{data.teamName}</p>
-                      <span style={{ fontSize: 10, color: C.txt3 }}>{teamDropdownOpen ? "▲" : "▼"}</span>
+                      <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{data.teamName}</p>
+                      <span style={{ fontSize: 10, color: C.txt3, flexShrink: 0 }}>{teamDropdownOpen ? "▲" : "▼"}</span>
                     </button>
                     {firstName && (
                       <p style={{ fontSize: 12, fontWeight: 500, color: C.txt2, margin: "2px 0 0" }}>{firstName}</p>
