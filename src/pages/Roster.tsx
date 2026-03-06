@@ -480,10 +480,9 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                   <div style={{ position: "relative", minWidth: 0, flex: 1 }} ref={teamDropdownRef}>
                     <button
                       onClick={(e) => { e.stopPropagation(); setTeamDropdownOpen(!teamDropdownOpen); }}
-                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "baseline", gap: 4, maxWidth: "100%", minWidth: 0 }}
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "baseline", gap: 4, maxWidth: "90%", minWidth: 0 }}
                     >
                       <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{data.teamName}</p>
-                      <span style={{ fontSize: 10, color: C.txt3, flexShrink: 0 }}>{teamDropdownOpen ? "▲" : "▼"}</span>
                     </button>
                     {firstName && (
                       <p style={{ fontSize: 12, fontWeight: 500, color: C.txt2, margin: "2px 0 0" }}>{firstName}</p>
@@ -808,7 +807,7 @@ export function WeekNav({
 }
 
 // Column widths shared between headers and card data
-const COL = { r: 26, p: 46, gap: 2 };
+const COL = { r: 26, p: 34, gap: 2 };
 
 
 function EmptySlot({ label, colors: C, highlight, warn, onClick }: { label: string; colors: Theme; highlight?: boolean; warn?: boolean; onClick?: () => void }) {
