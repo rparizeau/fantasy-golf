@@ -373,12 +373,12 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const colStyle: React.CSSProperties = { color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 };
 
   const sectionHeader = (label: string, extra?: React.ReactNode) => (
-    <div style={{ display: "flex", alignItems: "center", padding: "20px 16px 8px" }}>
+    <div style={{ display: "flex", alignItems: "center", padding: "20px 30px 8px" }}>
       <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
         <p style={{ ...colStyle, margin: 0, whiteSpace: "nowrap" }}>{label}</p>
         {extra}
       </div>
-      <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 15 }}>
+      <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 1 }}>
         {["R1", "R2", "R3", "R4"].map((l) => (
           <div key={l} style={{ width: COL.r, textAlign: "center" }}><span style={colStyle}>{l}</span></div>
         ))}
@@ -434,11 +434,11 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         {data && (
           <div style={{ padding: "12px 16px 0" }}>
             {/* SQUAD header with R1-R4 + PTS columns */}
-            <div style={{ display: "flex", alignItems: "center", padding: "0 0 8px" }}>
+            <div style={{ display: "flex", alignItems: "center", padding: "0 14px 8px" }}>
               <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                <p style={{ ...colStyle, margin: 0, whiteSpace: "nowrap" }}>Squad ({activePlayers.length}/{activeSize})</p>
+                <p style={{ ...colStyle, margin: 0, whiteSpace: "nowrap" }}>Squad</p>
               </div>
-              <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 15 }}>
+              <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 1 }}>
                 {["R1", "R2", "R3", "R4"].map((l) => (
                   <div key={l} style={{ width: COL.r, textAlign: "center" }}><span style={colStyle}>{l}</span></div>
                 ))}
@@ -449,40 +449,18 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
               background: C.card,
               borderRadius: 12,
               border: `1px solid ${C.border}`,
-              padding: "14px 16px",
+              padding: "14px 14px",
               marginBottom: 6,
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
-                  {/* Icon with season rank badge offset top-left */}
-                  <div style={{ position: "relative", flexShrink: 0 }}>
-                    <ManagerIcon size={42} bgColor={data.color ?? "#2D6B4A"} />
-                    {isOwnTeam && seasonRank > 0 && (
-                      <span style={{
-                        position: "absolute",
-                        top: -4,
-                        left: -6,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        minWidth: 20,
-                        height: 18,
-                        borderRadius: 5,
-                        background: C.goldDim,
-                        color: C.gold,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: "0 4px",
-                        border: `1px solid ${C.gold}`,
-                      }}>{seasonRankTied ? "T" : ""}{seasonRank}</span>
-                    )}
-                  </div>
+                  <ManagerIcon size={34} bgColor={data.color ?? "#2D6B4A"} />
                   <div style={{ position: "relative", minWidth: 0, flex: 1 }} ref={teamDropdownRef}>
                     <button
                       onClick={(e) => { e.stopPropagation(); setTeamDropdownOpen(!teamDropdownOpen); }}
                       style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "baseline", gap: 4, maxWidth: "90%", minWidth: 0 }}
                     >
-                      <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{data.teamName}</p>
+                      <p style={{ fontSize: 16, fontWeight: 700, color: C.txt, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{data.teamName}</p>
                     </button>
                     {firstName && (
                       <p style={{ fontSize: 12, fontWeight: 500, color: C.txt2, margin: "2px 0 0" }}>{firstName}</p>
@@ -551,54 +529,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                   </div>
                 </div>
               </div>
-              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-                {isFutureWeek ? (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                      <span style={{ color: C.txt3 }}>No leaderboard yet</span>
-                    </div>
-                    <div style={{ fontSize: 13, height: 18 }} />
-                  </>
-                ) : myRank > 0 ? (
-                  <>
-                    {/* Row 1: rival above or leader badge */}
-                    {rivalAbove ? (
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                        <span style={{ color: C.txt2 }}>▲ {ordinal(rivalAbove.rank)} · {rivalAbove.name}</span>
-                        <span style={{ color: C.txt3 }}>+{rivalAbove.points - myPoints} pts · <span style={{ color: C.txt2 }}>{rivalAbove.points}</span></span>
-                      </div>
-                    ) : myRank === 1 ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                        <span style={{ color: C.txt2, fontSize: 10 }}>●</span>
-                        <span style={{ color: C.txt2 }}>You are the current leader!</span>
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 13, height: 18 }} />
-                    )}
-                    {/* Row 2: rival below or last place badge */}
-                    {rivalBelow ? (
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                        <span style={{ color: C.txt2 }}>▼ {ordinal(rivalBelow.rank)} · {rivalBelow.name}</span>
-                        <span style={{ color: C.txt3 }}>-{myPoints - rivalBelow.points} pts · <span style={{ color: C.txt2 }}>{rivalBelow.points}</span></span>
-                      </div>
-                    ) : myRank === totalTeams && totalTeams > 1 ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                        <span style={{ color: C.txt3, fontSize: 10 }}>■</span>
-                        <span style={{ color: C.txt3 }}>You are currently last place</span>
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 13, height: 18 }} />
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                      <span style={{ color: C.txt3 }}>No leaderboard yet</span>
-                    </div>
-                    <div style={{ fontSize: 13, height: 18 }} />
-                  </>
-                )}
-              </div>
             </div>
           </div>
         )}
@@ -616,7 +546,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       {/* Bench */}
       <div style={{ background: C.card }}>
         {sectionHeader(`Bench (${benchPlayers.length}/${benchSize})`)}
-        <div style={{ padding: "0 16px 16px" }}>
+        <div style={{ padding: `0 16px ${reserveSize > 0 ? "16px" : "100px"}` }}>
 
           {benchPlayers.map((p) => (
             <PlayerCard key={p.playerId} player={p} par={par} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
@@ -628,18 +558,20 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
       </div>
 
       {/* Reserve */}
-      <div style={{ background: C.bg }}>
-        {sectionHeader(`Reserve (${sortedReserve.length}/${reserveSize})`)}
-        <div style={{ padding: "0 16px 100px" }}>
+      {reserveSize > 0 && (
+        <div style={{ background: C.bg }}>
+          {sectionHeader(`Reserve (${sortedReserve.length}/${reserveSize})`)}
+          <div style={{ padding: "0 16px 100px" }}>
 
-          {sortedReserve.map((p) => (
-            <PlayerCard key={p.playerId} player={p} par={par} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
-          ))}
-          {Array.from({ length: emptyReserve }).map((_, i) => (
-            <EmptySlot key={`er-${i}`} label="Reserve" colors={C} highlight={moving !== null} onClick={() => handleEmptySlotDrop("reserve")} />
-          ))}
+            {sortedReserve.map((p) => (
+              <PlayerCard key={p.playerId} player={p} par={par} colors={C} moving={moving === p.playerId} disabled={!canMove} onMove={() => handleMoveBtn(p.playerId)} onTap={() => setModalPlayerId(p.playerId)} />
+            ))}
+            {Array.from({ length: emptyReserve }).map((_, i) => (
+              <EmptySlot key={`er-${i}`} label="Reserve" colors={C} highlight={moving !== null} onClick={() => handleEmptySlotDrop("reserve")} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {modalPlayerId !== null && (
         <PlayerModal playerId={modalPlayerId} leagueId={leagueId} colors={C} onClose={() => setModalPlayerId(null)} />
@@ -807,7 +739,7 @@ export function WeekNav({
 }
 
 // Column widths shared between headers and card data
-const COL = { r: 26, p: 34, gap: 2 };
+const COL = { r: 26, p: 38, gap: 2 };
 
 
 function EmptySlot({ label, colors: C, highlight, warn, onClick }: { label: string; colors: Theme; highlight?: boolean; warn?: boolean; onClick?: () => void }) {

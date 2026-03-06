@@ -176,7 +176,7 @@ export function Golfers({ leagueId, teamId, colors: C, simTick }: GolfersProps) 
         <p style={{ flex: 1, color: C.txt2, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6, margin: 0 }}>Name</p>
         <div style={{ display: "flex", gap: STAT_COL.gap, flexShrink: 0 }}>
           {statCols.map((col) => (
-            <p key={col.key} style={{ width: STAT_COL.w, textAlign: "center", color: C.txt2, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4, margin: 0 }}>{col.label}</p>
+            <p key={col.key} style={{ width: STAT_COL.w, textAlign: "right", color: C.txt2, fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4, margin: 0 }}>{col.label}</p>
           ))}
         </div>
       </div>
@@ -221,7 +221,7 @@ export function Golfers({ leagueId, teamId, colors: C, simTick }: GolfersProps) 
                 <span style={{ fontSize: 11, color: C.txt3 }}>#{p.ranking}</span>
                 <span style={{ fontSize: 11, color: C.txt3 }}>{p.country}</span>
                 {p.ownedBy ? (
-                  <span style={{ fontSize: 10, color: C.blue }}>{p.ownedBy.teamName}</span>
+                  <span style={{ fontSize: 10, color: C.blue, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.ownedBy.teamName}</span>
                 ) : (
                   <span style={{ fontSize: 10, color: C.greenBright, fontWeight: 600 }}>FA</span>
                 )}
@@ -233,7 +233,7 @@ export function Golfers({ leagueId, teamId, colors: C, simTick }: GolfersProps) 
               {statCols.map((col) => {
                 const v = p[col.key];
                 return (
-                  <p key={col.key} style={{ width: STAT_COL.w, textAlign: "center", fontSize: 11, fontWeight: col.key === "seasonPoints" ? 700 : 500, color: (typeof v === "number" && v > 0) ? C.txt : C.txt3, margin: 0 }}>
+                  <p key={col.key} style={{ width: STAT_COL.w, textAlign: "right", fontSize: 11, fontWeight: col.key === "seasonPoints" ? 700 : 500, color: (typeof v === "number" && v > 0) ? C.txt : C.txt3, margin: 0 }}>
                     {typeof v === "number" ? v : ""}
                   </p>
                 );

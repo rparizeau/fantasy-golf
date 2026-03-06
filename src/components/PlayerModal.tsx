@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getPlayer, type PlayerDetail } from "../api";
 import type { Theme } from "../theme";
 
@@ -43,20 +43,72 @@ export function PlayerModal({ playerId, leagueId, colors: C, onClose }: PlayerMo
   const [player, setPlayer] = useState<PlayerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"scores" | "points">("scores");
+  const [pullDisplay, setPullDisplay] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const pullStartY = useRef(0);
+  const pullY = useRef(0);
+  const pullActive = useRef(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  const fetchPlayer = useCallback(() => {
+    return getPlayer(playerId, leagueId);
+  }, [playerId, leagueId]);
 
   useEffect(() => {
     let cancelled = false;
-    getPlayer(playerId, leagueId)
+    fetchPlayer()
       .then((d) => { if (!cancelled) setPlayer(d); })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load"); });
     return () => { cancelled = true; };
-  }, [playerId, leagueId]);
+  }, [fetchPlayer]);
+
+  const onBodyTouchStart = useCallback((e: React.TouchEvent) => {
+    if (bodyRef.current && bodyRef.current.scrollTop <= 0 && !refreshing) {
+      pullStartY.current = e.touches[0].clientY;
+      pullActive.current = true;
+    }
+  }, [refreshing]);
+
+  const onBodyTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!pullActive.current) return;
+    const diff = e.touches[0].clientY - pullStartY.current;
+    if (diff > 0) {
+      pullY.current = Math.min(diff * 0.5, 100);
+      setPullDisplay(pullY.current);
+    } else {
+      pullActive.current = false;
+      pullY.current = 0;
+      setPullDisplay(0);
+    }
+  }, []);
+
+  const onBodyTouchEnd = useCallback(async () => {
+    if (!pullActive.current) return;
+    pullActive.current = false;
+    if (pullY.current >= 60) {
+      setRefreshing(true);
+      setPullDisplay(60);
+      try {
+        const d = await fetchPlayer();
+        setPlayer(d);
+      } catch {
+        // silent
+      } finally {
+        setRefreshing(false);
+        setPullDisplay(0);
+      }
+    } else {
+      setPullDisplay(0);
+    }
+    pullY.current = 0;
+  }, [fetchPlayer]);
 
   const hasData = player && player.holeScores && player.holeScores.length > 0;
 
   return (
     <div
       onClick={onClose}
+      onTouchMove={(e) => e.stopPropagation()}
       style={{
         position: "fixed",
         inset: 0,
@@ -66,21 +118,66 @@ export function PlayerModal({ playerId, leagueId, colors: C, onClose }: PlayerMo
         alignItems: "stretch",
         justifyContent: "center",
         padding: 16,
+        overscrollBehavior: "contain",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={onBodyTouchStart}
+        onTouchMove={onBodyTouchMove}
+        onTouchEnd={onBodyTouchEnd}
+        ref={bodyRef}
         style={{
           width: "100%",
           background: C.bg,
           borderRadius: 14,
           display: "flex",
           flexDirection: "column",
-          overflow: "hidden",
+          overflow: "auto",
+          overscrollBehavior: "contain",
         }}
       >
+        {/* Pull to refresh indicator */}
+        {(pullDisplay > 0 || refreshing) && (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: pullDisplay, overflow: "hidden", flexShrink: 0 }}>
+            <div style={{
+              width: 20,
+              height: 20,
+              border: `3px solid ${C.border}`,
+              borderTopColor: C.green,
+              borderRadius: "50%",
+              animation: refreshing ? "spin 0.7s linear infinite" : undefined,
+              transform: !refreshing ? `rotate(${pullDisplay * 4}deg)` : undefined,
+              opacity: Math.min(pullDisplay / 60, 1),
+            }} />
+          </div>
+        )}
         {/* Header */}
-        <div style={{ padding: "20px 20px 16px", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ padding: "20px 20px 16px", borderBottom: `1px solid ${C.border}`, flexShrink: 0, position: "relative" }}>
+          <button
+            onClick={onClose}
+            style={{
+              position: "absolute",
+              top: 12,
+              right: 12,
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              border: "none",
+              background: C.card2,
+              color: C.txt3,
+              fontSize: 16,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
           {error ? (
             <p style={{ color: C.red, fontSize: 14, margin: 0 }}>{error}</p>
           ) : !player ? (
@@ -90,7 +187,7 @@ export function PlayerModal({ playerId, leagueId, colors: C, onClose }: PlayerMo
             </>
           ) : (
             <>
-              <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0 }}>{player.name}</p>
+              <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0, paddingRight: 32 }}>{player.name}</p>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, color: C.txt2 }}>#{player.ranking}</span>
                 <span style={{ fontSize: 13, color: C.txt2 }}>{player.country}</span>
@@ -142,7 +239,7 @@ export function PlayerModal({ playerId, leagueId, colors: C, onClose }: PlayerMo
         )}
 
         {/* Body */}
-        <div style={{ flex: 1, overflow: "auto", padding: hasData ? "12px 16px" : "0" }}>
+        <div style={{ flex: 1, padding: hasData ? "12px 16px" : "0" }}>
           {player && !hasData && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 120 }}>
               <p style={{ color: C.txt3, fontSize: 13 }}>No tournament scores available</p>
@@ -156,25 +253,6 @@ export function PlayerModal({ playerId, leagueId, colors: C, onClose }: PlayerMo
           )}
         </div>
 
-        {/* Footer */}
-        <div style={{ padding: "12px 20px 16px", borderTop: `1px solid ${C.border}` }}>
-          <button
-            onClick={onClose}
-            style={{
-              width: "100%",
-              padding: "12px 0",
-              fontSize: 15,
-              fontWeight: 600,
-              color: C.txt,
-              background: C.card,
-              border: `1px solid ${C.border}`,
-              borderRadius: 10,
-              cursor: "pointer",
-            }}
-          >
-            Close
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -197,82 +275,84 @@ function ScoresTab({ player, C }: { player: PlayerDetail; C: Theme }) {
         const backParSum = backPar.reduce((s, v) => s + v, 0);
         const rPts = roundPoints[ri] ?? 0;
 
-        const renderNine = (holes: (number | null)[], pars: number[], parSum: number, startHole: number) => (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 280 }}>
-              <thead>
-                <tr>
-                  <td style={{ ...cellStyle(C), fontWeight: 600, color: C.txt3, width: 38, fontSize: 10 }}>Hole</td>
-                  {holes.map((_, h) => (
-                    <td key={h} style={{ ...cellStyle(C), color: C.txt3, fontSize: 10 }}>{startHole + h + 1}</td>
-                  ))}
-                  <td style={{ ...cellStyle(C), fontWeight: 600, color: C.txt3, fontSize: 10 }}>{startHole === 0 ? "Out" : "In"}</td>
-                </tr>
-                <tr>
-                  <td style={{ ...cellStyle(C), fontWeight: 600, color: C.txt3, fontSize: 10 }}>Par</td>
-                  {pars.map((p, h) => (
-                    <td key={h} style={{ ...cellStyle(C), color: C.txt3, fontSize: 10 }}>{p}</td>
-                  ))}
-                  <td style={{ ...cellStyle(C), fontWeight: 600, color: C.txt3, fontSize: 10 }}>{parSum}</td>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={{ ...cellStyle(C), fontWeight: 600, color: C.txt3, fontSize: 10 }}></td>
-                  {holes.map((score, h) => {
-                    if (score == null) {
-                      return <td key={h} style={{ ...cellStyle(C), color: C.txt3, fontSize: 11 }}>-</td>;
-                    }
-                    const par = pars[h];
-                    const color = scoreColor(score, par, C);
-                    const bg = scoreBg(score, par, C);
-                    const diff = score - par;
-                    return (
-                      <td key={h} style={{ ...cellStyle(C), padding: 0 }}>
-                        <div style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: CELL - 2,
-                          height: CELL - 2,
-                          margin: "0 auto",
-                          borderRadius: diff <= -2 ? "50%" : diff === -1 ? "50%" : diff >= 2 ? 4 : diff === 1 ? 4 : 0,
-                          background: diff !== 0 ? bg : "transparent",
-                          border: diff <= -2 ? `1.5px solid ${color}` : "none",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color,
-                        }}>
-                          {score}
-                        </div>
-                      </td>
-                    );
-                  })}
-                  <td style={{ ...cellStyle(C), fontWeight: 700, color: C.txt, fontSize: 11 }}>
-                    {holes.some((s) => s != null) ? holes.reduce<number>((s, v) => s + (v ?? 0), 0) : "-"}
+        const renderNineRows = (holes: (number | null)[], pars: number[], parSum: number, startHole: number) => (
+          <>
+            <tr>
+              <td style={{ ...cellStyle(C), fontWeight: 600, color: C.txt3, width: 38, fontSize: 10 }}>{startHole === 0 ? "Front" : "Back"}</td>
+              {holes.map((_, h) => (
+                <td key={h} style={{ ...cellStyle(C), color: C.txt3, fontSize: 10 }}>{startHole + h + 1}</td>
+              ))}
+              <td style={{ ...cellStyle(C), fontWeight: 600, color: C.txt3, fontSize: 10 }}>{startHole === 0 ? "Out" : "In"}</td>
+            </tr>
+            <tr style={{ opacity: 0.5 }}>
+              <td style={{ ...cellStyle(C), fontWeight: 600, color: C.txt3, fontSize: 10 }}>Par</td>
+              {pars.map((p, h) => (
+                <td key={h} style={{ ...cellStyle(C), color: C.txt3, fontSize: 10 }}>{p}</td>
+              ))}
+              <td style={{ ...cellStyle(C), fontWeight: 600, color: C.txt3, fontSize: 10 }}>{parSum}</td>
+            </tr>
+            <tr>
+              <td style={{ ...cellStyle(C), fontWeight: 600, color: C.txt3, fontSize: 10 }}></td>
+              {holes.map((score, h) => {
+                if (score == null) {
+                  return <td key={h} style={{ ...cellStyle(C), color: C.txt3, fontSize: 11 }}>-</td>;
+                }
+                const par = pars[h];
+                const color = scoreColor(score, par, C);
+                const bg = scoreBg(score, par, C);
+                const diff = score - par;
+                return (
+                  <td key={h} style={{ ...cellStyle(C), padding: 0 }}>
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: CELL - 2,
+                      height: CELL - 2,
+                      margin: "0 auto",
+                      borderRadius: diff <= -2 ? "50%" : diff === -1 ? "50%" : diff >= 2 ? 4 : diff === 1 ? 4 : 0,
+                      background: diff !== 0 ? bg : "transparent",
+                      border: diff <= -2 ? `1.5px solid ${color}` : "none",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color,
+                    }}>
+                      {score}
+                    </div>
                   </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                );
+              })}
+              <td style={{ ...cellStyle(C), fontWeight: 700, color: C.txt, fontSize: 11 }}>
+                {holes.some((s) => s != null) ? holes.reduce<number>((s, v) => s + (v ?? 0), 0) : "-"}
+              </td>
+            </tr>
+          </>
         );
 
         return (
           <div key={ri}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: C.txt, margin: 0 }}>
-                Round {ri + 1} — {player.rounds[ri]}
-              </p>
-              <span style={{ fontSize: 12, fontWeight: 600, color: rPts >= 0 ? C.green : C.red }}>
-                {rPts >= 0 ? "+" : ""}{rPts} pts
-              </span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: C.txt, margin: 0 }}>Round {ri + 1}</p>
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.txt, margin: 0 }}>{player.rounds[ri]}</span>
             </div>
-            {renderNine(front, frontPar, frontParSum, 0)}
-            <div style={{ height: 4 }} />
-            {renderNine(back, backPar, backParSum, 9)}
-            {/* Total row */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, padding: "4px 0", marginTop: 2 }}>
-              <span style={{ fontSize: 11, color: C.txt3 }}>Total: {frontSum + backSum} ({frontParSum + backParSum} par)</span>
+            <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 280 }}>
+                  <tbody>
+                    {renderNineRows(front, frontPar, frontParSum, 0)}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style={{ height: 8 }} />
+            <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 280 }}>
+                  <tbody>
+                    {renderNineRows(back, backPar, backParSum, 9)}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         );
@@ -314,9 +394,9 @@ function PointsTab({ player, C }: { player: PlayerDetail; C: Theme }) {
 
         return (
           <div key={ri}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <p style={{ fontSize: 13, fontWeight: 700, color: C.txt, margin: 0 }}>Round {ri + 1}</p>
-              <span style={{ fontSize: 12, fontWeight: 600, color: rPts >= 0 ? C.green : C.red }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: rPts >= 0 ? C.green : C.red }}>
                 {rPts >= 0 ? "+" : ""}{rPts} pts
               </span>
             </div>

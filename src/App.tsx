@@ -19,9 +19,9 @@ export default function App() {
   const toggleTheme = () => setMode((m) => (m === "light" ? "dark" : "light"));
 
   const leagueId = leagueIdParam ? Number(leagueIdParam) : null;
-  const page = pageParam || "home";
+  const page = pageParam || "match";
 
-  const enterLeague = (id: number) => navigate(`/league/${id}/home`);
+  const enterLeague = (id: number) => navigate(`/league/${id}/match`);
   const enterLeaguePage = (id: number, p: string) => navigate(`/league/${id}/${p}`);
   const exitLeague = () => navigate("/");
   const changePage = (p: string) => navigate(`/league/${leagueId}/${p}`);

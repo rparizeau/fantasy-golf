@@ -21,7 +21,7 @@ interface PageContentProps {
 export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek, simTick }: PageContentProps) {
 
   switch (page) {
-    case "home":
+    case "match":
       return (
         <div style={{ flex: 1 }}>
           <Home leagueId={leagueId} myTeamId={myTeamId} colors={C} tournaments={tournaments} currentTournamentId={currentTournamentId} viewingWeek={viewingWeek} simTick={simTick} />

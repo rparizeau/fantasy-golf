@@ -16,7 +16,7 @@ export interface StandingsEntry {
 }
 
 // Column widths matching Roster PlayerCard
-const COL = { r: 26, p: 46, gap: 2 };
+const COL = { r: 26, p: 38, gap: 2 };
 
 export function StandingsList<T extends StandingsEntry>({
   entries,
@@ -61,8 +61,8 @@ export function StandingsList<T extends StandingsEntry>({
         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
           {title && <span style={colStyle}>{title}</span>}
         </div>
-        {showThru && <span style={{ ...colStyle, textAlign: "right", minWidth: 70 }}>Thru</span>}
         <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 1 }}>
+          {showThru && <div style={{ width: 32, textAlign: "center", flexShrink: 0 }}><span style={colStyle}>WAV</span></div>}
           {showRounds && ["R1", "R2", "R3", "R4"].map((l) => (
             <div key={l} style={{ width: COL.r, textAlign: "center" }}><span style={colStyle}>{l}</span></div>
           ))}
@@ -146,20 +146,16 @@ export function StandingsList<T extends StandingsEntry>({
                 <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>{entry.managerName}</p>
               </div>
 
-              {/* Thru */}
-              {showThru && (
-                <div style={{ textAlign: "right", minWidth: 70, flexShrink: 0 }}>
-                  <p style={{ color: C.txt2, fontSize: 15, fontWeight: 500, margin: 0 }}>
-                    {entry.completedWeeks ?? 0} {(entry.completedWeeks ?? 0) === 1 ? "Wk" : "Wks"}
-                  </p>
-                  <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>
-                    {(entry.totalWeeks ?? 0) - (entry.completedWeeks ?? 0)} rem
-                  </p>
-                </div>
-              )}
-
-              {/* Data columns: R1 R2 R3 R4 | PTS */}
+              {/* Data columns: WAV | R1 R2 R3 R4 | PTS */}
               <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "flex-start" }}>
+                {/* Waiver priority (reverse of standings) */}
+                {showThru && (
+                  <div style={{ width: 32, textAlign: "center", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", height: 20 }}>
+                    <p style={{ color: C.txt3, fontSize: 11, fontWeight: 600, margin: 0 }}>
+                      {entries.length - _idx}
+                    </p>
+                  </div>
+                )}
                 {showRounds && [0, 1, 2, 3].map((ri) => {
                   const pts = entry.roundPoints?.[ri];
                   const proj = entry.projectedRoundPoints?.[ri];
@@ -181,8 +177,11 @@ export function StandingsList<T extends StandingsEntry>({
                   <p style={{ fontSize: 15, fontWeight: 700, color: entry.totalPoints > 0 ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
                     {entry.totalPoints}
                   </p>
-                  <p style={{ fontSize: 10, color: isMe ? "transparent" : C.green, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
-                    {isMe ? "\u00A0" : `${entry.totalPoints >= myPoints ? "+" : ""}${entry.totalPoints - myPoints}`}
+                  <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
+                    {(() => {
+                      const proj = entry.projectedRoundPoints?.reduce((a, b) => a + b, 0) ?? 0;
+                      return proj > 0 ? `${proj}` : "-";
+                    })()}
                   </p>
                 </div>
               </div>
