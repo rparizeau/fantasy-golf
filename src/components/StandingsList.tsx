@@ -41,9 +41,6 @@ export function StandingsList<T extends StandingsEntry>({
 }) {
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
 
-  const myEntry = entries.find((e) => e.teamId === myTeamId);
-  const myPoints = myEntry?.totalPoints ?? 0;
-
   const colStyle: React.CSSProperties = { color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 };
 
   if (entries.length === 0) {

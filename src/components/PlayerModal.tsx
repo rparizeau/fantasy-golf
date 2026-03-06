@@ -259,7 +259,7 @@ export function PlayerModal({ playerId, leagueId, colors: C, onClose }: PlayerMo
 }
 
 function ScoresTab({ player, C }: { player: PlayerDetail; C: Theme }) {
-  const { holeScores, holePars, roundPoints } = player;
+  const { holeScores, holePars } = player;
   const CELL = 26;
 
   return (
@@ -269,11 +269,8 @@ function ScoresTab({ player, C }: { player: PlayerDetail; C: Theme }) {
         const back = round.slice(9, 18);
         const frontPar = holePars.slice(0, 9);
         const backPar = holePars.slice(9, 18);
-        const frontSum: number = front.reduce<number>((s, v) => s + (v ?? 0), 0);
-        const backSum: number = back.reduce<number>((s, v) => s + (v ?? 0), 0);
         const frontParSum = frontPar.reduce((s, v) => s + v, 0);
         const backParSum = backPar.reduce((s, v) => s + v, 0);
-        const rPts = roundPoints[ri] ?? 0;
 
         const renderNineRows = (holes: (number | null)[], pars: number[], parSum: number, startHole: number) => (
           <>

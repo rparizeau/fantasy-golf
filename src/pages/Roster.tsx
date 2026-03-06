@@ -4,12 +4,6 @@ import { PlayerModal } from "../components/PlayerModal";
 import { ManagerIcon } from "../components/ManagerIcon";
 import type { Theme } from "../theme";
 
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
 interface RosterProps {
   leagueId: number;
   teamId: number;
@@ -37,15 +31,15 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const [error, setError] = useState<string | null>(null);
   const [modalPlayerId, setModalPlayerId] = useState<number | null>(null);
   const [moving, setMoving] = useState<number | null>(null);
-  const [myRank, setMyRank] = useState(0);
+  const [, setMyRank] = useState(0);
   const [, setMyRankTied] = useState(false);
-  const [totalTeams, setTotalTeams] = useState(0);
+  const [, setTotalTeams] = useState(0);
   const [myPoints, setMyPoints] = useState(0);
-  const [rivalAbove, setRivalAbove] = useState<{ name: string; points: number; rank: number } | null>(null);
-  const [rivalBelow, setRivalBelow] = useState<{ name: string; points: number; rank: number } | null>(null);
+  const [, setRivalAbove] = useState<{ name: string; points: number; rank: number } | null>(null);
+  const [, setRivalBelow] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [projectedTotal, setProjectedTotal] = useState(0);
-  const [seasonRank, setSeasonRank] = useState(0);
-  const [seasonRankTied, setSeasonRankTied] = useState(false);
+  const [, setSeasonRank] = useState(0);
+  const [, setSeasonRankTied] = useState(false);
   const [, setSeasonPoints] = useState(0);
   const cacheRef = useRef(new Map<string, CachedWeek>());
   const initialLoadRef = useRef(true);

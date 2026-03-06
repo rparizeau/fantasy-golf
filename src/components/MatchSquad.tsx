@@ -30,8 +30,8 @@ export function MatchSquad({ leagueId, teamId, colors: C, tournamentId, tourname
   const [projectedTotal, setProjectedTotal] = useState(0);
   const [rivalAbove, setRivalAbove] = useState<{ name: string; points: number; rank: number } | null>(null);
   const [rivalBelow, setRivalBelow] = useState<{ name: string; points: number; rank: number } | null>(null);
-  const [seasonRank, setSeasonRank] = useState(0);
-  const [seasonRankTied, setSeasonRankTied] = useState(false);
+  const [, setSeasonRank] = useState(0);
+  const [, setSeasonRankTied] = useState(false);
   const [managerName, setManagerName] = useState("");
   const [modalPlayerId, setModalPlayerId] = useState<number | null>(null);
 
