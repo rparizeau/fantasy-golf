@@ -177,7 +177,7 @@ export function MatchSquad({ leagueId, teamId, colors: C, tournamentId, tourname
                 );
               })}
               <div style={{ width: COL.p, textAlign: "right" }}>
-                <p style={{ fontSize: 15, fontWeight: 700, color: C.txt, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>{myPoints}</p>
+                <p style={{ fontSize: 15, fontWeight: 700, color: myPoints > 0 ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>{myPoints > 0 ? myPoints : "-"}</p>
                 <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
                   {projectedTotal > 0 ? `${projectedTotal}` : "-"}
                 </p>
@@ -262,12 +262,29 @@ function SquadPlayerCard({ player: p, colors: C, onTap }: { player: RosterPlayer
     >
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ color: C.txt, fontSize: 14, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</p>
-        <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
-          <span style={{ fontSize: 11, color: C.txt3 }}>#{p.ranking}</span>
-          <span style={{ fontSize: 11, color: C.txt3 }}>{p.country}</span>
-          {!p.inField && <span style={{ fontSize: 10, color: C.red, fontWeight: 600 }}>NOT IN FIELD</span>}
-          {p.status === "cut" && <span style={{ fontSize: 10, color: C.red, fontWeight: 600 }}>CUT</span>}
-          {p.status === "wd" && <span style={{ fontSize: 10, color: C.red, fontWeight: 600 }}>WD</span>}
+        <div style={{ display: "flex", gap: 0, marginTop: 2, alignItems: "center" }}>
+          {hasRounds ? (
+            <>
+              <span style={{ fontSize: 11, fontWeight: 600, color: p.toPar > 0 ? C.red : C.txt3 }}>
+                {p.toParDisplay}{p.status === "active" && p.holesThru > 0 && p.holesThru < 18 ? ` thru ${p.holesThru}` : ""}
+              </span>
+              {p.status === "active" && (
+                <>
+                  <span style={{ fontSize: 11, color: C.txt3, margin: "0 5px" }}>&bull;</span>
+                  <span style={{ fontSize: 11, color: C.txt3 }}>{ordinal(p.position)}</span>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: 11, color: C.txt3 }}>#{p.ranking}</span>
+              <span style={{ fontSize: 11, color: C.txt3, margin: "0 5px" }}>&bull;</span>
+              <span style={{ fontSize: 11, color: C.txt3 }}>{p.country}</span>
+            </>
+          )}
+          {!p.inField && <span style={{ fontSize: 10, color: C.red, fontWeight: 600, marginLeft: 5 }}>NOT IN FIELD</span>}
+          {p.status === "cut" && <span style={{ fontSize: 10, color: C.red, fontWeight: 600, marginLeft: 5 }}>CUT</span>}
+          {p.status === "wd" && <span style={{ fontSize: 10, color: C.red, fontWeight: 600, marginLeft: 5 }}>WD</span>}
         </div>
       </div>
 

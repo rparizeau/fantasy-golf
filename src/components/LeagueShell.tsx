@@ -26,6 +26,7 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
   const [myTeamId, setMyTeamId] = useState<number | null>(null);
   const [seasonPoints, setSeasonPoints] = useState(0);
   const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const { tick: simTick } = useSimVersion();
 
   useEffect(() => {
@@ -89,6 +90,7 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
         seasonPoints={seasonPoints}
         leagues={leagues}
         onChangeLeague={onChangeLeague}
+        onHeightChange={setHeaderHeight}
       />
       <PageContent
         page={activePage}
@@ -100,6 +102,7 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
         viewingWeek={viewingWeek}
         onChangeWeek={setViewingWeek}
         simTick={simTick}
+        stickyTop={headerHeight}
       />
       <BottomNav activePage={activePage} colors={C} onChangePage={onChangePage} />
     </PullToRefresh>

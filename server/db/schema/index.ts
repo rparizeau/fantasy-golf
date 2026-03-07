@@ -1,6 +1,6 @@
 import {
   pgTable, pgEnum, integer, varchar, boolean, serial, date,
-  jsonb, timestamp, primaryKey, index, unique,
+  jsonb, timestamp, primaryKey, index, unique, real,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -273,6 +273,7 @@ export const simTournaments = pgTable("sim_tournaments", {
   cutLine: integer("cut_line"),
   fieldSize: integer("field_size").notNull().default(100),
   overrides: jsonb("overrides").$type<Record<number, { score?: number; wd?: boolean }>>(),
+  hotStreaks: jsonb("hot_streaks").$type<Record<number, string>>(),
   isEarningsAccumulated: boolean("is_earnings_accumulated").notNull().default(false),
   isPointsAccumulated: boolean("is_points_accumulated").notNull().default(false),
 });
@@ -496,6 +497,15 @@ export const managerPointsRelations = relations(managerPoints, ({ one }) => ({
   golferRoster: one(golferRoster, { fields: [managerPoints.golferRosterId], references: [golferRoster.id] }),
   scoringEvent: one(scoringEvents, { fields: [managerPoints.scoringEventId], references: [scoringEvents.id] }),
 }));
+
+// ─── Payouts ─────────────────────────────────────────────────
+
+export const payouts = pgTable("payouts", {
+  position: integer("position").primaryKey(),
+  pct: real("pct").notNull(),
+  regularPoints: real("regular_points").notNull().default(0),
+  majorPoints: real("major_points").notNull().default(0),
+});
 
 export const tournamentResultsRelations = relations(tournamentResults, ({ one }) => ({
   leagueTournament: one(leagueTournament, { fields: [tournamentResults.leagueTournamentId], references: [leagueTournament.id] }),

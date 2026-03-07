@@ -10,7 +10,7 @@ export function CourseIcon({ size = 42, bgColor, flagColor }: CourseIconProps) {
       style={{
         width: size,
         height: size,
-        borderRadius: 10,
+        borderRadius: Math.round(size * 0.2),
         background: bgColor,
         display: "flex",
         alignItems: "center",

@@ -1,5 +1,5 @@
 import { db } from "../index.js";
-import { golfers, tournaments, courses } from "../schema/index.js";
+import { golfers, tournaments, courses, payouts } from "../schema/index.js";
 import { eq } from "drizzle-orm";
 
 export async function loadGolfers() {
@@ -76,6 +76,19 @@ export function loadPayoutTable(): { position: number; pct: number }[] {
     { position: 61, pct: 0.158 }, { position: 62, pct: 0.154 }, { position: 63, pct: 0.15 },
     { position: 64, pct: 0.131 }, { position: 65, pct: 0.111 },
   ];
+}
+
+/** Load position-based point payouts from the DB. Pass isMajor to get the right column. */
+export async function loadPayoutPoints(isMajor: boolean): Promise<{ position: number; points: number }[]> {
+  const rows = await db.select({
+    position: payouts.position,
+    regularPoints: payouts.regularPoints,
+    majorPoints: payouts.majorPoints,
+  }).from(payouts).orderBy(payouts.position);
+  return rows.map((r) => ({
+    position: r.position,
+    points: isMajor ? r.majorPoints : r.regularPoints,
+  }));
 }
 
 export async function loadCourse(courseId: number) {

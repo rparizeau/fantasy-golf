@@ -20,11 +20,22 @@ interface LeagueHeaderProps {
   seasonPoints: number;
   leagues: LeagueSummary[];
   onChangeLeague: (id: number) => void;
+  onHeightChange?: (height: number) => void;
 }
 
-export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, onBack, viewedTournament: t, activePage: _activePage, tournaments, currentTournamentId, viewingWeek, onChangeWeek, seasonPoints, leagues, onChangeLeague }: LeagueHeaderProps) {
+export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, onBack, viewedTournament: t, activePage: _activePage, tournaments, currentTournamentId, viewingWeek, onChangeWeek, seasonPoints, leagues, onChangeLeague, onHeightChange }: LeagueHeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!rootRef.current || !onHeightChange) return;
+    const ro = new ResizeObserver(([entry]) => {
+      onHeightChange(entry.contentRect.height);
+    });
+    ro.observe(rootRef.current);
+    return () => ro.disconnect();
+  }, [onHeightChange]);
 
   const currentLeague = leagues.find((l) => l.id === leagueId);
   const leagueName = currentLeague?.name ?? "";
@@ -44,6 +55,7 @@ export function LeagueHeader({ leagueId, isDark: dk, colors: C, onToggleTheme, o
 
   return (
     <div
+      ref={rootRef}
       style={{
         position: "sticky",
         top: 0,

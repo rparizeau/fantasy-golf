@@ -17,7 +17,7 @@ export function useSimVersion() {
         const v = await getSimVersion();
         if (cancelled) return;
         setVersion(v);
-        const fp = `${v.tournamentId}:${v.phase}:${v.currentRound}:${v.fieldSize}:${v.cutLine}`;
+        const fp = `${v.tournamentId}:${v.phase}:${v.currentRound}:${v.fieldSize}:${v.cutLine}:${v.holesPlayed}`;
         if (fingerprintRef.current && fp !== fingerprintRef.current) {
           setTick((t) => t + 1);
         }

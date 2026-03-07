@@ -84,9 +84,9 @@ export function StandingsList<T extends StandingsEntry>({
               background: C.card,
               borderRadius: 12,
               marginBottom: 8,
-              border: `1px solid ${isMe ? C.green : C.border}`,
+              border: `1px solid ${isMe ? (badgeColor ?? C.green) : C.border}`,
               overflow: "hidden",
-              boxShadow: isMe ? `0 0 0 1px ${C.green}40` : undefined,
+              boxShadow: isMe ? `0 0 0 1px ${(badgeColor ?? C.green)}40` : undefined,
             }}
           >
             <div
@@ -172,7 +172,7 @@ export function StandingsList<T extends StandingsEntry>({
                 {/* PTS */}
                 <div style={{ width: COL.p, textAlign: "right" }}>
                   <p style={{ fontSize: 15, fontWeight: 700, color: entry.totalPoints > 0 ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
-                    {entry.totalPoints}
+                    {entry.totalPoints > 0 ? entry.totalPoints : "-"}
                   </p>
                   <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
                     {(() => {

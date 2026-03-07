@@ -18,6 +18,15 @@ export interface PlayerRound {
   status: "active" | "cut" | "wd";
 }
 
+export type HotStreakTier = "hot" | "really_hot" | "cold" | "really_cold";
+
+export const HOT_STREAK_BONUSES: Record<HotStreakTier, { birdieBoost: number; bogeyReduce: number }> = {
+  hot:         { birdieBoost: 0.12, bogeyReduce: 0.10 },
+  really_hot:  { birdieBoost: 0.25, bogeyReduce: 0.20 },
+  cold:        { birdieBoost: -0.08, bogeyReduce: -0.08 },
+  really_cold: { birdieBoost: -0.15, bogeyReduce: -0.14 },
+};
+
 export interface SimState {
   phase: Phase;
   tournamentId: number;
@@ -28,6 +37,7 @@ export interface SimState {
   cutLine: number | null;
   fieldSize: number;
   overrides: Record<number, { score?: number; wd?: boolean }>;
+  hotStreaks: Record<number, HotStreakTier>;
   earningsAccumulated?: boolean;
   pointsAccumulated?: boolean;
 }
@@ -134,11 +144,12 @@ function randomNormal(mean: number, stddev: number): number {
 }
 
 /** Generate 18 hole scores with realistic birdie/par/bogey distribution. */
-function generateHoleScores(holePars: number[], ranking: number): number[] {
+function generateHoleScores(holePars: number[], ranking: number, hotStreak?: HotStreakTier): number[] {
   const skill = 1 - (ranking - 1) / 99;
   const hotCold = randomNormal(0, 0.08);
-  const birdieBoost = Math.max(0, skill * 0.18 + hotCold);
-  const bogeyReduce = Math.max(0, skill * 0.14 + hotCold);
+  const bonus = hotStreak ? HOT_STREAK_BONUSES[hotStreak] : undefined;
+  const birdieBoost = Math.max(0, skill * 0.18 + hotCold + (bonus?.birdieBoost ?? 0));
+  const bogeyReduce = Math.max(0, skill * 0.14 + hotCold + (bonus?.bogeyReduce ?? 0));
 
   const scores: number[] = [];
   for (const par of holePars) {
@@ -179,7 +190,25 @@ function generateHoleScores(holePars: number[], ranking: number): number[] {
   return scores;
 }
 
-function rankPlayers(players: PlayerRound[], par: number, _totalRounds: number): void {
+/** Compute toPar from actual hole-level data when available (handles partial rounds). */
+function computeToPar(player: PlayerRound, par: number, holePars?: number[]): number {
+  if (player.holeScores && player.holeScores.length > 0 && holePars) {
+    let parForScored = 0;
+    let totalScored = 0;
+    for (const round of player.holeScores) {
+      for (let h = 0; h < round.length; h++) {
+        if (round[h] != null) {
+          parForScored += holePars[h] ?? 4;
+          totalScored += round[h]!;
+        }
+      }
+    }
+    return totalScored - parForScored;
+  }
+  return player.total - par * player.rounds.length;
+}
+
+function rankPlayers(players: PlayerRound[], par: number, _totalRounds: number, holePars?: number[]): void {
   const active = players.filter((p) => p.status === "active");
   const wd = players.filter((p) => p.status === "wd");
   const cut = players.filter((p) => p.status === "cut");
@@ -195,7 +224,7 @@ function rankPlayers(players: PlayerRound[], par: number, _totalRounds: number):
       pos = i + 1;
     }
     scored[i].position = pos;
-    scored[i].toPar = scored[i].total - par * scored[i].rounds.length;
+    scored[i].toPar = computeToPar(scored[i], par, holePars);
   }
 
   unscored.sort((a, b) => a.ranking - b.ranking);
@@ -209,7 +238,7 @@ function rankPlayers(players: PlayerRound[], par: number, _totalRounds: number):
   let wdPos = active.length + 1;
   for (let i = 0; i < wd.length; i++) {
     wd[i].position = wdPos + i;
-    wd[i].toPar = wd[i].total - par * wd[i].rounds.length;
+    wd[i].toPar = computeToPar(wd[i], par, holePars);
   }
 
   cut.sort((a, b) => a.total - b.total || a.ranking - b.ranking);
@@ -219,7 +248,7 @@ function rankPlayers(players: PlayerRound[], par: number, _totalRounds: number):
       cutPos = active.length + wd.length + i + 1;
     }
     cut[i].position = cutPos;
-    cut[i].toPar = cut[i].total - par * 2;
+    cut[i].toPar = computeToPar(cut[i], par, holePars);
   }
 
   const sorted = [...scored, ...unscored, ...wd, ...cut];
@@ -231,7 +260,104 @@ function rankPlayers(players: PlayerRound[], par: number, _totalRounds: number):
 
 const PHASE_ORDER: Phase[] = ["idle", "round1", "round2", "cut", "round3", "round4", "final"];
 
-export function advance(state: SimState): SimState {
+/** Check if the current phase is a round phase with incomplete holes (partial round in progress). */
+export function isPartialRound(state: SimState): boolean {
+  const roundPhases: Phase[] = ["round1", "round2", "round3", "round4"];
+  if (!roundPhases.includes(state.phase)) return false;
+  const roundIdx = state.currentRound - 1;
+  for (const p of state.players) {
+    if (p.status !== "active") continue;
+    if (p.holeScores && p.holeScores[roundIdx]) {
+      const round = p.holeScores[roundIdx];
+      if (round.some((h) => h === null)) return true;
+    }
+  }
+  return false;
+}
+
+/** Count holes played in current round (from first active player with hole data). */
+export function getHolesPlayed(state: SimState): number {
+  const roundPhases: Phase[] = ["round1", "round2", "round3", "round4"];
+  if (!roundPhases.includes(state.phase)) return 0;
+  const roundIdx = state.currentRound - 1;
+  for (const p of state.players) {
+    if (p.status !== "active") continue;
+    if (p.holeScores && p.holeScores[roundIdx]) {
+      return p.holeScores[roundIdx].filter((h) => h !== null).length;
+    }
+  }
+  return 0;
+}
+
+export function advance(state: SimState, holes: number = 18): SimState {
+  const holePars = state.holePars ?? defaultHolePars(state.par);
+
+  // Check if we're continuing a partial round
+  if (isPartialRound(state)) {
+    const roundIdx = state.currentRound - 1;
+    for (const player of state.players) {
+      if (player.status !== "active") continue;
+      if (!player.holeScores || !player.holeScores[roundIdx]) continue;
+
+      const currentHoles = player.holeScores[roundIdx];
+      const playedCount = currentHoles.filter((h) => h !== null).length;
+      const targetHoles = Math.min(holes, 18);
+
+      if (playedCount >= targetHoles) continue; // already played enough
+
+      // Generate scores for the new holes
+      const fullScores = generateHoleScores(holePars, player.ranking, state.hotStreaks?.[player.playerId]);
+      for (let h = playedCount; h < targetHoles; h++) {
+        currentHoles[h] = fullScores[h];
+      }
+      // Leave remaining holes as null if targetHoles < 18
+      for (let h = targetHoles; h < 18; h++) {
+        currentHoles[h] = null;
+      }
+
+      // Recalculate round total from non-null holes
+      const roundTotal = currentHoles.reduce((sum, s) => sum + (s ?? 0), 0);
+      // Only count non-null holes in the total
+      const scoredTotal = currentHoles.filter((s): s is number => s !== null).reduce((sum, s) => sum + s, 0);
+      player.rounds[roundIdx] = scoredTotal;
+      player.total = player.rounds.reduce((sum, s) => sum + s, 0);
+    }
+
+    // If all 18 holes complete and this is round 2, auto-advance through cut
+    const allComplete = !state.players.some((p) => {
+      if (p.status !== "active") return false;
+      if (!p.holeScores || !p.holeScores[roundIdx]) return false;
+      return p.holeScores[roundIdx].some((h) => h === null);
+    });
+
+    if (allComplete) {
+      state.hotStreaks = {};
+    }
+
+    if (allComplete && state.currentRound === 2) {
+      // Apply cut
+      rankPlayers(state.players, state.par, state.currentRound, holePars);
+      const currentIdx = PHASE_ORDER.indexOf(state.phase);
+      const nextPhase = PHASE_ORDER[currentIdx + 1];
+      if (nextPhase === "cut") {
+        const activePlayers = state.players.filter((p) => p.status === "active");
+        activePlayers.sort((a, b) => a.total - b.total || a.ranking - b.ranking);
+        if (activePlayers.length > 65) {
+          const cutScore = activePlayers[64].total;
+          state.cutLine = cutScore;
+          for (const player of activePlayers) {
+            if (player.total > cutScore) player.status = "cut";
+          }
+        }
+        state.phase = "cut";
+      }
+    }
+
+    rankPlayers(state.players, state.par, state.currentRound, holePars);
+    return state;
+  }
+
+  // Normal phase transition (not continuing a partial round)
   const currentIdx = PHASE_ORDER.indexOf(state.phase);
   if (currentIdx === -1 || currentIdx >= PHASE_ORDER.length - 1) {
     return state;
@@ -241,7 +367,8 @@ export function advance(state: SimState): SimState {
 
   if (nextPhase === "round1" || nextPhase === "round2" || nextPhase === "round3" || nextPhase === "round4") {
     const roundNum = parseInt(nextPhase.replace("round", ""));
-    const holePars = state.holePars ?? defaultHolePars(state.par);
+    const targetHoles = Math.min(holes, 18);
+
     for (const player of state.players) {
       if (player.status !== "active") continue;
 
@@ -254,11 +381,20 @@ export function advance(state: SimState): SimState {
       if (override?.score != null) {
         player.rounds.push(override.score);
       } else {
-        const holes = generateHoleScores(holePars, player.ranking);
+        const fullScores = generateHoleScores(holePars, player.ranking, state.hotStreaks?.[player.playerId]);
         if (!player.holeScores) player.holeScores = [];
-        player.holeScores.push(holes);
-        const roundTotal = holes.reduce((sum, s) => sum + s, 0);
-        player.rounds.push(roundTotal);
+
+        if (targetHoles < 18) {
+          // Partial round: store played holes as numbers, rest as null
+          const partialScores: (number | null)[] = fullScores.map((s, i) => i < targetHoles ? s : null);
+          player.holeScores.push(partialScores);
+          const roundTotal = partialScores.filter((s): s is number => s !== null).reduce((sum, s) => sum + s, 0);
+          player.rounds.push(roundTotal);
+        } else {
+          player.holeScores.push(fullScores);
+          const roundTotal = fullScores.reduce((sum, s) => sum + s, 0);
+          player.rounds.push(roundTotal);
+        }
       }
       player.total = player.rounds.reduce((sum, s) => sum + s, 0);
     }
@@ -266,8 +402,28 @@ export function advance(state: SimState): SimState {
     state.currentRound = roundNum;
     state.phase = nextPhase;
     state.overrides = {};
+    state.hotStreaks = {};
 
-    rankPlayers(state.players, state.par, roundNum);
+    // If full round AND round 2, auto-advance through cut
+    if (targetHoles >= 18 && roundNum === 2) {
+      rankPlayers(state.players, state.par, roundNum, holePars);
+      const cutIdx = PHASE_ORDER.indexOf(nextPhase);
+      const cutPhase = PHASE_ORDER[cutIdx + 1];
+      if (cutPhase === "cut") {
+        const activePlayers = state.players.filter((p) => p.status === "active");
+        activePlayers.sort((a, b) => a.total - b.total || a.ranking - b.ranking);
+        if (activePlayers.length > 65) {
+          const cutScore = activePlayers[64].total;
+          state.cutLine = cutScore;
+          for (const player of activePlayers) {
+            if (player.total > cutScore) player.status = "cut";
+          }
+        }
+        state.phase = "cut";
+      }
+    }
+
+    rankPlayers(state.players, state.par, roundNum, holePars);
   } else if (nextPhase === "cut") {
     const activePlayers = state.players.filter((p) => p.status === "active");
     activePlayers.sort((a, b) => a.total - b.total || a.ranking - b.ranking);
@@ -284,10 +440,10 @@ export function advance(state: SimState): SimState {
     }
 
     state.phase = "cut";
-    rankPlayers(state.players, state.par, 2);
+    rankPlayers(state.players, state.par, 2, holePars);
   } else if (nextPhase === "final") {
     state.phase = "final";
-    rankPlayers(state.players, state.par, 4);
+    rankPlayers(state.players, state.par, 4, holePars);
   }
 
   return state;
@@ -296,6 +452,7 @@ export function advance(state: SimState): SimState {
 export function rewind(state: SimState): SimState {
   const currentIdx = PHASE_ORDER.indexOf(state.phase);
   if (currentIdx <= 0) return state;
+  const holePars = state.holePars ?? defaultHolePars(state.par);
 
   if (state.phase === "final") {
     state.phase = "round4";
@@ -305,7 +462,7 @@ export function rewind(state: SimState): SimState {
     }
     state.cutLine = null;
     state.phase = "round2";
-    rankPlayers(state.players, state.par, 2);
+    rankPlayers(state.players, state.par, 2, holePars);
   } else {
     for (const player of state.players) {
       if (player.status !== "active" && player.status !== "wd") continue;
@@ -321,7 +478,7 @@ export function rewind(state: SimState): SimState {
     state.currentRound--;
     state.phase = PHASE_ORDER[currentIdx - 1];
     if (state.currentRound > 0) {
-      rankPlayers(state.players, state.par, state.currentRound);
+      rankPlayers(state.players, state.par, state.currentRound, holePars);
     }
   }
 
@@ -401,8 +558,9 @@ export function updatePlayer(
     player.toPar = player.total - state.par * newRounds.length;
   }
 
+  const holeParsForRank = state.holePars ?? defaultHolePars(state.par);
   const roundCount = Math.max(...state.players.filter((p) => p.status === "active").map((p) => p.rounds.length), 0);
-  rankPlayers(state.players, state.par, roundCount || state.currentRound);
+  rankPlayers(state.players, state.par, roundCount || state.currentRound, holeParsForRank);
   return state;
 }
 

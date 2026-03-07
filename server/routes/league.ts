@@ -275,6 +275,12 @@ router.get("/:id/team/:teamId", async (req, res) => {
   });
 });
 
+function getHolesThru(holeScores: (number | null)[][] | undefined): number {
+  if (!holeScores || holeScores.length === 0) return 0;
+  const lastRound = holeScores[holeScores.length - 1];
+  return lastRound.filter((h) => h !== null).length;
+}
+
 // GET /api/league/:id/team/:teamId/roster — full roster with player details
 router.get("/:id/team/:teamId/roster", async (req, res) => {
   const league = await getLeague(Number(req.params.id));
@@ -335,6 +341,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
         projectedRoundPoints: projectRoundPoints(rPts),
         earnings: isActive ? earnings : 0,
         points: pts,
+        holesThru: getHolesThru(simPlayer?.holeScores),
       };
     });
 
@@ -358,6 +365,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
         projectedRoundPoints: projectRoundPoints(rPts),
         earnings: 0,
         points: pts,
+        holesThru: getHolesThru(simPlayer?.holeScores),
       };
     });
 
@@ -412,6 +420,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
           projectedRoundPoints: projectRoundPoints(rPts),
           earnings: isActive ? earnings : 0,
           points: pts,
+          holesThru: getHolesThru(simPlayer?.holeScores),
         };
       };
 
@@ -452,6 +461,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
           projectedRoundPoints: [] as number[],
           earnings: 0,
           points: 0,
+          holesThru: 0,
         };
       };
 

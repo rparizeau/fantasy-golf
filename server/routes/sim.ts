@@ -6,7 +6,7 @@ import {
 } from "../db/dal/sim.js";
 import { loadPayoutTable, loadTournaments } from "../db/dal/seed-data.js";
 import { getAllLeagues, getLineupsForTeams, autoCopyLineups } from "../db/dal/league.js";
-import { advance, rewind, setOverride, updatePlayer, calculatePlayerPoints } from "../sim/engine.js";
+import { advance, rewind, setOverride, updatePlayer, calculatePlayerPoints, getHolesPlayed } from "../sim/engine.js";
 import { writePointsForRound, writeTournamentResults, deleteTournamentResults, deletePointsForTournamentRound } from "../db/dal/points.js";
 
 function buildPlayerEarnings(simState: SimState, purse: number, payoutTable: { position: number; pct: number }[]): Map<number, number> {
@@ -92,11 +92,15 @@ router.get("/state", async (_req, res) => {
     wdPlayers,
     cutLine: state.cutLine,
     overrides: state.overrides,
+    hotStreaks: state.hotStreaks ?? {},
+    holesPlayed: getHolesPlayed(state),
   });
 });
 
-// POST /api/sim/advance — generate next round of scores
-router.post("/advance", async (_req, res) => {
+// POST /api/sim/advance — generate next round of scores (accepts optional { holes } in body)
+router.post("/advance", async (req, res) => {
+  const requestedHoles = typeof req.body?.holes === "number" ? req.body.holes : 18;
+
   let state = await loadActiveSimState();
 
   if (state.phase === "final") {
@@ -110,26 +114,27 @@ router.post("/advance", async (_req, res) => {
     for (const league of allLeagues) {
       await autoCopyLineups(league.id, freshState.tournamentId, league.settings.activeSize);
     }
-    const advanced = advance(freshState);
+    const advanced = advance(freshState, requestedHoles);
     await saveSimState(advanced);
 
-    // Write points for round 1
-    if (advanced.currentRound === 1) {
+    // Write points for current round (idempotent — writePointsForRound deletes first)
+    if (advanced.currentRound >= 1) {
+      const roundIdx = advanced.currentRound - 1;
       const playerHoleScores = new Map<number, (number | null)[]>();
       for (const p of advanced.players) {
-        if (p.holeScores && p.holeScores[0]) {
-          playerHoleScores.set(p.playerId, p.holeScores[0]);
+        if (p.holeScores && p.holeScores[roundIdx]) {
+          playerHoleScores.set(p.playerId, p.holeScores[roundIdx]);
         }
       }
       const holePars = advanced.holePars ?? [];
       if (playerHoleScores.size > 0 && holePars.length > 0) {
-        await writePointsForRound(advanced.tournamentId, 1, playerHoleScores, holePars).catch((e) => {
+        await writePointsForRound(advanced.tournamentId, advanced.currentRound, playerHoleScores, holePars).catch((e) => {
           console.error("Failed to write round points:", e);
         });
       }
     }
 
-    res.json({ phase: advanced.phase, currentRound: advanced.currentRound });
+    res.json({ phase: advanced.phase, currentRound: advanced.currentRound, holesPlayed: getHolesPlayed(advanced) });
     return;
   }
 
@@ -140,12 +145,11 @@ router.post("/advance", async (_req, res) => {
     }
   }
 
-  const prevRound = state.currentRound;
-  const updated = advance(state);
+  const updated = advance(state, requestedHoles);
   await saveSimState(updated);
 
-  // Write points if a new round was played
-  if (updated.currentRound > prevRound) {
+  // Always write points for current round after advancing (idempotent)
+  if (updated.currentRound >= 1) {
     const roundIdx = updated.currentRound - 1;
     const playerHoleScores = new Map<number, (number | null)[]>();
     for (const p of updated.players) {
@@ -167,6 +171,7 @@ router.post("/advance", async (_req, res) => {
     activePlayers: updated.players.filter((p) => p.status === "active").length,
     cutPlayers: updated.players.filter((p) => p.status === "cut").length,
     cutLine: updated.cutLine,
+    holesPlayed: getHolesPlayed(updated),
   });
 });
 
@@ -304,6 +309,31 @@ router.post("/rollback", async (_req, res) => {
   await saveSimState(reverted);
 
   res.json({ phase: reverted.phase, tournamentId: reverted.tournamentId });
+});
+
+// POST /api/sim/hot-streak — set/remove hot streaks for players
+router.post("/hot-streak", async (req, res) => {
+  const { players } = req.body;
+  if (!Array.isArray(players)) {
+    res.status(400).json({ error: "players array is required" });
+    return;
+  }
+
+  const state = await loadActiveSimState();
+
+  // Build new hotStreaks map from request
+  const hotStreaks: Record<number, string> = {};
+  for (const entry of players) {
+    if (entry.playerId && entry.tier) {
+      if (entry.tier === "hot" || entry.tier === "really_hot") {
+        hotStreaks[entry.playerId] = entry.tier;
+      }
+    }
+  }
+
+  state.hotStreaks = hotStreaks as Record<number, "hot" | "really_hot">;
+  await saveSimState(state);
+  res.json({ hotStreaks: state.hotStreaks });
 });
 
 // POST /api/sim/reset — reset to idle with fresh field

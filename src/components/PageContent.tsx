@@ -16,9 +16,10 @@ interface PageContentProps {
   viewingWeek: number;
   onChangeWeek: (week: number) => void;
   simTick: number;
+  stickyTop: number;
 }
 
-export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek, simTick }: PageContentProps) {
+export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, currentTournamentId, viewingWeek, onChangeWeek, simTick, stickyTop }: PageContentProps) {
 
   switch (page) {
     case "match":
@@ -46,7 +47,7 @@ export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, 
     case "golfers":
       return (
         <div style={{ flex: 1 }}>
-          <Golfers leagueId={leagueId} teamId={myTeamId} colors={C} simTick={simTick} />
+          <Golfers leagueId={leagueId} teamId={myTeamId} colors={C} simTick={simTick} stickyTop={stickyTop} />
         </div>
       );
     case "league":

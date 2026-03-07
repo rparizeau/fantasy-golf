@@ -28,6 +28,7 @@ export interface SimVersion {
   currentRound: number;
   fieldSize: number;
   cutLine: number | null;
+  holesPlayed: number;
 }
 
 export function getSimVersion() {
@@ -47,16 +48,18 @@ export interface SimStatus {
   wdPlayers: number;
   cutLine: number | null;
   overrides: Record<number, { score?: number; wd?: boolean }>;
+  hotStreaks: Record<number, string>;
+  holesPlayed: number;
 }
 
 export function getSimState() {
   return fetchJSON<SimStatus>("/sim/state");
 }
 
-export function advanceSim() {
-  return fetchJSON<{ phase: string; currentRound: number; activePlayers?: number; cutPlayers?: number; cutLine?: number | null }>(
+export function advanceSim(holes?: number) {
+  return fetchJSON<{ phase: string; currentRound: number; activePlayers?: number; cutPlayers?: number; cutLine?: number | null; holesPlayed: number }>(
     "/sim/advance",
-    { method: "POST" }
+    { method: "POST", body: JSON.stringify({ holes }) }
   );
 }
 
@@ -90,6 +93,13 @@ export function resetSim(tournamentId?: number) {
   return fetchJSON<{ phase: string; tournamentId: number; fieldSize: number }>("/sim/reset", {
     method: "POST",
     body: JSON.stringify({ tournamentId }),
+  });
+}
+
+export function setHotStreaks(players: { playerId: number; tier: string }[]) {
+  return fetchJSON<{ hotStreaks: Record<number, string> }>("/sim/hot-streak", {
+    method: "POST",
+    body: JSON.stringify({ players }),
   });
 }
 
@@ -269,6 +279,7 @@ export interface RosterPlayer {
   projectedRoundPoints: number[];
   earnings: number;
   points: number;
+  holesThru: number;
 }
 
 export interface RosterData {

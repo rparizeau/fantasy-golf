@@ -20,6 +20,8 @@ export interface PlayerRound {
   status: "active" | "cut" | "wd";
 }
 
+export type HotStreakTier = "hot" | "really_hot" | "cold" | "really_cold";
+
 export interface SimState {
   phase: Phase;
   tournamentId: number;
@@ -30,6 +32,7 @@ export interface SimState {
   cutLine: number | null;
   fieldSize: number;
   overrides: Record<number, { score?: number; wd?: boolean }>;
+  hotStreaks: Record<number, HotStreakTier>;
   earningsAccumulated?: boolean;
   pointsAccumulated?: boolean;
 }
@@ -42,6 +45,7 @@ export interface SimVersion {
   currentRound: number;
   fieldSize: number;
   cutLine: number | null;
+  holesPlayed: number;
 }
 
 export async function loadSimVersion(): Promise<SimVersion> {
@@ -55,9 +59,23 @@ export async function loadSimVersion(): Promise<SimVersion> {
   }).from(simTournaments).where(eq(simTournaments.tournamentId, id));
 
   if (!row) {
-    return { tournamentId: id, phase: "idle", currentRound: 0, fieldSize: 0, cutLine: null };
+    return { tournamentId: id, phase: "idle", currentRound: 0, fieldSize: 0, cutLine: null, holesPlayed: 0 };
   }
-  return row;
+
+  // Compute holes played from first active player's last round
+  let holesPlayed = 0;
+  if (row.currentRound > 0) {
+    const [player] = await db.select({ holeScores: simPlayers.holeScores })
+      .from(simPlayers)
+      .where(eq(simPlayers.tournamentId, id))
+      .limit(1);
+    if (player?.holeScores) {
+      const lastRound = player.holeScores[player.holeScores.length - 1];
+      if (lastRound) holesPlayed = (lastRound as (number | null)[]).filter((h) => h !== null).length;
+    }
+  }
+
+  return { ...row, holesPlayed };
 }
 
 // --- Active Tournament ---
@@ -124,6 +142,7 @@ export async function loadTournamentState(tournamentId: number): Promise<SimStat
     cutLine: tourney.cutLine ?? null,
     fieldSize: tourney.fieldSize,
     overrides: (tourney.overrides ?? {}) as Record<number, { score?: number; wd?: boolean }>,
+    hotStreaks: (tourney.hotStreaks ?? {}) as Record<number, HotStreakTier>,
     earningsAccumulated: tourney.isEarningsAccumulated,
     pointsAccumulated: tourney.isPointsAccumulated,
   };
@@ -141,6 +160,7 @@ export async function saveSimState(state: SimState): Promise<void> {
       cutLine: state.cutLine ?? null,
       fieldSize: state.fieldSize,
       overrides: state.overrides as Record<number, { score?: number; wd?: boolean }>,
+      hotStreaks: (state.hotStreaks ?? {}) as Record<number, string>,
       isEarningsAccumulated: state.earningsAccumulated ?? false,
       isPointsAccumulated: state.pointsAccumulated ?? false,
     })
@@ -154,6 +174,7 @@ export async function saveSimState(state: SimState): Promise<void> {
         cutLine: state.cutLine ?? null,
         fieldSize: state.fieldSize,
         overrides: state.overrides as Record<number, { score?: number; wd?: boolean }>,
+        hotStreaks: (state.hotStreaks ?? {}) as Record<number, string>,
         isEarningsAccumulated: state.earningsAccumulated ?? false,
         isPointsAccumulated: state.pointsAccumulated ?? false,
       },
@@ -255,6 +276,7 @@ export async function createFreshState(tournamentId: number): Promise<SimState> 
     cutLine: null,
     fieldSize: allGolfers.length,
     overrides: {},
+    hotStreaks: {},
   };
 
   await saveSimState(state);

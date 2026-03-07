@@ -9,6 +9,7 @@ interface GolfersProps {
   teamId: number;
   colors: Theme;
   simTick: number;
+  stickyTop?: number;
 }
 
 const BTN = 36;
@@ -22,7 +23,7 @@ const statCols: { key: keyof PlayerPoolEntry; label: string }[] = [
   { key: "seasonPoints", label: "TOT" },
 ];
 
-export function Golfers({ leagueId, teamId, colors: C, simTick }: GolfersProps) {
+export function Golfers({ leagueId, teamId, colors: C, simTick, stickyTop = 0 }: GolfersProps) {
   const [players, setPlayers] = useState<PlayerPoolEntry[]>([]);
   const [myRoster, setMyRoster] = useState<RosterPlayer[]>([]);
   const [rosterSettings, setRosterSettings] = useState<RosterData["settings"] | null>(null);
@@ -110,15 +111,17 @@ export function Golfers({ leagueId, teamId, colors: C, simTick }: GolfersProps) 
   }
 
   return (
-    <div style={{ padding: "12px 16px 100px" }}>
+    <div>
       {error && (
-        <div style={{ background: C.redDim, color: C.red, padding: "10px 14px", borderRadius: 10, fontSize: 13, marginBottom: 10 }}>
-          {error}
+        <div style={{ padding: "12px 16px 0" }}>
+          <div style={{ background: C.redDim, color: C.red, padding: "10px 14px", borderRadius: 10, fontSize: 13, marginBottom: 10 }}>
+            {error}
+          </div>
         </div>
       )}
 
-      {/* Search + Filter row */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      {/* Search + Filter row (sticky) */}
+      <div style={{ position: "sticky", top: stickyTop, zIndex: 10, background: C.bg, padding: "8px 16px", display: "flex", gap: 8 }}>
         <input
           type="text"
           placeholder="Search golfers..."
@@ -171,6 +174,7 @@ export function Golfers({ leagueId, teamId, colors: C, simTick }: GolfersProps) 
         </select>
       </div>
 
+      <div style={{ padding: "0 16px 100px", marginTop: 8 }}>
       {/* Column header */}
       <div style={{ display: "flex", alignItems: "center", padding: "0 14px 6px" }}>
         <p style={{ flex: 1, color: C.txt2, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6, margin: 0 }}>Name</p>
@@ -248,6 +252,7 @@ export function Golfers({ leagueId, teamId, colors: C, simTick }: GolfersProps) 
           No golfers found
         </div>
       )}
+      </div>
 
       {modalPlayerId !== null && (
         <PlayerModal playerId={modalPlayerId} leagueId={leagueId} colors={C} onClose={() => setModalPlayerId(null)} />

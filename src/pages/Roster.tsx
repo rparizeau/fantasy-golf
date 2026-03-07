@@ -516,7 +516,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                     );
                   })}
                   <div style={{ width: COL.p, textAlign: "right" }}>
-                    <p style={{ fontSize: 15, fontWeight: 700, color: C.txt, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>{myPoints}</p>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: myPoints > 0 ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>{myPoints > 0 ? myPoints : "-"}</p>
                     <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
                       {projectedTotal > 0 ? `${projectedTotal}` : "-"}
                     </p>
@@ -655,7 +655,7 @@ export function WeekNav({
         >
           <span>Week {viewingWeek + 1}</span>
           {tournaments[viewingWeek]?.isMajor && <span style={{ color: C.gold }}>★</span>}
-          {isCurrent && <span style={{ color: C.green }}>(current)</span>}
+          {isCurrent && <span style={{ color: tournaments[viewingWeek]?.color ?? C.green }}>(current)</span>}
           <span style={{ fontSize: 10, color: C.txt3, marginLeft: 2 }}>{dropdownOpen ? "▲" : "▼"}</span>
         </button>
 
@@ -721,7 +721,7 @@ export function WeekNav({
                 </span>
                 {t.isMajor && <span style={{ color: C.gold, fontSize: 13 }}>★</span>}
                 {isCurrentWeek && (
-                  <span style={{ fontSize: 11, color: C.green, fontWeight: 600 }}>(current)</span>
+                  <span style={{ fontSize: 11, color: t.color ?? C.green, fontWeight: 600 }}>(current)</span>
                 )}
               </div>
             );
