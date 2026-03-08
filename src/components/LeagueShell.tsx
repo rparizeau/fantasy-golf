@@ -73,25 +73,29 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
     );
   }
 
+  const hideChrome = activePage === "settings";
+
   return (
     <PullToRefresh onRefresh={fullRefresh} colors={C}>
-      <LeagueHeader
-        leagueId={leagueId}
-        isDark={isDark}
-        colors={C}
-        onToggleTheme={onToggleTheme}
-        onBack={onBack}
-        viewedTournament={viewedTournament}
-        activePage={activePage}
-        tournaments={tournaments}
-        currentTournamentId={currentTournamentId}
-        viewingWeek={viewingWeek}
-        onChangeWeek={setViewingWeek}
-        seasonPoints={seasonPoints}
-        leagues={leagues}
-        onChangeLeague={onChangeLeague}
-        onHeightChange={setHeaderHeight}
-      />
+      {!hideChrome && (
+        <LeagueHeader
+          leagueId={leagueId}
+          isDark={isDark}
+          colors={C}
+          onToggleTheme={onToggleTheme}
+          onBack={onBack}
+          viewedTournament={viewedTournament}
+          activePage={activePage}
+          tournaments={tournaments}
+          currentTournamentId={currentTournamentId}
+          viewingWeek={viewingWeek}
+          onChangeWeek={setViewingWeek}
+          seasonPoints={seasonPoints}
+          leagues={leagues}
+          onChangeLeague={onChangeLeague}
+          onHeightChange={setHeaderHeight}
+        />
+      )}
       <PageContent
         page={activePage}
         leagueId={leagueId}
@@ -102,9 +106,9 @@ export function LeagueShell({ leagueId, activePage, isDark, colors: C, onToggleT
         viewingWeek={viewingWeek}
         onChangeWeek={setViewingWeek}
         simTick={simTick}
-        stickyTop={headerHeight}
+        stickyTop={hideChrome ? 0 : headerHeight}
       />
-      <BottomNav activePage={activePage} colors={C} onChangePage={onChangePage} />
+      {!hideChrome && <BottomNav activePage={activePage} colors={C} onChangePage={onChangePage} />}
     </PullToRefresh>
   );
 }

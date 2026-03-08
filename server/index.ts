@@ -11,6 +11,7 @@ import standingsRoutes from "./routes/standings.js";
 import chatRoutes from "./routes/chat.js";
 import rosterRoutes from "./routes/roster.js";
 import playerDetailRoutes from "./routes/player.js";
+import leagueCreateRoutes from "./routes/league-create.js";
 import { requireAuth, requireAdmin } from "./middleware/auth.js";
 
 const app = express();
@@ -28,6 +29,8 @@ app.use("/api/league", requireAuth, playerRoutes);
 app.use("/api/league", requireAuth, standingsRoutes);
 app.use("/api/league", requireAuth, chatRoutes);
 app.use("/api/league", requireAuth, rosterRoutes);
+app.use("/api/league", requireAuth, leagueCreateRoutes);
+app.use("/api", requireAuth, leagueCreateRoutes);
 app.use("/api/player", playerDetailRoutes);
 
 // Health check

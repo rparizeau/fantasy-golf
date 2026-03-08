@@ -42,6 +42,14 @@ export const scoringCategoryEnum = pgEnum("scoring_category", [
   "hole_outcome", "bonus",
 ]);
 
+export const waiverTypeEnum = pgEnum("waiver_type", [
+  "reverse_standings", "faab",
+]);
+
+export const tradeVetoEnum = pgEnum("trade_veto_rule", [
+  "none", "commissioner", "league",
+]);
+
 // ─── Tier 1: Standalone reference data ───────────────────────
 
 export const users = pgTable("users", {
@@ -102,6 +110,7 @@ export const leagues = pgTable("leagues", {
   id: serial("id").primaryKey(),
   createdById: integer("created_by_id").notNull().references(() => users.id),
   name: varchar("name", { length: 100 }).notNull(),
+  inviteCode: varchar("invite_code", { length: 12 }).unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -129,6 +138,11 @@ export const leagueSettings = pgTable("league_settings", {
   rosterCount: integer("roster_count").notNull().default(8),
   lineupCount: integer("lineup_count").notNull().default(4),
   reserveCount: integer("reserve_count").notNull().default(4),
+  waiverType: waiverTypeEnum("waiver_type").notNull().default("reverse_standings"),
+  faabBudget: integer("faab_budget").notNull().default(100),
+  tradeVetoRule: tradeVetoEnum("trade_veto_rule").notNull().default("none"),
+  regularSeasonPoints: integer("regular_season_points").notNull().default(500),
+  majorSeasonPoints: integer("major_season_points").notNull().default(700),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -209,6 +223,7 @@ export const drafts = pgTable("drafts", {
   currentPickNumber: integer("current_pick_number").notNull().default(0),
   roundCount: integer("round_count").notNull(),
   isSnake: boolean("is_snake").notNull().default(true),
+  scheduledAt: timestamp("scheduled_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

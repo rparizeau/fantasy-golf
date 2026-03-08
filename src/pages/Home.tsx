@@ -16,6 +16,7 @@ interface HomeProps {
 
 export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTournamentId, viewingWeek, simTick }: HomeProps) {
   const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
+  const [managerCount, setManagerCount] = useState(0);
   const [lbLoading, setLbLoading] = useState(true);
   const [squadLoaded, setSquadLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +28,7 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
     try {
       const lb = await getFantasyLeaderboard(leagueId, tid);
       setTeams(lb.teams);
+      setManagerCount(lb.managerCount ?? lb.teams.length);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
@@ -80,6 +82,7 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
               showRounds={true}
               badgeColor={tournaments[viewingWeek]?.color}
               emptyMessage={isFuture ? "Tournament hasn't started yet." : "No leaderboard data yet. Sim a round to see results."}
+              emptySlots={Math.max(0, managerCount - teams.length)}
             />
           )}
         </div>

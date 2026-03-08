@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import App from "./App";
 import { SimPanel } from "./pages/SimPanel";
+import { JoinLeague } from "./pages/JoinLeague";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -11,6 +12,7 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/sim" element={<SimPanel />} />
+          <Route path="/join/:code" element={<JoinLeague />} />
           <Route path="/league/:leagueId/:page" element={<App />} />
           <Route path="*" element={<App />} />
         </Routes>

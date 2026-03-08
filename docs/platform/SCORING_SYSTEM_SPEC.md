@@ -1,6 +1,6 @@
 # Fantasy Golf League — Scoring System & Schema Spec
-**Version:** 1.0  
-**Last Updated:** March 3, 2026  
+**Version:** 1.1
+**Last Updated:** March 7, 2026
 **Author:** Bobby + Claude  
 
 ---
@@ -361,7 +361,7 @@ SCORED_EVENTS → WEEKLY_TEAM_RESULTS → SEASON_STANDINGS
 
 - All roster construction is configurable per league (active, bench, total)
 - All scoring is configurable per league (point values, active/inactive events)
-- Season points distribution is fixed by the platform (percentage table) but tier base points (500/700) could be made league-configurable in the future
+- Season points distribution is stored in a `payouts` database table with separate `regular_points` and `major_points` columns per position (1st–65th). Seeded via `server/db/seed-payouts.ts`
 - Tournament tiers use an enum or reference table that's easy to extend (`regular`, `major`, and eventually `signature`)
 - No positional requirements — every golfer is eligible for every slot
 

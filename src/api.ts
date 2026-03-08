@@ -240,6 +240,7 @@ export interface FantasyLeaderboard {
   tournamentName: string;
   phase: string;
   showMoney: boolean;
+  managerCount?: number;
   teams: FantasyTeamSummary[];
 }
 
@@ -360,7 +361,7 @@ export interface SeasonStanding {
 }
 
 export function getSeasonStandings(leagueId: number) {
-  return fetchJSON<SeasonStanding[]>(`/league/${leagueId}/standings`);
+  return fetchJSON<{ leagueName: string; managerCount?: number; totalWeeks: number; standings: SeasonStanding[] }>(`/league/${leagueId}/standings`);
 }
 
 // --- Chat (Build 6+) ---
@@ -437,5 +438,73 @@ export function activateMulligan(leagueId: number, teamId: number, playerId: num
   return fetchJSON<{ ok: boolean; remaining: number }>(`/league/${leagueId}/team/${teamId}/mulligan`, {
     method: "POST",
     body: JSON.stringify({ playerId }),
+  });
+}
+
+// --- League Creation (Build 8+) ---
+
+export interface ScoringEventDefault {
+  id: number;
+  key: string;
+  label: string;
+  defaultPoints: number;
+  sortOrder: number;
+}
+
+export function getScoringEventDefaults() {
+  return fetchJSON<{ events: ScoringEventDefault[] }>("/scoring-events");
+}
+
+export interface SchedulePreviewTournament {
+  id: number;
+  name: string;
+  isMajor: boolean;
+  startDate: string;
+}
+
+export function getSchedulePreview(weekCount: number) {
+  return fetchJSON<{ tournaments: SchedulePreviewTournament[] }>(`/tournaments/schedule-preview?weekCount=${weekCount}`);
+}
+
+export interface CreateLeaguePayload {
+  name: string;
+  teamName?: string;
+  managerCount: number;
+  lineupCount: number;
+  benchCount: number;
+  reserveCount: number;
+  scoring: { scoringEventId: number; pointsVal: number }[];
+  waiverType: "reverse_standings" | "faab";
+  faabBudget: number;
+  tradeVetoRule: "none" | "commissioner" | "league";
+  weekCount: number;
+  regularSeasonPoints: number;
+  majorSeasonPoints: number;
+  draftScheduledAt?: string;
+}
+
+export function createLeague(payload: CreateLeaguePayload) {
+  return fetchJSON<{ leagueId: number; inviteCode: string; managerId: number }>("/league/create", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface InvitePreview {
+  id: number;
+  name: string;
+  members: number;
+  maxMembers: number;
+  creatorName: string;
+}
+
+export function getInvitePreview(code: string) {
+  return fetchJSON<InvitePreview>(`/league/invite/${code}`);
+}
+
+export function joinLeague(inviteCode: string, teamName?: string) {
+  return fetchJSON<{ leagueId: number; managerId: number }>("/league/join", {
+    method: "POST",
+    body: JSON.stringify({ inviteCode, teamName }),
   });
 }

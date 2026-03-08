@@ -243,6 +243,7 @@ router.get("/:id/leaderboard", async (req, res) => {
     tournamentName: tournament.name,
     phase: simState.phase,
     showMoney: league.settings.showMoney,
+    managerCount: league.settings.managerCount ?? league.teams.length,
     teams,
   });
 });

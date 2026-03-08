@@ -7,6 +7,7 @@ import { ProfileMenu } from "./ProfileMenu";
 import { ManagerIcon } from "./ManagerIcon";
 import { CourseIcon } from "./CourseIcon";
 import { PullToRefresh } from "./PullToRefresh";
+import { CreateLeagueWizard } from "./CreateLeagueWizard";
 
 interface LobbyProps {
   isDark: boolean;
@@ -19,6 +20,7 @@ export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeaguePage }: L
   const { manager } = useAuth();
   const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showWizard, setShowWizard] = useState(false);
 
   const refresh = useCallback(async () => {
     const data = await getLeagues();
@@ -30,6 +32,7 @@ export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeaguePage }: L
   }, [refresh]);
 
   return (
+    <>
     <PullToRefresh onRefresh={refresh} colors={C}>
     <div>
       {/* STICKY HEADER */}
@@ -66,6 +69,7 @@ export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeaguePage }: L
 
         {/* Create a League */}
         <div
+          onClick={() => setShowWizard(true)}
           style={{
             background: C.card,
             borderRadius: 14,
@@ -98,6 +102,14 @@ export function Lobby({ isDark, colors: C, onToggleTheme, onEnterLeaguePage }: L
       </div>
     </div>
     </PullToRefresh>
+    {showWizard && (
+      <CreateLeagueWizard
+        colors={C}
+        onClose={() => { setShowWizard(false); refresh(); }}
+        onCreated={() => { /* stays open to show invite code */ }}
+      />
+    )}
+    </>
   );
 }
 
@@ -163,7 +175,7 @@ function NavIcon({ id, color }: { id: string; color: string }) {
 const navLinks = [
   { id: "match", label: "Match" },
   { id: "golfers", label: "Golfers" },
-  { id: "league", label: "Tour" },
+  { id: "league", label: "League" },
   { id: "chat", label: "Chat" },
 ];
 

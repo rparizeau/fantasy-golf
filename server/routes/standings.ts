@@ -45,7 +45,7 @@ router.get("/:id/standings", async (req, res) => {
     s.previousRank = s.currentRank;
   });
 
-  res.json(standings);
+  res.json({ leagueName: league.name, managerCount: league.settings.managerCount, totalWeeks, standings });
 });
 
 export default router;

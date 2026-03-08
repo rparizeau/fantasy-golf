@@ -36,6 +36,7 @@ export interface LeagueData {
     mulligansPerSeason: number;
     scoringSettings: ScoringSettings;
     showMoney: boolean;
+    managerCount: number;
   };
   teams: TeamData[];
 }
@@ -224,6 +225,7 @@ export async function getLeague(leagueId: number): Promise<LeagueData | null> {
       mulligansPerSeason: 0,
       scoringSettings: scoring,
       showMoney: false,
+      managerCount: settings?.managerCount ?? teamDataList.length,
     },
     teams: teamDataList,
   };

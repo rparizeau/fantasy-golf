@@ -1,6 +1,6 @@
 # Fantasy Golf League — Navigation Specification
-**Version:** 1.0  
-**Last Updated:** March 1, 2026  
+**Version:** 1.1
+**Last Updated:** March 7, 2026
 **Author:** Bobby + Claude  
 
 ---
@@ -36,23 +36,36 @@ The lobby is the app entry point. It contains no bottom navigation and no league
 ### Layout
 
 ```
-SECTION: HEADER
+SECTION: STICKY HEADER (sticky, top: 0, z-index: 40)
 ├── ROW (height: 64px, vertically centered)
-│   ├── LEFT:  "Welcome back," (txt2, 14px)
-│   └── RIGHT: Day/Night toggle
-│
+│   ├── LEFT:  "Fantasy Golf" (txt, 16px, weight 700)
+│   └── RIGHT: ProfileMenu (avatar button → dropdown with theme toggle, sign out)
+
+SECTION: GREETING
 ├── ROW
-│   └── FULL:  "Bobby" (txt, 30px, weight 700, letter-spacing -0.5)
+│   ├── "Welcome back," (txt2, 14px)
+│   └── Manager display name (txt, 30px, weight 700, letter-spacing -0.5)
 
 SECTION: BODY
-├── TITLE: "Your Leagues" (txt2, 13px, uppercase, weight 600, spacing 0.8)
+├── COLUMN HEADER ROW
+│   ├── LEFT:  "Your Leagues" (txt2, 12px, uppercase, weight 600, spacing 0.6)
+│   └── RIGHT: "PTS" (txt2, 12px, uppercase, weight 600)
 │
 ├── LEAGUE CARD (repeating, one per league)
-│   ├── Top: League name (txt3, 11px, uppercase) + Team name (txt, 18px, weight 700)
-│   ├── Top Right: Rank badge (e.g., "#3 of 10")
-│   ├── Info Row: Live beacon + "Wk {n} • {Tournament} • {Purse}"
-│   ├── Bottom Row (3 cols): Season total | This week earnings | › chevron
-│   └── On tap → enters league
+│   ├── Team Info (tappable → enters league at scorecard tab)
+│   │   ├── LEFT: ManagerIcon (42px) with rank badge overlay (top-left)
+│   │   │         + Team name (txt, 18px, weight 700) + League name (txt2, 12px)
+│   │   └── RIGHT: Week points (15px, weight 700) or "-" if no scores
+│   ├── Tournament Section (tappable → enters league at scorecard tab)
+│   │   ├── CourseIcon (24px, tournament colors)
+│   │   └── Tournament name (txt2, 12px, weight 600, truncated)
+│   ├── Nav Links Row (4 equal columns, border-top)
+│   │   ├── Match (flag icon)
+│   │   ├── Golfers (search icon)
+│   │   ├── Tour (grid icon)
+│   │   └── Chat (speech bubble icon)
+│   │   └── Each: SVG icon (18px) + label (10px, weight 600)
+│   └── Tapping nav link → enters league at that specific tab
 │
 ├── CREATE A LEAGUE CARD
 │   ├── Dashed border (2px dashed, border color)
@@ -63,11 +76,13 @@ SECTION: BODY
 
 ### Behavior
 - Default theme: **Light mode**
-- Day/Night toggle position must match the league header toggle position exactly (same vertical and horizontal coordinates)
-- "Welcome back," row height (64px) matches the league header first row height — this prevents layout jank on transition
-- League cards show league-specific week number, tournament name, and purse (abbreviated, e.g., "$10M")
-- Tapping a league card enters the League Shell with that league's data
+- Theme toggle is inside the ProfileMenu dropdown (avatar button in top-right)
+- Header row height (64px) matches the league header first row height — this prevents layout jank on transition
+- League cards show team name, league name, rank badge, week points, and active tournament
+- Nav links on each card allow direct entry to a specific tab (Match, Golfers, Tour, Chat)
+- Tapping the team info or tournament section enters the league at the scorecard tab
 - Create a League card is a placeholder — no flows built
+- Pull-to-refresh supported on the entire lobby
 
 ---
 
@@ -79,34 +94,38 @@ The league header is persistent and sticky (`position: sticky; top: 0`) across a
 
 ```
 LEAGUE HEADER (sticky, top: 0, z-index: 40)
-├── ROW 1 (height: 64px, vertically centered)
-│   ├── LEFT:  ‹ Back button (30×30, radius 8) + League Name (txt, 14px, weight 600)
-│   └── RIGHT: Day/Night toggle (44×26)
+├── Tournament Info Section (gradient bg: transparent → tournamentColor at 20% opacity)
+│   ├── ROW 1 (height: 64px, vertically centered)
+│   │   ├── LEFT:  Home button (30×30, house icon, radius 8)
+│   │   │          + League Name button (txt, 14px, weight 600)
+│   │   │          + ▼ dropdown arrow (if multiple leagues)
+│   │   └── RIGHT: ProfileMenu (avatar → theme toggle, sign out)
+│   │
+│   ├── ROW 2 (tournament detail, margin-top: 4px)
+│   │   ├── LEFT:  CourseIcon (52px, tournament primary + secondary colors)
+│   │   ├── RIGHT of icon (flex column):
+│   │   │   ├── Tournament Name (txt, 17px, weight 700) + ★ if major
+│   │   │   ├── Course Name (txt2, 13px) | "Pts: {seasonPoints}" (txt2, 13px)
+│   │   │   └── Location (txt3, 12px)   | "Par {par}" (txt3, 12px)
 │
-├── ROW 2 (margin-top: 4px, margin-bottom: 4px)
-│   ├── LEFT:  Tournament Name (txt, 17px, weight 700)
-│   └── RIGHT: Status badge with beacon if live
-│              • Live: green dot (6px, pulsing) + "Live • R{n}" (greenBright)
-│              • Final: "Final" (blue)
-│              • Upcoming: "Upcoming" (txt3)
+├── League Dropdown (absolute, z-index: 50, appears on league name click)
+│   └── List of leagues with name + team name, selected highlighted
 │
-├── ROW 3 (margin-bottom: 3px)
-│   ├── LEFT:  Course Name (txt2, 13px)
-│   └── RIGHT: "Purse: {amount}" (txt2, 13px)
-│
-├── ROW 4
-│   ├── LEFT:  📍 Location (txt3, 12px)
-│   └── RIGHT: "Cut: {value}" (txt3, 12px)
+├── Week Navigation (WeekNav component, border-bottom, tournament color bg at 20%)
+│   └── Horizontally scrollable pill buttons for each tournament week
+│       ├── Active week: bold, tournament-color text + "(current)" label
+│       └── Other weeks: muted text
 ```
 
 ### Behavior
-- Background: card color with bottom border
-- Light mode gets subtle box shadow (`0 1px 3px rgba(0,0,0,0.04)`)
-- ‹ Back button returns to Lobby — clears active league state
-- Toggle position is identical to lobby toggle — no visual shift on transition
-- Status badge contains the pulsing beacon dot inline when tournament is live
-- Header content updates based on the league's current tournament week
-- Padding: `0 16px 16px` (horizontal 16px, bottom 16px)
+- Background: card color, no box shadow
+- Home button returns to Lobby — clears active league state
+- League name is tappable to open league switcher dropdown (if user is in multiple leagues)
+- Header reports its height via ResizeObserver so child pages can position sticky sub-headers below it
+- Tournament info shows CourseIcon with the tournament's primary and secondary colors
+- Season points displayed alongside course name
+- WeekNav allows switching between tournament weeks; current week auto-scrolls into view
+- Padding: `0 16px 16px` (horizontal 16px, bottom 16px) on the tournament info section
 
 ---
 
@@ -116,13 +135,13 @@ The bottom nav is fixed to the viewport bottom and appears **only** inside the L
 
 ### Tabs
 
-| Order | ID         | Label    | Icon Description        |
-|-------|------------|----------|-------------------------|
-| 1     | `home`     | Home     | House with door          |
-| 2     | `scorecard`| Roster   | Golf flag on green       |
-| 3     | `golfers`  | Golfers  | People/users group       |
-| 4     | `league`   | League   | Table/grid (standings)   |
-| 5     | `chat`     | Chat     | Speech bubble            |
+| Order | ID         | Label    | Icon Description                        |
+|-------|------------|----------|-----------------------------------------|
+| 1     | `match`    | Match    | Flag on pole (golf pin)                 |
+| 2     | `scorecard`| Squad    | People/users group                      |
+| 3     | `golfers`  | Golfers  | Magnifying glass (search)               |
+| 4     | `league`   | Tour     | Table/grid (standings)                  |
+| 5     | `chat`     | Chat     | Speech bubble                           |
 
 ### Layout
 
@@ -157,24 +176,28 @@ The area between the sticky header and fixed bottom nav. Each tab renders its co
 - Scrollable independently of header and nav
 - Content swaps instantly on tab change — no transition animation, no loading state
 
-### Current Pages (placeholder)
-All five pages currently render a centered placeholder card showing the page name and league context. Page content will be built out individually.
+### Pages
 
-| Tab      | Page Title | Description (future) |
-|----------|-----------|----------------------|
-| Home     | Home      | League dashboard, quick stats, activity feed |
-| Roster   | Roster    | Active lineup, reserve players, weekly management |
-| Golfers  | Golfers   | All rostered golfers, free agents, waiver wire |
-| League   | League    | Season standings, head-to-head, league history |
-| Chat     | Chat      | League-scoped messaging between members |
+| Tab      | Component      | Description |
+|----------|---------------|-------------|
+| Match    | Home          | Fantasy leaderboard for the active tournament week, team-by-team rankings |
+| Squad    | Roster        | Your active roster with per-round scores, projected points, rival comparison |
+| Golfers  | Golfers       | Full player pool — free agents, rostered players, waiver claims. Sticky search + filter bar below the header |
+| Tour     | LeagueStandings | Season standings across all tournament weeks |
+| Chat     | Chat          | League-scoped messaging between members |
 
 ---
 
 ## 6. Theme System
 
-### Toggle Component
-- Dimensions: 44×26px, border-radius 13px
-- Knob: 20×20px circle with emoji indicator (☀️ light, 🌙 dark)
+### ProfileMenu
+The theme toggle and sign-out action are inside a ProfileMenu component (avatar button in top-right corner of both Lobby and League headers).
+
+- Avatar button: ManagerIcon (28px) showing user's team color
+- Dropdown: card background, border, shadow, positioned below avatar
+- Contains: Day/Night toggle row + Sign Out button
+- Toggle dimensions: 44×26px, border-radius 13px
+- Knob: 20×20px circle with emoji indicator (sun/moon)
 - Light state: card2 background, gray knob
 - Dark state: greenDim background, green knob
 - Transition: `all .25s` on both track and knob
@@ -205,20 +228,21 @@ All five pages currently render a centered placeholder card showing the page nam
 ### Default
 - App always starts in **light mode**
 - Theme persists within session across lobby and league views
-- Toggle appears in both lobby header row 1 and league header row 1 at the same coordinates
+- Toggle is accessible via ProfileMenu in both lobby and league header (same position)
 
 ---
 
 ## 7. Transition Rules
 
 ### Lobby → League
-- Toggle must not move (identical coordinates in both states)
+- ProfileMenu stays in top-right corner in both states
 - First row height is 64px in both lobby and league header
 - No animated transition — instant swap
 - Bottom nav appears; lobby content replaced by league shell
+- Can enter via card tap (default tab) or via nav link (specific tab)
 
 ### League → Lobby
-- ‹ Back button triggers exit
+- Home button (house icon) triggers exit
 - Active league state clears
 - Bottom nav disappears
 - Page resets to lobby view

@@ -28,6 +28,7 @@ export function StandingsList<T extends StandingsEntry>({
   badgeColor,
   renderExpanded,
   emptyMessage,
+  emptySlots = 0,
 }: {
   entries: T[];
   colors: Theme;
@@ -38,6 +39,7 @@ export function StandingsList<T extends StandingsEntry>({
   badgeColor?: string;
   renderExpanded?: (entry: T, colors: Theme) => React.ReactNode;
   emptyMessage?: string;
+  emptySlots?: number;
 }) {
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
 
@@ -208,6 +210,48 @@ export function StandingsList<T extends StandingsEntry>({
           </div>
         );
       })}
+      {/* Empty slots for managers who haven't joined yet */}
+      {Array.from({ length: emptySlots }).map((_, i) => (
+        <div
+          key={`empty-${i}`}
+          style={{
+            background: C.card,
+            borderRadius: 12,
+            marginBottom: 8,
+            border: `1px dashed ${C.border}`,
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", padding: "12px 14px", gap: 12 }}>
+            <div style={{ width: 32, display: "flex", justifyContent: "center", flexShrink: 0 }}>
+              <div
+                style={{
+                  minWidth: 20, height: 18, borderRadius: 5,
+                  background: C.card2, display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, fontWeight: 700, color: C.txt3, padding: "0 4px", border: `1px solid ${C.border}`,
+                }}
+              >
+                {entries.length + i + 1}
+              </div>
+            </div>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: C.card2, border: `1px solid ${C.border}`, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ color: C.txt3, fontSize: 14, fontWeight: 500, margin: 0, fontStyle: "italic" }}>Waiting for player...</p>
+            </div>
+            <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "flex-start" }}>
+              {showThru && <div style={{ width: 32 }} />}
+              {showRounds && [0, 1, 2, 3].map((ri) => (
+                <div key={ri} style={{ width: COL.r, textAlign: "center" }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>-</p>
+                </div>
+              ))}
+              <div style={{ width: COL.p, textAlign: "right" }}>
+                <p style={{ fontSize: 15, fontWeight: 700, color: C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>-</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
     </>
   );
 }

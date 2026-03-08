@@ -4,6 +4,7 @@ import { Home } from "../pages/Home";
 import { Roster } from "../pages/Roster";
 import { Golfers } from "../pages/Golfers";
 import { LeagueStandings } from "../pages/League";
+import { LeagueSettings } from "../pages/LeagueSettings";
 import { Chat } from "../pages/Chat";
 
 interface PageContentProps {
@@ -60,6 +61,12 @@ export function PageContent({ page, leagueId, myTeamId, colors: C, tournaments, 
       return (
         <div style={{ flex: 1 }}>
           <Chat leagueId={leagueId} teamId={myTeamId} colors={C} />
+        </div>
+      );
+    case "settings":
+      return (
+        <div style={{ flex: 1 }}>
+          <LeagueSettings leagueId={leagueId} colors={C} />
         </div>
       );
     default:
