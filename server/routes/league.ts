@@ -164,7 +164,15 @@ router.get("/:id/leaderboard", async (req, res) => {
   const payoutTable = loadPayoutTable();
   const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
 
-  const playerEarningsMap = new Map<number, { earnings: number; position: number; toPar: number; toParDisplay: string; status: string }>();
+  // Build position tied map
+  const positionCounts = new Map<number, number>();
+  for (const p of simState.players) {
+    if (p.status === "active" && p.rounds.length > 0 && p.position > 0) {
+      positionCounts.set(p.position, (positionCounts.get(p.position) ?? 0) + 1);
+    }
+  }
+
+  const playerEarningsMap = new Map<number, { earnings: number; position: number; positionTied: boolean; toPar: number; toParDisplay: string; status: string }>();
   for (const p of simState.players) {
     let earnings = 0;
     if (p.status === "active" && p.rounds.length > 0) {
@@ -174,6 +182,7 @@ router.get("/:id/leaderboard", async (req, res) => {
     playerEarningsMap.set(p.playerId, {
       earnings,
       position: p.position,
+      positionTied: (positionCounts.get(p.position) ?? 0) > 1,
       toPar: p.toPar,
       toParDisplay: p.rounds.length > 0 ? formatScore(p.toPar) : "-",
       status: p.status,
@@ -197,6 +206,7 @@ router.get("/:id/leaderboard", async (req, res) => {
         playerId,
         name: simPlayer?.name || `Player ${playerId}`,
         position: earningsData?.position ?? 0,
+        positionTied: earningsData?.positionTied ?? false,
         toPar: earningsData?.toPar ?? 0,
         toParDisplay: earningsData?.toParDisplay ?? "-",
         status: (earningsData?.status ?? "active") as "active" | "cut" | "wd",
@@ -308,6 +318,14 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
     return;
   }
 
+  // Build position tied map for this sim state
+  const rosterPosCounts = new Map<number, number>();
+  for (const p of simState.players) {
+    if (p.status === "active" && p.rounds.length > 0 && p.position > 0) {
+      rosterPosCounts.set(p.position, (rosterPosCounts.get(p.position) ?? 0) + 1);
+    }
+  }
+
   if (isLiveTournament) {
     const tournament = tournaments.find((t) => t.id === simState.tournamentId) || tournaments[0];
     const payoutTable = loadPayoutTable();
@@ -336,6 +354,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
         toPar: simPlayer?.toPar ?? 0,
         toParDisplay: simPlayer && simPlayer.rounds.length > 0 ? formatScore(simPlayer.toPar) : "-",
         position: simPlayer?.position ?? 0,
+        positionTied: (rosterPosCounts.get(simPlayer?.position ?? 0) ?? 0) > 1,
         status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
         rounds: simPlayer?.rounds ?? [],
         roundPoints: rPts,
@@ -360,6 +379,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
         toPar: simPlayer?.toPar ?? 0,
         toParDisplay: simPlayer && simPlayer.rounds.length > 0 ? formatScore(simPlayer.toPar) : "-",
         position: simPlayer?.position ?? 0,
+        positionTied: (rosterPosCounts.get(simPlayer?.position ?? 0) ?? 0) > 1,
         status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
         rounds: simPlayer?.rounds ?? [],
         roundPoints: rPts,
@@ -391,6 +411,13 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
     const hasSim = pastSimState.players.length > 0 && pastSimState.phase !== "idle";
 
     if (hasSim) {
+      // Recompute position counts for past tournament
+      const pastPosCounts = new Map<number, number>();
+      for (const p of pastSimState.players) {
+        if (p.status === "active" && p.rounds.length > 0 && p.position > 0) {
+          pastPosCounts.set(p.position, (pastPosCounts.get(p.position) ?? 0) + 1);
+        }
+      }
       const tournament = tournaments.find((t) => t.id === viewTournamentId) || tournaments[0];
       const payoutTable = loadPayoutTable();
       const pastHolePars = pastSimState.holePars ?? [];
@@ -415,6 +442,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
           toPar: simPlayer?.toPar ?? 0,
           toParDisplay: simPlayer && simPlayer.rounds.length > 0 ? formatScore(simPlayer.toPar) : "-",
           position: simPlayer?.position ?? 0,
+          positionTied: (pastPosCounts.get(simPlayer?.position ?? 0) ?? 0) > 1,
           status: (simPlayer?.status ?? "active") as "active" | "cut" | "wd",
           rounds: simPlayer?.rounds ?? [],
           roundPoints: rPts,
@@ -456,6 +484,7 @@ router.get("/:id/team/:teamId/roster", async (req, res) => {
           toPar: 0,
           toParDisplay: "-",
           position: 0,
+          positionTied: false,
           status: "active" as const,
           rounds: [] as number[],
           roundPoints: [] as number[],

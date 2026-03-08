@@ -225,6 +225,7 @@ export interface FantasyTeamSummary {
     playerId: number;
     name: string;
     position: number;
+    positionTied: boolean;
     toPar: number;
     toParDisplay: string;
     status: "active" | "cut" | "wd";
@@ -274,6 +275,7 @@ export interface RosterPlayer {
   toPar: number;
   toParDisplay: string;
   position: number;
+  positionTied: boolean;
   status: "active" | "cut" | "wd";
   rounds: number[];
   roundPoints: number[];

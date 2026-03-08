@@ -372,10 +372,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         <p style={{ ...colStyle, margin: 0, whiteSpace: "nowrap" }}>{label}</p>
         {extra}
       </div>
-      <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 1 }}>
-        {["R1", "R2", "R3", "R4"].map((l) => (
-          <div key={l} style={{ width: COL.r, textAlign: "center" }}><span style={colStyle}>{l}</span></div>
-        ))}
+      <div style={{ flexShrink: 0, marginRight: 1 }}>
         <div style={{ width: COL.p, textAlign: "right" }}><span style={colStyle}>PTS</span></div>
       </div>
     </div>
@@ -389,14 +386,6 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const par = tournaments[viewingWeek]?.par ?? 72;
   const viewedMember = members.find((m) => m.teamId === viewingTeamId);
   const firstName = viewedMember?.managerName?.split(" ")[0] ?? "";
-
-  // Team round totals from active roster
-  const teamRoundPoints = [0, 1, 2, 3].map((ri) =>
-    roster.filter((p) => p.isActive).reduce((sum, p) => sum + (p.roundPoints[ri] ?? 0), 0)
-  );
-  const teamProjRoundPoints = [0, 1, 2, 3].map((ri) =>
-    roster.filter((p) => p.isActive).reduce((sum, p) => sum + (p.projectedRoundPoints?.[ri] ?? 0), 0)
-  );
 
   return (
     <div style={{ position: "relative" }}>
@@ -427,15 +416,12 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
         {/* Summary card */}
         {data && (
           <div style={{ padding: "12px 16px 0" }}>
-            {/* SQUAD header with R1-R4 + PTS columns */}
+            {/* SQUAD header */}
             <div style={{ display: "flex", alignItems: "center", padding: "0 14px 8px" }}>
               <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                 <p style={{ ...colStyle, margin: 0, whiteSpace: "nowrap" }}>Squad</p>
               </div>
-              <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 1 }}>
-                {["R1", "R2", "R3", "R4"].map((l) => (
-                  <div key={l} style={{ width: COL.r, textAlign: "center" }}><span style={colStyle}>{l}</span></div>
-                ))}
+              <div style={{ flexShrink: 0, marginRight: 1 }}>
                 <div style={{ width: COL.p, textAlign: "right" }}><span style={colStyle}>PTS</span></div>
               </div>
             </div>
@@ -499,28 +485,9 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                     )}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "flex-start" }}>
-                  {[0, 1, 2, 3].map((ri) => {
-                    const pts = teamRoundPoints[ri];
-                    const proj = teamProjRoundPoints[ri];
-                    const played = pts != null && pts !== 0;
-                    return (
-                      <div key={ri} style={{ width: COL.r, textAlign: "center" }}>
-                        <p style={{ fontSize: 12, fontWeight: 600, color: played ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                          {played ? pts : "-"}
-                        </p>
-                        <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3 }}>
-                          {played ? proj : proj ? `${proj}` : "-"}
-                        </p>
-                      </div>
-                    );
-                  })}
-                  <div style={{ width: COL.p, textAlign: "right" }}>
-                    <p style={{ fontSize: 15, fontWeight: 700, color: myPoints > 0 ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>{myPoints > 0 ? myPoints : "-"}</p>
-                    <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
-                      {projectedTotal > 0 ? `${projectedTotal}` : "-"}
-                    </p>
-                  </div>
+                <div style={{ flexShrink: 0, textAlign: "right" }}>
+                  <p style={{ fontSize: 16, fontWeight: 700, color: myPoints > 0 ? C.txt : C.txt3, margin: 0 }}>{myPoints > 0 ? myPoints : "-"}</p>
+                  <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projectedTotal > 0 ? `${projectedTotal} proj` : "-"}</p>
                 </div>
               </div>
             </div>
@@ -847,39 +814,17 @@ function PlayerCard({
         </div>
       </div>
 
-      {/* Data columns: R1 R2 R3 R4 | PTS */}
-      <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "flex-start" }}>
-        {/* R1–R4 */}
-        {[0, 1, 2, 3].map((i) => {
-          const rPts = p.roundPoints[i];
-          const proj = p.projectedRoundPoints[i];
-          const played = rPts != null && rPts !== 0;
-          return (
-            <div key={i} style={{ width: COL.r, textAlign: "center" }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: played ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                {played ? rPts : "-"}
-              </p>
-              <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3 }}>
-                {played ? proj : proj ? `${proj}` : "-"}
-              </p>
-            </div>
-          );
-        })}
-
-        {/* PTS */}
+      {/* PTS */}
+      <div style={{ flexShrink: 0, textAlign: "right" }}>
+        <p style={{ fontSize: 14, fontWeight: 600, color: hasRounds ? C.txt : C.txt3, margin: 0 }}>
+          {hasRounds ? p.points : "-"}
+        </p>
         {(() => {
           const projTotal = p.projectedRoundPoints.length > 0
             ? p.projectedRoundPoints.reduce((a, b) => a + b, 0)
             : 0;
           return (
-            <div style={{ width: COL.p, textAlign: "right" }}>
-              <p style={{ fontSize: 15, fontWeight: 700, color: hasRounds ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
-                {hasRounds ? p.points : "-"}
-              </p>
-              <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
-                {projTotal > 0 ? `${projTotal}` : "-"}
-              </p>
-            </div>
+            <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projTotal > 0 ? `${projTotal} proj` : "-"}</p>
           );
         })()}
       </div>

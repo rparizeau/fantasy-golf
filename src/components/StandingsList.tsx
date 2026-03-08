@@ -24,7 +24,6 @@ export function StandingsList<T extends StandingsEntry>({
   myTeamId,
   title,
   showThru = true,
-  showRounds = false,
   badgeColor,
   renderExpanded,
   emptyMessage,
@@ -35,7 +34,6 @@ export function StandingsList<T extends StandingsEntry>({
   myTeamId?: number;
   title?: string;
   showThru?: boolean;
-  showRounds?: boolean;
   badgeColor?: string;
   renderExpanded?: (entry: T, colors: Theme) => React.ReactNode;
   emptyMessage?: string;
@@ -62,9 +60,6 @@ export function StandingsList<T extends StandingsEntry>({
         </div>
         <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, marginRight: 1 }}>
           {showThru && <div style={{ width: 32, textAlign: "center", flexShrink: 0 }}><span style={colStyle}>WAV</span></div>}
-          {showRounds && ["R1", "R2", "R3", "R4"].map((l) => (
-            <div key={l} style={{ width: COL.r, textAlign: "center" }}><span style={colStyle}>{l}</span></div>
-          ))}
           <div style={{ width: COL.p, textAlign: "right" }}><span style={colStyle}>PTS</span></div>
         </div>
       </div>
@@ -145,41 +140,26 @@ export function StandingsList<T extends StandingsEntry>({
                 <p style={{ color: C.txt3, fontSize: 11, margin: "2px 0 0" }}>{entry.managerName}</p>
               </div>
 
-              {/* Data columns: WAV | R1 R2 R3 R4 | PTS */}
-              <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "flex-start" }}>
+              {/* Data columns: WAV | PTS */}
+              <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "center" }}>
                 {/* Waiver priority (reverse of standings) */}
                 {showThru && (
-                  <div style={{ width: 32, textAlign: "center", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", height: 20 }}>
+                  <div style={{ width: 32, textAlign: "center", flexShrink: 0 }}>
                     <p style={{ color: C.txt3, fontSize: 11, fontWeight: 600, margin: 0 }}>
                       {entries.length - _idx}
                     </p>
                   </div>
                 )}
-                {showRounds && [0, 1, 2, 3].map((ri) => {
-                  const pts = entry.roundPoints?.[ri];
-                  const proj = entry.projectedRoundPoints?.[ri];
-                  const played = pts != null && pts !== 0;
-                  return (
-                    <div key={ri} style={{ width: COL.r, textAlign: "center" }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: played ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                        {played ? pts : "-"}
-                      </p>
-                      <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3 }}>
-                        {played ? proj : proj ? `${proj}` : "-"}
-                      </p>
-                    </div>
-                  );
-                })}
 
                 {/* PTS */}
-                <div style={{ width: COL.p, textAlign: "right" }}>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: entry.totalPoints > 0 ? C.txt : C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: entry.totalPoints > 0 ? C.txt : C.txt3, margin: 0 }}>
                     {entry.totalPoints > 0 ? entry.totalPoints : "-"}
                   </p>
-                  <p style={{ fontSize: 10, color: C.txt3, margin: 0, lineHeight: 1.3, textAlign: "right" }}>
+                  <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>
                     {(() => {
                       const proj = entry.projectedRoundPoints?.reduce((a, b) => a + b, 0) ?? 0;
-                      return proj > 0 ? `${proj}` : "-";
+                      return proj > 0 ? `${proj} proj` : "-";
                     })()}
                   </p>
                 </div>
@@ -238,15 +218,11 @@ export function StandingsList<T extends StandingsEntry>({
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ color: C.txt3, fontSize: 14, fontWeight: 500, margin: 0, fontStyle: "italic" }}>Waiting for player...</p>
             </div>
-            <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "flex-start" }}>
+            <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "center" }}>
               {showThru && <div style={{ width: 32 }} />}
-              {showRounds && [0, 1, 2, 3].map((ri) => (
-                <div key={ri} style={{ width: COL.r, textAlign: "center" }}>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>-</p>
-                </div>
-              ))}
-              <div style={{ width: COL.p, textAlign: "right" }}>
-                <p style={{ fontSize: 15, fontWeight: 700, color: C.txt3, margin: 0, height: 20, display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>-</p>
+              <div style={{ textAlign: "right" }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: C.txt3, margin: 0 }}>-</p>
+                <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>-</p>
               </div>
             </div>
           </div>
