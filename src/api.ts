@@ -232,6 +232,9 @@ export interface FantasyTeamSummary {
     earnings: number;
     points: number;
     isActive: boolean;
+    currentRound: number;
+    holesThru: number;
+    totalScore: number;
   }[];
 }
 
@@ -242,6 +245,7 @@ export interface FantasyLeaderboard {
   phase: string;
   showMoney: boolean;
   managerCount?: number;
+  activeSize?: number;
   teams: FantasyTeamSummary[];
 }
 

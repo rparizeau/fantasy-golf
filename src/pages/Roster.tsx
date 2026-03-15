@@ -236,7 +236,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
   const autoSave = (newRoster: RosterPlayer[]) => {
     if (viewingTeamId !== teamId) return;
     const activeIds = newRoster.filter((p) => p.isActive).map((p) => p.playerId);
-    if (activeIds.length !== activeSize) return;
+    if (activeIds.length > activeSize) return;
     const tid = tournaments[viewingWeek]?.id;
     if (tid != null) cacheRef.current.delete(`${tid}:${viewingTeamId}`);
     setLineup(leagueId, teamId, activeIds, tid).catch((e) => {
@@ -487,7 +487,7 @@ export function Roster({ leagueId, teamId, colors: C, tournaments, currentTourna
                 </div>
                 <div style={{ flexShrink: 0, textAlign: "right" }}>
                   <p style={{ fontSize: 16, fontWeight: 700, color: myPoints > 0 ? C.txt : C.txt3, margin: 0 }}>{myPoints > 0 ? myPoints : "-"}</p>
-                  <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projectedTotal > 0 ? `${projectedTotal} proj` : "-"}</p>
+                  <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projectedTotal > 0 ? `${projectedTotal}` : "-"}</p>
                 </div>
               </div>
             </div>
@@ -824,7 +824,7 @@ function PlayerCard({
             ? p.projectedRoundPoints.reduce((a, b) => a + b, 0)
             : 0;
           return (
-            <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projTotal > 0 ? `${projTotal} proj` : "-"}</p>
+            <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projTotal > 0 ? `${projTotal}` : "-"}</p>
           );
         })()}
       </div>

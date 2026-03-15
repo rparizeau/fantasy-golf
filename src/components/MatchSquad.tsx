@@ -119,7 +119,7 @@ export function MatchSquad({ leagueId, teamId, colors: C, tournamentId, tourname
             </div>
             <div style={{ flexShrink: 0, textAlign: "right" }}>
               <p style={{ fontSize: 16, fontWeight: 700, color: myPoints > 0 ? C.txt : C.txt3, margin: 0 }}>{myPoints > 0 ? myPoints : "-"}</p>
-              <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projectedTotal > 0 ? `${projectedTotal} proj` : "-"}</p>
+              <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projectedTotal > 0 ? `${projectedTotal}` : "-"}</p>
             </div>
           </div>
           {/* Active golfers */}

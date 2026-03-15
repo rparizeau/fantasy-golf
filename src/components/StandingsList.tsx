@@ -141,7 +141,7 @@ export function StandingsList<T extends StandingsEntry>({
               </div>
 
               {/* Data columns: WAV | PTS */}
-              <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: COL.gap, flexShrink: 0, alignItems: "center", marginRight: 1 }}>
                 {/* Waiver priority (reverse of standings) */}
                 {showThru && (
                   <div style={{ width: 32, textAlign: "center", flexShrink: 0 }}>
@@ -152,14 +152,14 @@ export function StandingsList<T extends StandingsEntry>({
                 )}
 
                 {/* PTS */}
-                <div style={{ textAlign: "right" }}>
+                <div style={{ width: COL.p, textAlign: "right" }}>
                   <p style={{ fontSize: 14, fontWeight: 600, color: entry.totalPoints > 0 ? C.txt : C.txt3, margin: 0 }}>
                     {entry.totalPoints > 0 ? entry.totalPoints : "-"}
                   </p>
                   <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>
                     {(() => {
                       const proj = entry.projectedRoundPoints?.reduce((a, b) => a + b, 0) ?? 0;
-                      return proj > 0 ? `${proj} proj` : "-";
+                      return proj > 0 ? `${proj}` : "-";
                     })()}
                   </p>
                 </div>

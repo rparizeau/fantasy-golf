@@ -202,6 +202,13 @@ router.get("/:id/leaderboard", async (req, res) => {
       const isActive = lineup.includes(playerId);
       const pts = simPlayer ? calculatePlayerPoints(simPlayer.holeScores, holePars, scoring) : 0;
 
+      const rounds = simPlayer?.rounds ?? [];
+      const holeScoresArr = simPlayer?.holeScores ?? [];
+      const currentRound = holeScoresArr.length;
+      const lastRound = holeScoresArr[currentRound - 1] ?? [];
+      const holesThru = lastRound.filter((s: number | null) => s != null).length;
+      const totalScore = rounds.reduce((a: number, b: number) => a + b, 0);
+
       return {
         playerId,
         name: simPlayer?.name || `Player ${playerId}`,
@@ -213,6 +220,9 @@ router.get("/:id/leaderboard", async (req, res) => {
         earnings: isActive ? (earningsData?.earnings ?? 0) : 0,
         points: isActive ? pts : 0,
         isActive,
+        currentRound,
+        holesThru,
+        totalScore,
       };
     });
 
@@ -254,6 +264,7 @@ router.get("/:id/leaderboard", async (req, res) => {
     phase: simState.phase,
     showMoney: league.settings.showMoney,
     managerCount: league.settings.managerCount ?? league.teams.length,
+    activeSize: league.settings.activeSize,
     teams,
   });
 });
@@ -570,8 +581,8 @@ router.post("/:id/team/:teamId/lineup", async (req: AuthenticatedRequest, res) =
     return;
   }
 
-  if (activePlayerIds.length !== league.settings.activeSize) {
-    res.status(400).json({ error: `Active lineup must have exactly ${league.settings.activeSize} players` });
+  if (activePlayerIds.length > league.settings.activeSize) {
+    res.status(400).json({ error: `Active lineup cannot exceed ${league.settings.activeSize} players` });
     return;
   }
 

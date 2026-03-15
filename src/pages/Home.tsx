@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { getFantasyLeaderboard, getRoster, type FantasyTeamSummary, type TournamentListItem, type RosterData } from "../api";
+import { getFantasyLeaderboard, type FantasyTeamSummary, type TournamentListItem } from "../api";
 import { StandingsList } from "../components/StandingsList";
 import { ManagerIcon } from "../components/ManagerIcon";
 import type { Theme } from "../theme";
@@ -18,8 +18,8 @@ interface HomeProps {
 
 export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTournamentId, viewingWeek, simTick }: HomeProps) {
   const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
-  const [myRoster, setMyRoster] = useState<RosterData | null>(null);
   const [managerCount, setManagerCount] = useState(0);
+  const [activeSize, setActiveSize] = useState(2);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,13 +29,10 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
   const refresh = useCallback(async () => {
     if (!tid) return;
     try {
-      const [lb, roster] = await Promise.all([
-        getFantasyLeaderboard(leagueId, tid),
-        getRoster(leagueId, myTeamId, tid),
-      ]);
+      const lb = await getFantasyLeaderboard(leagueId, tid);
       setTeams(lb.teams);
       setManagerCount(lb.managerCount ?? lb.teams.length);
-      setMyRoster(roster);
+      if (lb.activeSize) setActiveSize(lb.activeSize);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
@@ -66,15 +63,6 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
 
   const colStyle: React.CSSProperties = { color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 };
 
-  // For my team, use the full roster data (has positionTied); for others, use leaderboard data
-  const myTeamLb = teams.find((t) => t.teamId === myTeamId);
-  const myActivePlayers = myRoster
-    ? myRoster.roster.filter((p) => p.isActive).sort((a, b) => a.ranking - b.ranking)
-    : [];
-  const myPoints = myActivePlayers.reduce((sum, p) => sum + p.points, 0);
-  const myRank = myTeamLb ? teams.findIndex((t) => t.totalPoints === myTeamLb.totalPoints) + 1 : 0;
-  const myProjTotal = myTeamLb?.projectedRoundPoints.reduce((a, b) => a + b, 0) ?? 0;
-
   return (
     <div>
       {/* Match section — all teams with tournament background */}
@@ -84,9 +72,6 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
           <div style={{ display: "flex", alignItems: "center", padding: "0 14px 8px" }}>
             <div style={{ flex: 1 }}>
               <p style={{ ...colStyle, margin: 0 }}>Match</p>
-            </div>
-            <div style={{ flexShrink: 0, marginRight: 1 }}>
-              <div style={{ width: COL.p, textAlign: "right" }}><span style={colStyle}>PTS</span></div>
             </div>
           </div>
 
@@ -100,64 +85,8 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
             </div>
           ) : (
             <>
-              {/* My team card */}
-              {myRoster && (
-                <div style={{
-                  background: C.card,
-                  borderRadius: 12,
-                  border: `1px solid ${tColor ?? C.green}`,
-                  padding: "14px 14px",
-                  marginBottom: 6,
-                  boxShadow: `0 0 0 1px ${(tColor ?? C.green)}40`,
-                  overflow: "visible",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: myActivePlayers.length > 0 ? 10 : 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
-                      <div style={{ position: "relative", flexShrink: 0, overflow: "visible" }}>
-                        <ManagerIcon size={34} bgColor={myRoster.color ?? "#2D6B4A"} />
-                        {myRank > 0 && (
-                          <span style={{
-                            position: "absolute", top: -6, left: -6, zIndex: 2,
-                            display: "inline-flex", alignItems: "center", justifyContent: "center",
-                            minWidth: 20, height: 18, borderRadius: 5,
-                            background: `linear-gradient(${tColor ? `${tColor}20` : C.card2}, ${tColor ? `${tColor}20` : C.card2}), ${C.card}`,
-                            color: tColor ?? C.txt2, fontSize: 11, fontWeight: 700, padding: "0 4px",
-                            border: `1px solid ${tColor ?? C.border}`,
-                          }}>{myRank}</span>
-                        )}
-                      </div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <p style={{ fontSize: 16, fontWeight: 700, color: C.txt, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myRoster.teamName}</p>
-                        {myTeamLb && <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{myTeamLb.managerName}</p>}
-                      </div>
-                    </div>
-                    <div style={{ flexShrink: 0, textAlign: "right" }}>
-                      <p style={{ fontSize: 16, fontWeight: 700, color: myPoints > 0 ? C.txt : C.txt3, margin: 0 }}>{myPoints > 0 ? myPoints : "-"}</p>
-                      <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{myProjTotal > 0 ? `${myProjTotal} proj` : "-"}</p>
-                    </div>
-                  </div>
-                  {myActivePlayers.length > 0 && (
-                    <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-                      {myActivePlayers.map((p) => {
-                        const hasPos = p.status === "active" && p.position > 0;
-                        const posLabel = hasPos ? `${p.positionTied ? "T" : ""}${p.position}` : "";
-                        return (
-                          <div key={p.playerId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
-                            <span style={{ color: C.txt2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 }}>
-                              {hasPos && <span style={{ color: C.txt3, marginRight: 6 }}>{posLabel}</span>}
-                              {p.name}
-                            </span>
-                            <span style={{ color: p.points > 0 ? C.txt : C.txt3, fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>{p.points > 0 ? p.points : "-"}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Other teams */}
-              {teams.filter((t) => t.teamId !== myTeamId).map((team) => {
+              {teams.map((team) => {
+                const isMe = team.teamId === myTeamId;
                 const rank = teams.findIndex((t) => t.totalPoints === team.totalPoints) + 1;
                 const tied = teams.filter((t) => t.totalPoints === team.totalPoints).length > 1;
                 const rankLabel = `${tied ? "T" : ""}${rank}`;
@@ -169,13 +98,14 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
                     style={{
                       background: C.card,
                       borderRadius: 12,
-                      border: `1px solid ${C.border}`,
+                      border: `1px solid ${isMe ? (tColor ?? C.green) : C.border}`,
                       padding: "14px 14px",
                       marginBottom: 6,
                       overflow: "visible",
+                      boxShadow: isMe ? `0 0 0 1px ${(tColor ?? C.green)}40` : undefined,
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: activePlayers.length > 0 ? 10 : 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
                         <div style={{ position: "relative", flexShrink: 0, overflow: "visible" }}>
                           <ManagerIcon size={34} bgColor={team.color ?? "#2D6B4A"} />
@@ -191,32 +121,55 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
                           )}
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <p style={{ fontSize: 14, fontWeight: 600, color: C.txt, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.teamName}</p>
+                          <p style={{ fontSize: 16, fontWeight: 700, color: C.txt, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.teamName}</p>
                           <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{team.managerName}</p>
                         </div>
                       </div>
                       <div style={{ flexShrink: 0, textAlign: "right" }}>
-                        <p style={{ fontSize: 14, fontWeight: 600, color: team.totalPoints > 0 ? C.txt : C.txt3, margin: 0 }}>{team.totalPoints > 0 ? team.totalPoints : "-"}</p>
-                        <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projTotal > 0 ? `${projTotal} proj` : "-"}</p>
+                        <p style={{ fontSize: 16, fontWeight: 700, color: team.totalPoints > 0 ? C.txt : C.txt3, margin: 0 }}>{team.totalPoints > 0 ? team.totalPoints : "-"}</p>
+                        <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projTotal > 0 ? projTotal : "-"}</p>
                       </div>
                     </div>
-                    {activePlayers.length > 0 && (
-                      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-                        {activePlayers.map((p) => {
-                          const hasPos = p.status === "active" && p.position > 0;
-                          const posLabel = hasPos ? `${p.positionTied ? "T" : ""}${p.position}` : "";
-                          return (
-                            <div key={p.playerId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
-                              <span style={{ color: C.txt2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 }}>
-                                {hasPos && <span style={{ color: C.txt3, marginRight: 6 }}>{posLabel}</span>}
-                                {p.name}
-                              </span>
-                              <span style={{ color: p.points > 0 ? C.txt : C.txt3, fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>{p.points > 0 ? p.points : "-"}</span>
-                            </div>
-                          );
-                        })}
+                    <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", fontSize: 10, fontWeight: 600, color: C.txt3, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>
+                        <span style={{ width: 32, flexShrink: 0 }}>POS</span>
+                        <span style={{ flex: 1 }} />
+                        <span style={{ width: 28, textAlign: "center", flexShrink: 0 }}>RND</span>
+                        <span style={{ width: 28, textAlign: "center", flexShrink: 0 }}>THR</span>
+                        <span style={{ width: 28, textAlign: "center", flexShrink: 0 }}>TOT</span>
+                        <span style={{ width: 32, textAlign: "right", flexShrink: 0 }}>PTS</span>
                       </div>
-                    )}
+                      {activePlayers.map((p) => {
+                        const hasPos = p.status === "active" && p.position > 0;
+                        const posLabel = hasPos ? `${p.positionTied ? "T" : ""}${p.position}` : "-";
+                        const tot = p.status === "active" ? p.toParDisplay : (p.totalScore > 0 ? `${p.totalScore}` : "-");
+                        const thru = p.holesThru === 18 ? "F" : (p.holesThru > 0 ? p.holesThru : "-");
+                        const rnd = p.currentRound > 0 ? p.currentRound : "-";
+                        const statStyle: React.CSSProperties = { color: C.txt3, fontWeight: 600, flexShrink: 0, width: 28, textAlign: "center" as const };
+                        return (
+                          <div key={p.playerId} style={{ display: "flex", alignItems: "center", fontSize: 13 }}>
+                            <span style={{ color: C.txt3, fontWeight: 600, width: 32, flexShrink: 0 }}>{posLabel}</span>
+                            <span style={{ color: C.txt2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 }}>
+                              {p.name}
+                            </span>
+                            <span style={statStyle}>{rnd}</span>
+                            <span style={statStyle}>{thru}</span>
+                            <span style={{ ...statStyle, color: p.status === "active" ? (p.toPar < 0 ? C.green : p.toPar > 0 ? C.red : C.txt3) : C.txt3 }}>{tot}</span>
+                            <span style={{ color: p.points > 0 ? C.txt : C.txt3, fontWeight: 600, flexShrink: 0, width: 32, textAlign: "right" }}>{p.points > 0 ? p.points : "-"}</span>
+                          </div>
+                        );
+                      })}
+                      {Array.from({ length: activeSize - activePlayers.length }).map((_, i) => (
+                        <div key={`empty-${i}`} style={{ display: "flex", alignItems: "center", fontSize: 13 }}>
+                          <span style={{ color: C.txt3, fontWeight: 600, width: 32, flexShrink: 0 }}>-</span>
+                          <span style={{ color: C.txt3, fontStyle: "italic", flex: 1 }}>Empty slot</span>
+                          <span style={{ color: C.txt3, fontWeight: 600, flexShrink: 0, width: 28, textAlign: "center" }}>-</span>
+                          <span style={{ color: C.txt3, fontWeight: 600, flexShrink: 0, width: 28, textAlign: "center" }}>-</span>
+                          <span style={{ color: C.txt3, fontWeight: 600, flexShrink: 0, width: 28, textAlign: "center" }}>-</span>
+                          <span style={{ color: C.txt3, fontWeight: 600, flexShrink: 0, width: 32, textAlign: "right" }}>-</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
               })}

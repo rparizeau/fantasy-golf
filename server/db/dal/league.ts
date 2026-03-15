@@ -5,7 +5,7 @@ import {
   tournamentResults, waivers, activities, messages, golfers,
   leagueTournament,
 } from "../schema/index.js";
-import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, asc, gte, inArray, sql } from "drizzle-orm";
 import { DEFAULT_SCORING, type ScoringSettings } from "../../sim/engine.js";
 import { getSeasonPoints } from "./points.js";
 
@@ -372,7 +372,6 @@ export async function setLineup(teamPk: number, tournamentId: number, golferIds:
   const [manager] = await db.select().from(managers).where(eq(managers.id, teamPk));
   if (!manager) return;
 
-  const { leagueTournament } = await import("../schema/index.js");
   const [lt] = await db.select().from(leagueTournament)
     .where(and(
       eq(leagueTournament.leagueId, manager.leagueId),
@@ -380,18 +379,27 @@ export async function setLineup(teamPk: number, tournamentId: number, golferIds:
     ));
   if (!lt) return;
 
-  const { rosterId } = await getOrCreateTournamentRoster(teamPk, lt.id);
+  // Find this week and all future weeks to propagate lineup forward
+  const futureLts = await db.select().from(leagueTournament)
+    .where(and(
+      eq(leagueTournament.leagueId, manager.leagueId),
+      gte(leagueTournament.weekNumber, lt.weekNumber),
+    ));
 
-  await db.transaction(async (tx) => {
-    // Delete existing golfer_roster entries
-    await tx.delete(golferRoster).where(eq(golferRoster.rosterId, rosterId));
-    // Insert new ones
-    if (golferIds.length > 0) {
-      await tx.insert(golferRoster).values(
-        golferIds.map((gid) => ({ golferId: gid, rosterId, statusEnum: "rostered" as const, isActive: true }))
-      );
-    }
-  });
+  for (const futLt of futureLts) {
+    const { rosterId } = await getOrCreateTournamentRoster(teamPk, futLt.id);
+
+    await db.transaction(async (tx) => {
+      // Delete existing golfer_roster entries
+      await tx.delete(golferRoster).where(eq(golferRoster.rosterId, rosterId));
+      // Insert new ones
+      if (golferIds.length > 0) {
+        await tx.insert(golferRoster).values(
+          golferIds.map((gid) => ({ golferId: gid, rosterId, statusEnum: "rostered" as const, isActive: true }))
+        );
+      }
+    });
+  }
 }
 
 // --- Roster mutations ---

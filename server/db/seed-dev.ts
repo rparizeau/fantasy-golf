@@ -252,30 +252,32 @@ async function seedDev() {
   }
   console.log(`  ✓ league_tournament: ${ltIdMap.size}`);
 
-  // ─── 7. Tournament rosters (lineups for active tournament) ─
+  // ─── 7. Tournament rosters (lineups for ALL weeks) ─
   let trCount = 0;
-  const activeTournamentId = tournamentsRaw[0]?.id ?? 1;
 
   for (let i = 0; i < LEAGUES.length; i++) {
     const league = LEAGUES[i];
     for (let t = 0; t < league.teams.length; t++) {
       const managerId = managerIdMap.get(`${i}-${t}`)!;
-      const ltId = ltIdMap.get(`${i}-${activeTournamentId}`);
-      if (!ltId) continue;
-
       const lineupGolfers = rosterGolfers.get(`${i}-${t}`) ?? [];
-      if (lineupGolfers.length === 0) continue;
 
-      const [tr] = await db.insert(schema.tournamentRosters).values({
-        leagueTournamentId: ltId, managerId,
-      }).returning();
-      const [roster] = await db.insert(schema.rosters).values({
-        rosterableId: tr.id, rosterableType: "tournament_roster",
-      }).returning();
-      await db.insert(schema.golferRoster).values(
-        lineupGolfers.map((gid) => ({ golferId: gid, rosterId: roster.id, statusEnum: "rostered" as const, isActive: true }))
-      );
-      trCount++;
+      for (const tourn of tournamentsRaw) {
+        const ltId = ltIdMap.get(`${i}-${tourn.id}`);
+        if (!ltId) continue;
+
+        const [tr] = await db.insert(schema.tournamentRosters).values({
+          leagueTournamentId: ltId, managerId,
+        }).returning();
+        const [roster] = await db.insert(schema.rosters).values({
+          rosterableId: tr.id, rosterableType: "tournament_roster",
+        }).returning();
+        if (lineupGolfers.length > 0) {
+          await db.insert(schema.golferRoster).values(
+            lineupGolfers.map((gid) => ({ golferId: gid, rosterId: roster.id, statusEnum: "rostered" as const, isActive: true }))
+          );
+        }
+        trCount++;
+      }
     }
   }
   console.log(`  ✓ tournament rosters: ${trCount}`);

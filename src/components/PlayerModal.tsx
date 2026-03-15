@@ -39,6 +39,19 @@ function scoreBg(score: number, par: number, C: Theme): string {
   return C.redDim;
 }
 
+const COUNTRY_TO_ISO: Record<string, string> = {
+  ARG: "AR", AUS: "AU", AUT: "AT", BEL: "BE", CAN: "CA", CHI: "CL",
+  COL: "CO", ENG: "GB", ESP: "ES", FRA: "FR", GER: "DE", IRL: "IE",
+  JPN: "JP", KOR: "KR", NIR: "GB", NOR: "NO", NZL: "NZ", RSA: "ZA",
+  SCO: "GB", SWE: "SE", TPE: "TW", USA: "US", VEN: "VE",
+};
+
+function countryFlag(code: string): string {
+  const iso = COUNTRY_TO_ISO[code];
+  if (!iso) return "";
+  return String.fromCodePoint(...[...iso].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
 export function PlayerModal({ playerId, leagueId, colors: C, onClose }: PlayerModalProps) {
   const [player, setPlayer] = useState<PlayerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -190,23 +203,7 @@ export function PlayerModal({ playerId, leagueId, colors: C, onClose }: PlayerMo
               <p style={{ fontSize: 20, fontWeight: 700, color: C.txt, margin: 0, paddingRight: 32 }}>{player.name}</p>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, color: C.txt2 }}>#{player.ranking}</span>
-                <span style={{ fontSize: 13, color: C.txt2 }}>{player.country}</span>
-                {player.status === "cut" && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: C.redDim, padding: "2px 8px", borderRadius: 6 }}>CUT</span>
-                )}
-                {player.status === "wd" && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.red, background: C.redDim, padding: "2px 8px", borderRadius: 6 }}>WD</span>
-                )}
-                {player.status === "active" && player.rounds.length > 0 && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.green, background: C.greenDim, padding: "2px 8px", borderRadius: 6 }}>
-                    {player.toParDisplay}
-                  </span>
-                )}
-                {player.rounds.length > 0 && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.txt2, background: C.card, padding: "2px 8px", borderRadius: 6 }}>
-                    {player.points} pts
-                  </span>
-                )}
+                <span style={{ fontSize: 13, color: C.txt2 }}><span style={{ fontSize: 18 }}>{countryFlag(player.country)}</span> {player.country}</span>
               </div>
             </>
           )}
@@ -237,6 +234,41 @@ export function PlayerModal({ playerId, leagueId, colors: C, onClose }: PlayerMo
             ))}
           </div>
         )}
+
+        {/* Stat bar */}
+        {player && hasData && (() => {
+          const currentRound = player.holeScores.length;
+          const lastRoundHoles = player.holeScores[currentRound - 1] ?? [];
+          const thru = lastRoundHoles.filter((s) => s != null).length;
+          const totalStrokes = player.rounds.reduce((a, b) => a + b, 0);
+          const tot = player.status === "active" ? player.toParDisplay : `${totalStrokes}`;
+          const statStyle: React.CSSProperties = { flex: 1, textAlign: "center" };
+          const labelStyle: React.CSSProperties = { fontSize: 10, fontWeight: 600, color: C.txt3, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 };
+          const valStyle: React.CSSProperties = { fontSize: 15, fontWeight: 700, color: C.txt, margin: "2px 0 0" };
+          return (
+            <div style={{ display: "flex", margin: "12px 16px 0", background: C.card, borderRadius: 8, border: `1px solid ${C.border}`, padding: "8px 0" }}>
+              <div style={statStyle}>
+                <p style={labelStyle}>RND</p>
+                <p style={valStyle}>{currentRound}</p>
+              </div>
+              <div style={{ width: 1, background: C.border }} />
+              <div style={statStyle}>
+                <p style={labelStyle}>THRU</p>
+                <p style={valStyle}>{thru === 18 ? "F" : thru}</p>
+              </div>
+              <div style={{ width: 1, background: C.border }} />
+              <div style={statStyle}>
+                <p style={labelStyle}>TOT</p>
+                <p style={{ ...valStyle, color: player.status === "active" ? (player.toPar < 0 ? C.green : player.toPar > 0 ? C.red : C.txt) : C.txt }}>{tot}</p>
+              </div>
+              <div style={{ width: 1, background: C.border }} />
+              <div style={statStyle}>
+                <p style={labelStyle}>PTS</p>
+                <p style={{ ...valStyle, color: player.points > 0 ? C.green : player.points < 0 ? C.red : C.txt3 }}>{player.points}</p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Body */}
         <div style={{ flex: 1, padding: hasData ? "12px 16px" : "0" }}>
@@ -332,7 +364,7 @@ function ScoresTab({ player, C }: { player: PlayerDetail; C: Theme }) {
               <p style={{ fontSize: 13, fontWeight: 700, color: C.txt, margin: 0 }}>Round {ri + 1}</p>
               <span style={{ fontSize: 13, fontWeight: 700, color: C.txt, margin: 0 }}>{player.rounds[ri]}</span>
             </div>
-            <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+            <div style={{ background: C.card, borderRadius: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 280 }}>
                   <tbody>
@@ -342,7 +374,7 @@ function ScoresTab({ player, C }: { player: PlayerDetail; C: Theme }) {
               </div>
             </div>
             <div style={{ height: 8 }} />
-            <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+            <div style={{ background: C.card, borderRadius: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 280 }}>
                   <tbody>
@@ -385,6 +417,39 @@ function PointsTab({ player, C }: { player: PlayerDetail; C: Theme }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Summary table */}
+      <div style={{ background: C.card, borderRadius: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, textAlign: "center" }}>
+          <thead>
+            <tr style={{ background: C.card2 }}>
+              {["Double", "Bogey", "Par", "Birdie", "Eagle"].map((name) => (
+                <th key={name} style={{ padding: "6px 4px", fontWeight: 600, color: C.txt2, borderBottom: `1px solid ${C.border}` }}>{name}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {["Double", "Bogey", "Par", "Birdie", "Eagle"].map((name) => {
+                const count = counts[name] ?? 0;
+                const isGood = ["Eagle", "Birdie"].includes(name);
+                const isBad = ["Bogey", "Double"].includes(name);
+                return (
+                  <td key={name} style={{ padding: "8px 4px", fontWeight: 600, color: count === 0 ? C.txt3 : isGood ? C.green : isBad ? C.red : C.txt, borderBottom: `1px solid ${C.border}` }}>
+                    {count}
+                  </td>
+                );
+              })}
+            </tr>
+          </tbody>
+        </table>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px" }}>
+          <span style={{ fontSize: 13, color: C.txt2 }}>Total Points</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: player.points >= 0 ? C.green : C.red }}>
+            {player.points >= 0 ? "+" : ""}{player.points}
+          </span>
+        </div>
+      </div>
+
       {holeScores.map((round, ri) => {
         const rPts = roundPoints[ri] ?? 0;
         const holes = holePoints[ri] ?? [];
@@ -397,7 +462,7 @@ function PointsTab({ player, C }: { player: PlayerDetail; C: Theme }) {
                 {rPts >= 0 ? "+" : ""}{rPts} pts
               </span>
             </div>
-            <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+            <div style={{ background: C.card, borderRadius: 0, border: `1px solid ${C.border}`, overflow: "hidden" }}>
               {round.map((score, h) => {
                 if (score == null) return null;
                 const par = holePars[h] ?? 4;
@@ -435,39 +500,6 @@ function PointsTab({ player, C }: { player: PlayerDetail; C: Theme }) {
         );
       })}
 
-      {/* Summary */}
-      <div style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, padding: "12px 14px" }}>
-        <p style={{ fontSize: 13, fontWeight: 700, color: C.txt, margin: "0 0 8px" }}>Summary</p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {["Ace", "Albatross", "Eagle", "Birdie", "Par", "Bogey", "Double", "Triple+"].map((name) => {
-            const count = counts[name] ?? 0;
-            if (count === 0) return null;
-            const isGood = ["Ace", "Albatross", "Eagle", "Birdie"].includes(name);
-            const isBad = ["Bogey", "Double", "Triple+"].includes(name);
-            return (
-              <div
-                key={name}
-                style={{
-                  background: isGood ? C.greenDim : isBad ? C.redDim : C.card2,
-                  color: isGood ? C.green : isBad ? C.red : C.txt2,
-                  borderRadius: 6,
-                  padding: "4px 10px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                }}
-              >
-                {count} {name}{count !== 1 && name !== "Par" ? "s" : ""}
-              </div>
-            );
-          })}
-        </div>
-        <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
-          <span style={{ fontSize: 13, color: C.txt2 }}>Total Points</span>
-          <span style={{ fontSize: 16, fontWeight: 700, color: player.points >= 0 ? C.green : C.red }}>
-            {player.points >= 0 ? "+" : ""}{player.points}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }
