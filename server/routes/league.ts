@@ -209,6 +209,16 @@ router.get("/:id/leaderboard", async (req, res) => {
       const holesThru = lastRound.filter((s: number | null) => s != null).length;
       const totalScore = rounds.reduce((a: number, b: number) => a + b, 0);
 
+      // Current round score relative to par + strokes
+      let currentRoundToPar = 0;
+      let currentRoundStrokes = 0;
+      for (let h = 0; h < lastRound.length; h++) {
+        if (lastRound[h] != null) {
+          currentRoundStrokes += lastRound[h] as number;
+          currentRoundToPar += (lastRound[h] as number) - (holePars[h] ?? 4);
+        }
+      }
+
       return {
         playerId,
         name: simPlayer?.name || `Player ${playerId}`,
@@ -220,9 +230,12 @@ router.get("/:id/leaderboard", async (req, res) => {
         earnings: isActive ? (earningsData?.earnings ?? 0) : 0,
         points: isActive ? pts : 0,
         isActive,
+        rounds,
         currentRound,
         holesThru,
         totalScore,
+        currentRoundToPar,
+        currentRoundStrokes,
       };
     });
 

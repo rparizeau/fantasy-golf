@@ -322,16 +322,15 @@ router.post("/hot-streak", async (req, res) => {
   const state = await loadActiveSimState();
 
   // Build new hotStreaks map from request
+  const validTiers = ["hot", "really_hot", "cold", "really_cold"];
   const hotStreaks: Record<number, string> = {};
   for (const entry of players) {
-    if (entry.playerId && entry.tier) {
-      if (entry.tier === "hot" || entry.tier === "really_hot") {
-        hotStreaks[entry.playerId] = entry.tier;
-      }
+    if (entry.playerId && entry.tier && validTiers.includes(entry.tier)) {
+      hotStreaks[entry.playerId] = entry.tier;
     }
   }
 
-  state.hotStreaks = hotStreaks as Record<number, "hot" | "really_hot">;
+  state.hotStreaks = hotStreaks as Record<number, "hot" | "really_hot" | "cold" | "really_cold">;
   await saveSimState(state);
   res.json({ hotStreaks: state.hotStreaks });
 });

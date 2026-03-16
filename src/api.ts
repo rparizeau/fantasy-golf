@@ -232,9 +232,12 @@ export interface FantasyTeamSummary {
     earnings: number;
     points: number;
     isActive: boolean;
+    rounds: number[];
     currentRound: number;
     holesThru: number;
     totalScore: number;
+    currentRoundToPar: number;
+    currentRoundStrokes: number;
   }[];
 }
 

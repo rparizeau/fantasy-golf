@@ -4,8 +4,6 @@ import { StandingsList } from "../components/StandingsList";
 import { ManagerIcon } from "../components/ManagerIcon";
 import type { Theme } from "../theme";
 
-const COL = { p: 38 };
-
 interface HomeProps {
   leagueId: number;
   myTeamId: number;
@@ -20,6 +18,7 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
   const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
   const [managerCount, setManagerCount] = useState(0);
   const [activeSize, setActiveSize] = useState(2);
+  const [phase, setPhase] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +32,7 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
       setTeams(lb.teams);
       setManagerCount(lb.managerCount ?? lb.teams.length);
       if (lb.activeSize) setActiveSize(lb.activeSize);
+      setPhase(lb.phase);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
@@ -62,6 +62,10 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
   }
 
   const colStyle: React.CSSProperties = { color: C.txt2, fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 };
+
+  // Derive round columns from phase (e.g., "round3" → [1,2,3], "cut" → [1,2], "final" → [1,2,3,4])
+  const phaseRound = phase.startsWith("round") ? Number(phase.replace("round", "")) : phase === "cut" ? 2 : phase === "final" ? 4 : 0;
+  const roundCols = phaseRound > 0 ? Array.from({ length: phaseRound }, (_, i) => i + 1) : [];
 
   return (
     <div>
@@ -125,34 +129,71 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
                           <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{team.managerName}</p>
                         </div>
                       </div>
-                      <div style={{ flexShrink: 0, textAlign: "right" }}>
-                        <p style={{ fontSize: 16, fontWeight: 700, color: team.totalPoints > 0 ? C.txt : C.txt3, margin: 0 }}>{team.totalPoints > 0 ? team.totalPoints : "-"}</p>
-                        <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{projTotal > 0 ? projTotal : "-"}</p>
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        <span style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          width: 36, height: 36, borderRadius: "50%",
+                          background: `linear-gradient(${tColor ? `${tColor}20` : C.card2}, ${tColor ? `${tColor}20` : C.card2}), ${C.card}`,
+                          color: tColor ?? C.txt2, fontSize: 14, fontWeight: 700,
+                          border: `1px solid ${tColor ?? C.border}`,
+                        }}>{team.totalPoints > 0 ? team.totalPoints : "-"}</span>
+                        {projTotal > 0 && (
+                          <span style={{
+                            position: "absolute", bottom: -4, right: -6, zIndex: 2,
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            background: C.card, borderRadius: 3, padding: "0 1px",
+                            color: C.txt2, fontSize: 9, fontWeight: 700,
+                            boxShadow: `0 0 0 1px ${C.card}`,
+                          }}>{projTotal}</span>
+                        )}
                       </div>
                     </div>
                     <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
                       <div style={{ display: "flex", alignItems: "center", fontSize: 10, fontWeight: 600, color: C.txt3, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>
                         <span style={{ width: 32, flexShrink: 0 }}>POS</span>
                         <span style={{ flex: 1 }} />
-                        <span style={{ width: 28, textAlign: "center", flexShrink: 0 }}>RND</span>
+                        {roundCols.map((r) => (
+                          <span key={r} style={{ width: 28, textAlign: "center", flexShrink: 0 }}>R{r}</span>
+                        ))}
+                        {roundCols.length === 0 && <span style={{ width: 28, textAlign: "center", flexShrink: 0 }}>RND</span>}
                         <span style={{ width: 28, textAlign: "center", flexShrink: 0 }}>THR</span>
                         <span style={{ width: 28, textAlign: "center", flexShrink: 0 }}>TOT</span>
                         <span style={{ width: 32, textAlign: "right", flexShrink: 0 }}>PTS</span>
                       </div>
                       {activePlayers.map((p) => {
                         const hasPos = p.status === "active" && p.position > 0;
-                        const posLabel = hasPos ? `${p.positionTied ? "T" : ""}${p.position}` : "-";
+                        const posLabel = p.status === "cut" ? "MC" : hasPos ? `${p.positionTied ? "T" : ""}${p.position}` : "-";
                         const tot = p.status === "active" ? p.toParDisplay : (p.totalScore > 0 ? `${p.totalScore}` : "-");
                         const thru = p.holesThru === 18 ? "F" : (p.holesThru > 0 ? p.holesThru : "-");
-                        const rnd = p.currentRound > 0 ? p.currentRound : "-";
                         const statStyle: React.CSSProperties = { color: C.txt3, fontWeight: 600, flexShrink: 0, width: 28, textAlign: "center" as const };
+
+                        const roundColValues = roundCols.map((r) => {
+                          if (r < p.currentRound) {
+                            return { val: `${p.rounds[r - 1] ?? "-"}`, color: C.txt };
+                          } else if (r === p.currentRound) {
+                            if (p.holesThru === 0) return { val: "-", color: C.txt3 };
+                            if (p.holesThru === 18) return { val: `${p.currentRoundStrokes}`, color: C.txt };
+                            const tp = p.currentRoundToPar;
+                            return { val: tp === 0 ? "E" : tp > 0 ? `+${tp}` : `${tp}`, color: tp < 0 ? C.green : tp > 0 ? C.red : C.txt3 };
+                          } else {
+                            return { val: "-", color: C.txt3 };
+                          }
+                        });
+
+                        // Abbreviate name: "Scottie Scheffler" → "S.Scheffler"
+                        const nameParts = p.name.split(" ");
+                        const shortName = nameParts.length > 1 ? `${nameParts[0][0]}.${nameParts.slice(1).join(" ")}` : p.name;
+
                         return (
                           <div key={p.playerId} style={{ display: "flex", alignItems: "center", fontSize: 13 }}>
-                            <span style={{ color: C.txt3, fontWeight: 600, width: 32, flexShrink: 0 }}>{posLabel}</span>
+                            <span style={{ color: p.status === "cut" ? C.red : C.txt3, fontWeight: 600, width: 32, flexShrink: 0 }}>{posLabel}</span>
                             <span style={{ color: C.txt2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, flex: 1 }}>
-                              {p.name}
+                              {shortName}
                             </span>
-                            <span style={statStyle}>{rnd}</span>
+                            {roundColValues.map((rv, i) => (
+                              <span key={i} style={{ ...statStyle, color: rv.color }}>{rv.val}</span>
+                            ))}
+                            {roundCols.length === 0 && <span style={statStyle}>-</span>}
                             <span style={statStyle}>{thru}</span>
                             <span style={{ ...statStyle, color: p.status === "active" ? (p.toPar < 0 ? C.green : p.toPar > 0 ? C.red : C.txt3) : C.txt3 }}>{tot}</span>
                             <span style={{ color: p.points > 0 ? C.txt : C.txt3, fontWeight: 600, flexShrink: 0, width: 32, textAlign: "right" }}>{p.points > 0 ? p.points : "-"}</span>
@@ -163,7 +204,9 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
                         <div key={`empty-${i}`} style={{ display: "flex", alignItems: "center", fontSize: 13 }}>
                           <span style={{ color: C.txt3, fontWeight: 600, width: 32, flexShrink: 0 }}>-</span>
                           <span style={{ color: C.txt3, fontStyle: "italic", flex: 1 }}>Empty slot</span>
-                          <span style={{ color: C.txt3, fontWeight: 600, flexShrink: 0, width: 28, textAlign: "center" }}>-</span>
+                          {(roundCols.length > 0 ? roundCols : [0]).map((_, j) => (
+                            <span key={j} style={{ color: C.txt3, fontWeight: 600, flexShrink: 0, width: 28, textAlign: "center" }}>-</span>
+                          ))}
                           <span style={{ color: C.txt3, fontWeight: 600, flexShrink: 0, width: 28, textAlign: "center" }}>-</span>
                           <span style={{ color: C.txt3, fontWeight: 600, flexShrink: 0, width: 28, textAlign: "center" }}>-</span>
                           <span style={{ color: C.txt3, fontWeight: 600, flexShrink: 0, width: 32, textAlign: "right" }}>-</span>
