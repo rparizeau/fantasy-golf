@@ -96,6 +96,7 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
                 const rankLabel = `${tied ? "T" : ""}${rank}`;
                 const activePlayers = team.players.filter((p) => p.isActive);
                 const projTotal = team.projectedRoundPoints.reduce((a, b) => a + b, 0);
+                const isLeader = rank === 1;
                 return (
                   <div
                     key={team.teamId}
@@ -103,27 +104,33 @@ export function Home({ leagueId, myTeamId, colors: C, tournaments, currentTourna
                       background: C.card,
                       borderRadius: 12,
                       border: `1px solid ${isMe ? (tColor ?? C.green) : C.border}`,
-                      padding: "14px 14px",
+                      padding: isLeader ? "0 14px 14px" : "14px 14px",
                       marginBottom: 6,
-                      overflow: "visible",
+                      overflow: "hidden",
                       boxShadow: isMe ? `0 0 0 1px ${(tColor ?? C.green)}40` : undefined,
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
-                        <div style={{ position: "relative", flexShrink: 0, overflow: "visible" }}>
-                          <ManagerIcon size={34} bgColor={team.color ?? "#2D6B4A"} />
-                          {rank > 0 && (
-                            <span style={{
-                              position: "absolute", top: -4, left: -6, zIndex: 2,
-                              display: "inline-flex", alignItems: "center", justifyContent: "center",
-                              minWidth: 20, height: 18, borderRadius: 5,
-                              background: `linear-gradient(${tColor ? `${tColor}20` : C.card2}, ${tColor ? `${tColor}20` : C.card2}), ${C.card}`,
-                              color: tColor ?? C.txt2, fontSize: 11, fontWeight: 700, padding: "0 4px",
-                              border: `1px solid ${tColor ?? C.border}`,
-                            }}>{rankLabel}</span>
-                          )}
-                        </div>
+                    {isLeader && (
+                      <div style={{ background: tColor ?? C.txt3, margin: "0 -14px", padding: "3px 0", textAlign: "center", marginBottom: 10, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.2, color: "#fff", lineHeight: 1 }}>Leader of the Pack</span>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+                      <span style={{
+                        width: 32, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "flex-start",
+                      }}>
+                        {rank > 0 && (
+                          <span style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            minWidth: 20, height: 18, borderRadius: 5,
+                            background: `linear-gradient(${tColor ? `${tColor}20` : C.card2}, ${tColor ? `${tColor}20` : C.card2}), ${C.card}`,
+                            color: tColor ?? C.txt2, fontSize: 11, fontWeight: 700, padding: "0 4px",
+                            border: `1px solid ${tColor ?? C.border}`,
+                          }}>{rankLabel}</span>
+                        )}
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
+                        <ManagerIcon size={28} bgColor={team.color ?? "#2D6B4A"} />
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <p style={{ fontSize: 16, fontWeight: 700, color: C.txt, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{team.teamName}</p>
                           <p style={{ fontSize: 11, color: C.txt3, margin: "2px 0 0" }}>{team.managerName}</p>
