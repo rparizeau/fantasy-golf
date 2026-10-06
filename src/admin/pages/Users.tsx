@@ -47,37 +47,32 @@ export function Users() {
       {error && <div style={{ ...list.empty, color: C.red }}>{error}</div>}
 
       {!error && (
-        <div style={list.card}>
-          <table style={list.table}>
+        <div className="adm-card">
+          <table className="adm-table adm-users">
             <thead>
               <tr>
-                <th style={list.th}>User</th>
-                <th style={list.th}>Email</th>
-                <th style={{ ...list.th, textAlign: "right" }}>Teams</th>
-                <th style={list.th}>App experience</th>
+                <th>User</th>
+                <th>Email</th>
+                <th className="num">Teams</th>
+                <th>App experience</th>
               </tr>
             </thead>
             <tbody>
               {visible.map((u) => (
                 <tr key={u.id}>
-                  <td style={list.td}>
+                  <td className="c-user">
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <span style={{ width: 32, height: 32, borderRadius: "50%", background: C.card2, color: C.txt2, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>
                         {initials(u.name)}
                       </span>
-                      <span style={{ fontWeight: 600 }}>{u.name}</span>
+                      <span style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{u.name}</span>
                     </div>
                   </td>
-                  <td style={{ ...list.td, color: C.txt2 }}>{u.email}</td>
-                  <td style={{ ...list.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{u.teamCount}</td>
-                  <td style={list.td}>
+                  <td className="c-email">{u.email}</td>
+                  <td className="c-count num" data-label="Teams">{u.teamCount}</td>
+                  <td className="c-preview">
                     {/* Stub: design only. Wiring (read-only preview + audit log) is a later phase. */}
-                    <a
-                      href="#"
-                      onClick={(e) => e.preventDefault()}
-                      aria-label={`Preview app as ${u.name}`}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.card, color: C.txt, fontSize: 13, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap" }}
-                    >
+                    <a href="#" className="adm-plink" onClick={(e) => e.preventDefault()} aria-label={`Preview app as ${u.name}`}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6" />
                       </svg>

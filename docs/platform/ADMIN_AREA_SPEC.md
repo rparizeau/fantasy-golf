@@ -98,13 +98,27 @@ Conventions follow the existing codebase: inline style objects, no new dependenc
 - Rail hover or keyboard focus expands it **over** the page, without reflowing the content. The toggle becomes "keep navigation open" to pin it.
 - Collapsed/pinned preference is remembered in `localStorage`.
 - The user button is always the last item, pinned to the bottom of the nav (the nav is full viewport height, sticky).
-- Narrow screens: the nav stacks above the content.
+- Phones (<768px): the nav is an off-canvas drawer opened from a menu button in the top bar. It has a backdrop, closes on backdrop tap, Escape or choosing a page, and keeps the user button at the bottom. The collapse/rail behavior above applies at >=768px only.
 
 ### 4.2 Season bar
 Sticky top bar with a season dropdown. It contains only the current year (derived from the date), selected, with no past seasons. A "Current season" badge sits next to it. The selection is not yet consumed by any page.
 
 ### 4.3 User button (stub)
 Shows the admin's initials and display name from `useAuth()`. It is a button with no click behavior and no menu. A `TODO` marks where the menu goes.
+
+### 4.4 Responsive (mobile first)
+Base CSS is the phone layout and `@media (min-width: 768px)` adds the desktop enhancements.
+
+| | Phone (<768px) | >=768px |
+|---|---|---|
+| Nav | off-canvas drawer, 48px rows | sticky rail / expanded nav |
+| Top bar | menu button + season select | season label, select, badge |
+| Page padding | 16px | 32px |
+| Leagues / Users | stacked cards, one per row | tables |
+| Tap targets | >=44px (chips, buttons, inputs) | 36-40px |
+| Search inputs | 16px font (stops iOS zoom-on-focus) | same |
+
+The Simulator already used wrapping flex rows, a horizontally scrolling table and bottom-sheet modals, so it is unchanged apart from the 16px search font.
 
 ## 5. Data
 
@@ -159,6 +173,8 @@ Verification: `npm run build` (type-check + bundle) must pass, and the server mu
 - [ ] User button is at the bottom at any window height and does nothing when clicked
 - [ ] Leagues and Users show real rows; search works
 - [ ] Simulator list loads more rows as you scroll; search still works
+- [ ] On a phone-width window: menu button opens the drawer; backdrop, Escape and choosing a page close it
+- [ ] On a phone-width window: Leagues and Users show as cards, nothing scrolls sideways, and the user button is at the bottom of the drawer
 - [ ] Player app (lobby, league pages, polling) is unaffected
 
 ## 8. Release / safety

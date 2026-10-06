@@ -50,8 +50,8 @@ export function Leagues() {
         subtitle={rows ? `${rows.length} leagues · ${totalManagers} managers` : undefined}
       />
 
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
-        <label style={{ ...list.searchWrap, flex: "0 1 320px" }}>
+      <div className="adm-filters">
+        <label style={{ ...list.searchWrap, flex: "1 1 260px" }}>
           <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Search leagues</span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.txt2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={list.searchIcon}>
             <circle cx="11" cy="11" r="7" />
@@ -59,58 +59,38 @@ export function Leagues() {
           </svg>
           <input type="search" placeholder="Search leagues or owners..." value={query} onChange={(e) => setQuery(e.target.value)} style={list.searchInput} />
         </label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {FILTERS.map((f) => {
-            const on = f === filter;
-            return (
-              <button
-                key={f}
-                type="button"
-                aria-pressed={on}
-                onClick={() => setFilter(f)}
-                style={{
-                  height: 36,
-                  padding: "0 14px",
-                  borderRadius: 999,
-                  border: `1px solid ${on ? C.txt : C.border}`,
-                  background: on ? C.txt : C.card,
-                  color: on ? "#fff" : C.txt,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  fontFamily: "inherit",
-                  cursor: "pointer",
-                }}
-              >
-                {f} <span style={{ fontWeight: 400, opacity: 0.75 }}>{counts[f] ?? 0}</span>
-              </button>
-            );
-          })}
+        <div className="adm-chips">
+          {FILTERS.map((f) => (
+            <button key={f} type="button" aria-pressed={f === filter} className={f === filter ? "adm-chip on" : "adm-chip"} onClick={() => setFilter(f)}>
+              {f} <span style={{ fontWeight: 400, opacity: 0.75 }}>{counts[f] ?? 0}</span>
+            </button>
+          ))}
         </div>
       </div>
 
       {error && <div style={{ ...list.empty, color: C.red }}>{error}</div>}
 
       {!error && (
-        <div style={list.card}>
-          <table style={list.table}>
+        <div className="adm-card">
+          <table className="adm-table adm-leagues">
             <thead>
               <tr>
-                <th style={list.th}>League</th>
-                <th style={list.th}>Owner</th>
-                <th style={{ ...list.th, textAlign: "right" }}>Managers</th>
-                <th style={list.th}>Status</th>
+                <th>League</th>
+                <th>Owner</th>
+                <th className="num">Managers</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {visible.map((l) => (
                 <tr key={l.id}>
-                  <td style={{ ...list.td, fontWeight: 600 }}>{l.name}</td>
-                  <td style={list.td}>
+                  <td className="c-name">{l.name}</td>
+                  <td className="c-owner">
                     <div style={{ fontWeight: 500 }}>{l.ownerName}</div>
-                    <div style={list.muted}>{l.ownerEmail}</div>
+                    <div className="adm-sub">{l.ownerEmail}</div>
                   </td>
-                  <td style={{ ...list.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{l.managerCount}</td>
-                  <td style={list.td}>
+                  <td className="c-count num" data-label="Managers">{l.managerCount}</td>
+                  <td className="c-status">
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, fontSize: 13, fontWeight: 500, background: STATUS_STYLE[l.status].bg, color: STATUS_STYLE[l.status].fg }}>
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: STATUS_STYLE[l.status].fg }} />
                       {l.status}

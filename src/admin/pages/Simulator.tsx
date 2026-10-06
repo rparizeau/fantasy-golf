@@ -823,7 +823,7 @@ export function Simulator() {
         placeholder="Search players..."
         value={searchQuery}
         onChange={(e) => { setSearchQuery(e.target.value); setVisibleCount(PAGE_STEP); }}
-        style={{ ...styles.input, marginTop: 12, marginBottom: 10, maxWidth: 320 }}
+        style={{ ...styles.input, marginTop: 12, marginBottom: 10, maxWidth: 320, fontSize: 16 }}
       />
 
       {/* Leaderboard Table */}

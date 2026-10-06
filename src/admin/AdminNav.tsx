@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { themes } from "../theme";
 import { useAuth } from "../context/AuthContext";
@@ -18,6 +18,9 @@ const NAV_ITEMS = [
 interface AdminNavProps {
   collapsed: boolean;
   onToggle: () => void;
+  /** Phone drawer state (the rail/collapse behavior only applies at >=768px). */
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
 }
 
 /**
@@ -25,20 +28,28 @@ interface AdminNavProps {
  * focusing the rail expands it over the page without reflowing the content
  * (see the .adm-* rules in AdminLayout).
  */
-export function AdminNav({ collapsed, onToggle }: AdminNavProps) {
+export function AdminNav({ collapsed, onToggle, mobileOpen, onCloseMobile }: AdminNavProps) {
   const { manager } = useAuth();
   // After a nav click, keep the rail closed until the pointer leaves it.
   const [closed, setClosed] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // Move focus into the drawer when it opens on a phone.
+  useEffect(() => {
+    if (mobileOpen) closeRef.current?.focus();
+  }, [mobileOpen]);
+
+  const wrapClass = ["adm-wrap", collapsed ? "adm-rail" : "", collapsed && closed ? "adm-closed" : "", mobileOpen ? "adm-open" : ""]
+    .filter(Boolean)
+    .join(" ");
   const name = manager?.displayName ?? "";
   const initials = name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "?";
 
   return (
-    <div
-      className={collapsed ? (closed ? "adm-wrap adm-rail adm-closed" : "adm-wrap adm-rail") : "adm-wrap"}
-      style={{ width: collapsed ? 68 : 240 }}
-      onMouseLeave={() => setClosed(false)}
-    >
-      <aside className="adm-side" style={{ width: collapsed ? 68 : 240 }}>
+    <>
+    <div className={`adm-backdrop${mobileOpen ? " adm-open" : ""}`} onClick={onCloseMobile} aria-hidden="true" />
+    <div className={wrapClass} onMouseLeave={() => setClosed(false)}>
+      <aside className="adm-side" aria-label="Admin navigation">
         <div style={{ display: "flex", alignItems: "center", gap: 4, height: 44 }}>
           <div style={{ width: 48, flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <img src="/icon.svg" alt="Fantasy Golf" width={32} height={32} style={{ display: "block" }} />
@@ -47,7 +58,14 @@ export function AdminNav({ collapsed, onToggle }: AdminNavProps) {
             <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: C.txt }}>Fantasy Golf</span>
             <span style={{ display: "block", fontSize: 12, color: C.txt2 }}>Admin</span>
           </div>
-          <div className="adm-lbl">
+          <div className="adm-close">
+            <button ref={closeRef} type="button" className="adm-iconbtn" onClick={onCloseMobile} aria-label="Close menu">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="adm-lbl adm-toggle">
             <button
               type="button"
               className="adm-iconbtn"
@@ -71,7 +89,7 @@ export function AdminNav({ collapsed, onToggle }: AdminNavProps) {
               to={item.to}
               className={({ isActive }) => (isActive ? "adm-nav on" : "adm-nav")}
               aria-label={item.label}
-              onClick={() => setClosed(true)}
+              onClick={() => { setClosed(true); onCloseMobile(); }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: "0 0 auto" }}>
                 <path d={item.icon} />
@@ -95,5 +113,6 @@ export function AdminNav({ collapsed, onToggle }: AdminNavProps) {
         </div>
       </aside>
     </div>
+    </>
   );
 }
