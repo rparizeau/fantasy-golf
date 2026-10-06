@@ -13,7 +13,7 @@ import {
   type LeaderboardPlayer,
   type TournamentListItem,
   type Leaderboard as _Leaderboard,
-} from "../api";
+} from "../../api";
 
 const PHASE_LABELS: Record<string, string> = {
   idle: "Idle — Waiting to Start",
@@ -452,7 +452,7 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
 
 // --- SimPanel ---
 
-export function SimPanel() {
+export function Simulator() {
   const [sim, setSim] = useState<SimStatus | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
   const [holePars, setHolePars] = useState<number[] | undefined>(undefined);
@@ -678,7 +678,7 @@ export function SimPanel() {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Sim Panel</h1>
+      <h1 style={styles.title}>Simulator</h1>
 
       {/* Tournament Tabs */}
       <div style={styles.tabBar}>
@@ -1332,12 +1332,8 @@ const modal: Record<string, React.CSSProperties> = {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    maxWidth: 960,
-    margin: "0 auto",
-    padding: "12px 16px 100px",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    background: "#F4F5F7",
-    minHeight: "100vh",
+    // Page chrome (background, padding, font) now comes from AdminLayout.
+    maxWidth: 1100,
   },
   title: {
     fontSize: 22,
