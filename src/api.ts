@@ -53,51 +53,51 @@ export interface SimStatus {
 }
 
 export function getSimState() {
-  return fetchJSON<SimStatus>("/sim/state");
+  return fetchJSON<SimStatus>("/admin/simulator/state");
 }
 
 export function advanceSim(holes?: number) {
   return fetchJSON<{ phase: string; currentRound: number; activePlayers?: number; cutPlayers?: number; cutLine?: number | null; holesPlayed: number }>(
-    "/sim/advance",
+    "/admin/simulator/advance",
     { method: "POST", body: JSON.stringify({ holes }) }
   );
 }
 
 export function setOverride(playerId: number, override: { score?: number; wd?: boolean }) {
-  return fetchJSON<{ overrides: Record<number, unknown> }>("/sim/override", {
+  return fetchJSON<{ overrides: Record<number, unknown> }>("/admin/simulator/override", {
     method: "POST",
     body: JSON.stringify({ playerId, ...override }),
   });
 }
 
 export function updatePlayer(playerId: number, updates: { rounds?: (number | null)[]; status?: string; holeScores?: ((number | null)[] | null)[] }) {
-  return fetchJSON<{ ok: boolean }>("/sim/player/update", {
+  return fetchJSON<{ ok: boolean }>("/admin/simulator/player/update", {
     method: "POST",
     body: JSON.stringify({ playerId, ...updates }),
   });
 }
 
 export function rewindSim() {
-  return fetchJSON<{ phase: string; currentRound: number }>("/sim/rewind", { method: "POST" });
+  return fetchJSON<{ phase: string; currentRound: number }>("/admin/simulator/rewind", { method: "POST" });
 }
 
 export function completeSim() {
-  return fetchJSON<{ completed: boolean; nextTournamentId: number | null; nextTournamentName: string | null }>("/sim/complete", { method: "POST" });
+  return fetchJSON<{ completed: boolean; nextTournamentId: number | null; nextTournamentName: string | null }>("/admin/simulator/complete", { method: "POST" });
 }
 
 export function rollbackSim() {
-  return fetchJSON<{ phase: string; tournamentId: number }>("/sim/rollback", { method: "POST" });
+  return fetchJSON<{ phase: string; tournamentId: number }>("/admin/simulator/rollback", { method: "POST" });
 }
 
 export function resetSim(tournamentId?: number) {
-  return fetchJSON<{ phase: string; tournamentId: number; fieldSize: number }>("/sim/reset", {
+  return fetchJSON<{ phase: string; tournamentId: number; fieldSize: number }>("/admin/simulator/reset", {
     method: "POST",
     body: JSON.stringify({ tournamentId }),
   });
 }
 
 export function setHotStreaks(players: { playerId: number; tier: string }[]) {
-  return fetchJSON<{ hotStreaks: Record<number, string> }>("/sim/hot-streak", {
+  return fetchJSON<{ hotStreaks: Record<number, string> }>("/admin/simulator/hot-streak", {
     method: "POST",
     body: JSON.stringify({ players }),
   });
@@ -516,4 +516,32 @@ export function joinLeague(inviteCode: string, teamName?: string) {
     method: "POST",
     body: JSON.stringify({ inviteCode, teamName }),
   });
+}
+
+// --- Admin ---
+
+export type AdminLeagueStatus = "Setup" | "Drafting" | "Active";
+
+export interface AdminLeague {
+  id: number;
+  name: string;
+  ownerName: string;
+  ownerEmail: string;
+  managerCount: number;
+  status: AdminLeagueStatus;
+}
+
+export interface AdminUser {
+  id: number;
+  name: string;
+  email: string;
+  teamCount: number;
+}
+
+export function getAdminLeagues() {
+  return fetchJSON<AdminLeague[]>("/admin/leagues");
+}
+
+export function getAdminUsers() {
+  return fetchJSON<AdminUser[]>("/admin/users");
 }

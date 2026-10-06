@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth.js";
 import simRoutes from "./routes/sim.js";
+import adminRoutes from "./routes/admin.js";
 import simVersionRoutes from "./routes/sim-version.js";
 import tournamentRoutes from "./routes/tournament.js";
 import leagueRoutes from "./routes/league.js";
@@ -22,7 +23,9 @@ app.use(express.json());
 // API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/sim", requireAuth, simVersionRoutes);
-app.use("/api/sim", requireAdmin, simRoutes);
+// Admin namespace — everything under /api/admin requires an admin.
+app.use("/api/admin/simulator", requireAdmin, simRoutes);
+app.use("/api/admin", requireAdmin, adminRoutes);
 app.use("/api/tournament", tournamentRoutes);
 app.use("/api/league", requireAuth, leagueRoutes);
 app.use("/api/league", requireAuth, playerRoutes);
