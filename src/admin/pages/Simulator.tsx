@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   getSimState,
   advanceSim,
@@ -460,8 +460,10 @@ export function Simulator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(0);
-  const pageSize = 20;
+  // Continuous scroll: render the leaderboard in chunks as the sentinel below the table scrolls into view.
+  const PAGE_STEP = 25;
+  const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const [editingPlayer, setEditingPlayer] = useState<LeaderboardPlayer | null>(null);
   const [advanceModalRound, setAdvanceModalRound] = useState<number | null>(null);
 
@@ -486,7 +488,7 @@ export function Simulator() {
     if (sim && tournamentId === sim.tournamentId) return;
     setLoading(true);
     setSearchQuery("");
-    setPage(0);
+    setVisibleCount(PAGE_STEP);
     try {
       await resetSim(tournamentId);
       await refresh();
@@ -667,8 +669,20 @@ export function Simulator() {
     ? sortedLeaderboard.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : sortedLeaderboard;
 
-  const totalPages = Math.ceil(filteredPlayers.length / pageSize);
-  const displayedPlayers = filteredPlayers.slice(page * pageSize, (page + 1) * pageSize);
+  const displayedPlayers = filteredPlayers.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredPlayers.length;
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) setVisibleCount((n) => n + PAGE_STEP); },
+      { rootMargin: "300px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // visibleCount: re-observe after each chunk so a still-visible sentinel keeps loading.
+  }, [hasMore, visibleCount]);
 
   const activeTournament = tournaments.find((t) => t.id === sim?.tournamentId);
 
@@ -808,7 +822,7 @@ export function Simulator() {
         type="text"
         placeholder="Search players..."
         value={searchQuery}
-        onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+        onChange={(e) => { setSearchQuery(e.target.value); setVisibleCount(PAGE_STEP); }}
         style={{ ...styles.input, marginTop: 12, marginBottom: 10, maxWidth: 320 }}
       />
 
@@ -930,28 +944,16 @@ export function Simulator() {
           </table>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={styles.pagination}>
-            <button
-              style={styles.pageBtn}
-              onClick={() => setPage((p) => p - 1)}
-              disabled={page === 0}
-            >
-              Prev
-            </button>
-            <span style={styles.pageInfo}>
-              {page + 1} of {totalPages}
-            </span>
-            <button
-              style={styles.pageBtn}
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page >= totalPages - 1}
-            >
-              Next
-            </button>
-          </div>
-        )}
+        {/* Continuous scroll sentinel */}
+        <div ref={sentinelRef} style={styles.pagination}>
+          <span style={styles.pageInfo}>
+            {filteredPlayers.length === 0
+              ? ""
+              : hasMore
+                ? `Showing ${displayedPlayers.length} of ${filteredPlayers.length} players`
+                : `All ${filteredPlayers.length} players loaded`}
+          </span>
+        </div>
       </div>
 
       {/* Player Edit Modal */}
@@ -1489,16 +1491,6 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 12,
     marginTop: 12,
-  },
-  pageBtn: {
-    padding: "8px 16px",
-    borderRadius: 8,
-    border: "1px solid #E2E5EA",
-    background: "#fff",
-    color: "#1A1D21",
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: "pointer",
   },
   pageInfo: {
     fontSize: 12,
