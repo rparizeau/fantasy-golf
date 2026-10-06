@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { themes } from "../theme";
 import { useAuth } from "../context/AuthContext";
@@ -26,11 +27,17 @@ interface AdminNavProps {
  */
 export function AdminNav({ collapsed, onToggle }: AdminNavProps) {
   const { manager } = useAuth();
+  // After a nav click, keep the rail closed until the pointer leaves it.
+  const [closed, setClosed] = useState(false);
   const name = manager?.displayName ?? "";
   const initials = name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "?";
 
   return (
-    <div className={collapsed ? "adm-wrap adm-rail" : "adm-wrap"} style={{ width: collapsed ? 68 : 240 }}>
+    <div
+      className={collapsed ? (closed ? "adm-wrap adm-rail adm-closed" : "adm-wrap adm-rail") : "adm-wrap"}
+      style={{ width: collapsed ? 68 : 240 }}
+      onMouseLeave={() => setClosed(false)}
+    >
       <aside className="adm-side" style={{ width: collapsed ? 68 : 240 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 4, height: 44 }}>
           <div style={{ width: 48, flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -64,6 +71,7 @@ export function AdminNav({ collapsed, onToggle }: AdminNavProps) {
               to={item.to}
               className={({ isActive }) => (isActive ? "adm-nav on" : "adm-nav")}
               aria-label={item.label}
+              onClick={() => setClosed(true)}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: "0 0 auto" }}>
                 <path d={item.icon} />

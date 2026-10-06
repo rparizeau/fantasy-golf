@@ -31,9 +31,9 @@ html,body{margin:0;padding:0;height:100%}
 .adm-iconbtn:hover{background:#F0F1F3}
 .adm-rail .adm-lbl{display:none}
 .adm-rail .adm-nav{padding:0;justify-content:center}
-.adm-rail:hover .adm-side,.adm-rail:focus-within .adm-side{width:240px!important;box-shadow:8px 0 24px rgba(17,24,39,.12)}
-.adm-rail:hover .adm-lbl,.adm-rail:focus-within .adm-lbl{display:inline-block}
-.adm-rail:hover .adm-nav,.adm-rail:focus-within .adm-nav{padding:0 12px;justify-content:flex-start}
+.adm-rail:not(.adm-closed):hover .adm-side,.adm-rail:has(:focus-visible) .adm-side{width:240px!important;box-shadow:8px 0 24px rgba(17,24,39,.12)}
+.adm-rail:not(.adm-closed):hover .adm-lbl,.adm-rail:has(:focus-visible) .adm-lbl{display:inline-block}
+.adm-rail:not(.adm-closed):hover .adm-nav,.adm-rail:has(:focus-visible) .adm-nav{padding:0 12px;justify-content:flex-start}
 @media (max-width:760px){
   .adm-wrap{position:static!important;width:100%!important;height:auto!important;min-height:0!important}
   .adm-side{position:relative!important;width:100%!important;height:auto!important;box-shadow:none!important}
