@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   getSimState,
   advanceSim,
@@ -13,7 +13,7 @@ import {
   type LeaderboardPlayer,
   type TournamentListItem,
   type Leaderboard as _Leaderboard,
-} from "../api";
+} from "../../api";
 
 const PHASE_LABELS: Record<string, string> = {
   idle: "Idle — Waiting to Start",
@@ -452,7 +452,7 @@ function PlayerEditModal({ player, par, holePars, onSave, onClose }: ModalProps)
 
 // --- SimPanel ---
 
-export function SimPanel() {
+export function Simulator() {
   const [sim, setSim] = useState<SimStatus | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
   const [holePars, setHolePars] = useState<number[] | undefined>(undefined);
@@ -460,8 +460,10 @@ export function SimPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(0);
-  const pageSize = 20;
+  // Continuous scroll: render the leaderboard in chunks as the sentinel below the table scrolls into view.
+  const PAGE_STEP = 25;
+  const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const [editingPlayer, setEditingPlayer] = useState<LeaderboardPlayer | null>(null);
   const [advanceModalRound, setAdvanceModalRound] = useState<number | null>(null);
 
@@ -486,7 +488,7 @@ export function SimPanel() {
     if (sim && tournamentId === sim.tournamentId) return;
     setLoading(true);
     setSearchQuery("");
-    setPage(0);
+    setVisibleCount(PAGE_STEP);
     try {
       await resetSim(tournamentId);
       await refresh();
@@ -667,8 +669,20 @@ export function SimPanel() {
     ? sortedLeaderboard.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : sortedLeaderboard;
 
-  const totalPages = Math.ceil(filteredPlayers.length / pageSize);
-  const displayedPlayers = filteredPlayers.slice(page * pageSize, (page + 1) * pageSize);
+  const displayedPlayers = filteredPlayers.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredPlayers.length;
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) setVisibleCount((n) => n + PAGE_STEP); },
+      { rootMargin: "300px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // visibleCount: re-observe after each chunk so a still-visible sentinel keeps loading.
+  }, [hasMore, visibleCount]);
 
   const activeTournament = tournaments.find((t) => t.id === sim?.tournamentId);
 
@@ -678,7 +692,7 @@ export function SimPanel() {
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Sim Panel</h1>
+      <h1 style={styles.title}>Simulator</h1>
 
       {/* Tournament Tabs */}
       <div style={styles.tabBar}>
@@ -808,8 +822,8 @@ export function SimPanel() {
         type="text"
         placeholder="Search players..."
         value={searchQuery}
-        onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
-        style={{ ...styles.input, marginTop: 12, marginBottom: 10, maxWidth: 320 }}
+        onChange={(e) => { setSearchQuery(e.target.value); setVisibleCount(PAGE_STEP); }}
+        style={{ ...styles.input, marginTop: 12, marginBottom: 10, maxWidth: 320, fontSize: 16 }}
       />
 
       {/* Leaderboard Table */}
@@ -930,28 +944,16 @@ export function SimPanel() {
           </table>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={styles.pagination}>
-            <button
-              style={styles.pageBtn}
-              onClick={() => setPage((p) => p - 1)}
-              disabled={page === 0}
-            >
-              Prev
-            </button>
-            <span style={styles.pageInfo}>
-              {page + 1} of {totalPages}
-            </span>
-            <button
-              style={styles.pageBtn}
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page >= totalPages - 1}
-            >
-              Next
-            </button>
-          </div>
-        )}
+        {/* Continuous scroll sentinel */}
+        <div ref={sentinelRef} style={styles.pagination}>
+          <span style={styles.pageInfo}>
+            {filteredPlayers.length === 0
+              ? ""
+              : hasMore
+                ? `Showing ${displayedPlayers.length} of ${filteredPlayers.length} players`
+                : `All ${filteredPlayers.length} players loaded`}
+          </span>
+        </div>
       </div>
 
       {/* Player Edit Modal */}
@@ -1332,12 +1334,8 @@ const modal: Record<string, React.CSSProperties> = {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    maxWidth: 960,
-    margin: "0 auto",
-    padding: "12px 16px 100px",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    background: "#F4F5F7",
-    minHeight: "100vh",
+    // Page chrome (background, padding, font) now comes from AdminLayout.
+    maxWidth: 1100,
   },
   title: {
     fontSize: 22,
@@ -1493,16 +1491,6 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 12,
     marginTop: 12,
-  },
-  pageBtn: {
-    padding: "8px 16px",
-    borderRadius: 8,
-    border: "1px solid #E2E5EA",
-    background: "#fff",
-    color: "#1A1D21",
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: "pointer",
   },
   pageInfo: {
     fontSize: 12,
